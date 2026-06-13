@@ -1,0 +1,37 @@
+[
+  {
+    "id": "proj1",
+    "name": "ML Pipeline Modernization",
+    "description": "Redesign the data ingestion and ML training pipeline with modern tooling.",
+    "required_fte": 2.8,
+    "role_requirements": [
+      {"role": "Data Scientist", "seniority": "senior", "count": 1},
+      {"role": "Backend Developer", "count": 1},
+      {"role": "DevOps Engineer", "count": 1}
+    ],
+    "skill_requirements": [
+      {"skill_id": "python", "min_level": 3},
+      {"skill_id": "ml", "min_level": 3},
+      {"skill_id": "docker", "min_level": 2}
+    ],
+    "excluded_person_ids": [],
+    "priority": "high"
+  },
+  {
+    "id": "proj2",
+    "name": "Customer Analytics Dashboard",
+    "description": "Build a real-time customer analytics dashboard with interactive charts.",
+    "required_fte": 2.0,
+    "role_requirements": [
+      {"role": "Frontend Developer", "count": 1},
+      {"role": "Backend Developer", "count": 1}
+    ],
+    "skill_requirements": [
+      {"skill_id": "react", "min_level": 3},
+      {"skill_id": "typescript", "min_level": 3},
+      {"skill_id": "sql", "min_level": 2}
+    ],
+    "excluded_person_ids": [],
+    "priority": "medium"
+  }
+]

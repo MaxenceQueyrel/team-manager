@@ -1,0 +1,12 @@
+[
+  {"id": "python", "name": "Python", "category": "backend"},
+  {"id": "java", "name": "Java", "category": "backend"},
+  {"id": "go", "name": "Go", "category": "backend"},
+  {"id": "react", "name": "React", "category": "frontend"},
+  {"id": "typescript", "name": "TypeScript", "category": "frontend"},
+  {"id": "ml", "name": "Machine Learning", "category": "data"},
+  {"id": "sql", "name": "SQL", "category": "data"},
+  {"id": "devops", "name": "DevOps / CI-CD", "category": "infrastructure"},
+  {"id": "docker", "name": "Docker", "category": "infrastructure"},
+  {"id": "design", "name": "UI/UX Design", "category": "design"}
+]
