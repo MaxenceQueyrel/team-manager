@@ -1,3 +1,18 @@
+# ── Node / Bun ────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.next/
+bun.lockb
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# (keep docker-compose files but ignore generated runtime artifacts)
+
+# ── Byte-compiled / optimized / DLL files ─────────────────────────────────────
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
