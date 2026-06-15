@@ -1,5 +1,7 @@
 .PHONY: dev prod down down-prod logs build \
-        install test test-optimizer test-api \
+        install-backend install-frontend \
+        run-backend run-frontend \
+        test test-optimizer test-api \
         lint-backend lint-frontend
 
 COMPOSE     = docker compose
@@ -8,56 +10,59 @@ PROD_FILE   = -f infra/docker-compose.yml
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 
-dev:          ## Start the full stack in development mode (hot-reload)
+dev:              ## Start the full stack in development mode (hot-reload)
 	$(COMPOSE) $(DEV_FILE) up
 
-build:        ## Build production images without starting
+build:            ## Build production images without starting
 	$(COMPOSE) $(PROD_FILE) build
 
-prod:         ## Build and start the full stack in production mode
+prod:             ## Build and start the full stack in production mode
 	$(COMPOSE) $(PROD_FILE) up --build
 
-down:         ## Stop and remove dev containers
+down:             ## Stop and remove dev containers
 	$(COMPOSE) $(DEV_FILE) down
 
-down-prod:    ## Stop and remove production containers
+down-prod:        ## Stop and remove production containers
 	$(COMPOSE) $(PROD_FILE) down
 
-logs:         ## Tail logs from all dev containers
+logs:             ## Tail logs from all dev containers
 	$(COMPOSE) $(DEV_FILE) logs -f
 
 # ── Local development (without Docker) ───────────────────────────────────────
 
-install:      ## Install all Python workspace dependencies
-	uv sync
+install-backend:  ## Install Python workspace dependencies (optimizer + backend) incl. dev
+	uv sync --all-groups
 
-backend:      ## Run the API server locally with hot-reload
+install-frontend: ## Install frontend dependencies
+	cd frontend && bun install
+
+run-backend:      ## Run the API server locally with hot-reload
 	cd backend && uv run uvicorn api.main:app --reload --port 8000
 
-frontend:     ## Run the frontend dev server locally
+run-frontend:     ## Run the frontend dev server locally
 	cd frontend && bun run dev
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-test:         ## Run all tests
+test:             ## Run all tests
 	$(MAKE) test-optimizer test-api
 
-test-optimizer: ## Run optimizer unit tests
+test-optimizer:   ## Run optimizer unit tests
 	cd optimizer && uv run pytest tests/ -v
 
-test-api:     ## Run backend API tests
+test-api:         ## Run backend API tests
 	cd backend && uv run pytest tests/ -v
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 
-lint-backend: ## Lint optimizer + backend with ruff
+lint-backend:     ## Lint optimizer + backend with ruff
 	uv run ruff check optimizer/src backend/src
 
-lint-frontend: ## Lint frontend with eslint
+lint-frontend:    ## Lint frontend with eslint
 	cd frontend && bun run lint
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
-help:         ## Show this help message
+help:             ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
-	  awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	  awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'

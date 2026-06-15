@@ -15,8 +15,7 @@ React 19 + TypeScript + Vite single-page application, managed with **bun**.
 ## Install dependencies
 
 ```bash
-cd frontend
-bun install
+make install-frontend   # from repo root; runs: cd frontend && bun install
 ```
 
 ---
@@ -24,7 +23,7 @@ bun install
 ## Development server
 
 ```bash
-bun run dev
+make run-frontend       # from repo root; runs: cd frontend && bun run dev
 ```
 
 Opens at <http://localhost:3000> with HMR. The dev server proxies `/api` to the backend — make sure the backend is running too (see [backend/README.md](../backend/README.md)).

@@ -20,14 +20,10 @@ The backend depends on the `optimizer` workspace package — install from the **
 Run from the **repo root** (installs the full workspace: backend + optimizer):
 
 ```bash
-uv sync
+make install-backend   # runs: uv sync --all-groups
 ```
 
-To also install dev dependencies (pytest, ruff, httpx):
-
-```bash
-uv sync --group dev
-```
+This installs both runtime and dev dependencies (pytest, ruff, httpx) for all workspace members.
 
 ---
 
@@ -35,7 +31,7 @@ uv sync --group dev
 
 ```bash
 # From repo root (recommended)
-make backend
+make run-backend
 
 # Or manually from the backend directory
 cd backend

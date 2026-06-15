@@ -80,14 +80,17 @@ cd team-manager
 # 2. Copy env file
 cp .env.example .env
 
-# 3. Install all Python dependencies (optimizer + backend in one shot)
-make install          # runs: uv sync
+# 3. Install Python dependencies (optimizer + backend in one shot)
+make install-backend
 
-# 4. In a first terminal — API server
-make backend          # runs on http://localhost:8000
+# 4. Install frontend dependencies
+make install-frontend
 
-# 5. In a second terminal — Frontend dev server
-make frontend         # runs on http://localhost:3000
+# 5. In a first terminal — API server
+make run-backend      # runs on http://localhost:8000
+
+# 6. In a second terminal — Frontend dev server
+make run-frontend     # runs on http://localhost:3000
 ```
 
 ---
@@ -101,9 +104,10 @@ make down             Stop dev containers
 make down-prod        Stop production containers
 make logs             Tail dev container logs
 
-make install          Install Python workspace dependencies (uv sync)
-make backend          Run API server locally with hot-reload
-make frontend         Run frontend dev server locally
+make install-backend  Install Python workspace dependencies (uv sync)
+make install-frontend Install frontend dependencies (bun install)
+make run-backend      Run API server locally with hot-reload
+make run-frontend     Run frontend dev server locally
 
 make test             Run all tests (optimizer + API)
 make test-optimizer   Run optimizer unit tests only
