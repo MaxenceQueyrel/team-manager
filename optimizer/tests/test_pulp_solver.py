@@ -1,5 +1,5 @@
 import pytest
-from optimizer.solver import TeamAssignmentSolver
+from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.models import (
     AssignmentWeights,
     PersonInput,
@@ -11,7 +11,7 @@ from optimizer.models import (
 
 @pytest.fixture
 def solver():
-    return TeamAssignmentSolver()
+    return PuLPTeamAssignmentSolver()
 
 
 @pytest.fixture

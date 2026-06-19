@@ -1,49 +1,45 @@
-"""
-Domain types for the OR solver.
-No HTTP, no database, no framework — plain Pydantic models only.
-"""
 from pydantic import BaseModel, Field
 
 
 class SkillLevel(BaseModel):
-    skill_id: str
-    level: float = Field(ge=0, le=5)
+    skill_id: str = Field(description="Identifier of the skill.")
+    level: float = Field(ge=0, le=5, description="Proficiency level in the skill, from 0 to 5.")
 
 
 class SkillRequirement(BaseModel):
-    skill_id: str
-    min_level: float = Field(ge=0, le=5)
+    skill_id: str = Field(description="Identifier of the required skill.")
+    min_level: float = Field(ge=0, le=5, description="Minimum proficiency level required, from 0 to 5.")
 
 
 class PersonInput(BaseModel):
-    id: str
-    years_of_experience: float = Field(ge=0)
-    fte_capacity: float = Field(default=1.0, ge=0, le=1)
-    skills: list[SkillLevel] = []
-    growth_targets: list[str] = []           # skill_ids the person wants to learn
-    affinities: dict[str, float] = {}        # person_id → score in [-5, +5]
+    id: str = Field(description="Identifier of the person.")
+    years_of_experience: float = Field(ge=0, description="Number of years of professional experience.")
+    fte_capacity: float = Field(default=1.0, ge=0, le=1, description="Available capacity as a fraction of full-time equivalent.")
+    skills: list[SkillLevel] = Field(default=[], description="Skills the person has, with their proficiency levels.")
+    growth_targets: list[str] = Field(default=[], description="Skill IDs the person wants to learn.")
+    affinities: dict[str, float] = Field(default={}, description="Mapping of person_id to affinity score, in [-5, +5].")
 
 
 class ProjectInput(BaseModel):
-    id: str
-    n_slots: int = Field(default=1, ge=1)    # how many people to assign
-    skill_requirements: list[SkillRequirement] = []
-    excluded_person_ids: list[str] = []
+    id: str = Field(description="Identifier of the project.")
+    n_slots: int = Field(default=1, ge=1, description="Number of people to assign to the project.")
+    skill_requirements: list[SkillRequirement] = Field(default=[], description="Skills required by the project, with minimum levels.")
+    excluded_person_ids: list[str] = Field(default=[], description="Person IDs that must not be assigned to the project.")
 
 
 class AssignmentWeights(BaseModel):
-    performance: float = Field(default=0.25, ge=0, le=1)  # skill fit + seniority
-    chemistry: float = Field(default=0.25, ge=0, le=1)    # pairwise affinity
-    growth: float = Field(default=0.25, ge=0, le=1)       # learning opportunities
-    cost: float = Field(default=0.25, ge=0, le=1)         # avoid over-qualification
+    performance: float = Field(default=0.25, ge=0, le=1, description="Weight for skill fit and seniority.")
+    chemistry: float = Field(default=0.25, ge=0, le=1, description="Weight for pairwise affinity between members.")
+    growth: float = Field(default=0.25, ge=0, le=1, description="Weight for learning opportunities.")
+    cost: float = Field(default=0.25, ge=0, le=1, description="Weight for avoiding over-qualification.")
 
 
 class AssignedMember(BaseModel):
-    person_id: str
-    fte_allocation: float = Field(ge=0, le=1)
+    person_id: str = Field(description="Identifier of the assigned person.")
+    fte_allocation: float = Field(ge=0, le=1, description="Fraction of full-time equivalent allocated to the project.")
 
 
 class AssignmentResult(BaseModel):
-    project_id: str
-    members: list[AssignedMember]
-    score: float
+    project_id: str = Field(description="Identifier of the project the assignment was computed for.")
+    members: list[AssignedMember] = Field(description="People assigned to the project, with their FTE allocation.")
+    score: float = Field(description="Composite score of the assignment.")

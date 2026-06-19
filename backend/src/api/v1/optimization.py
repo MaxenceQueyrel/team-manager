@@ -5,7 +5,8 @@ from api.models.project import Project
 from api.models.team import Team, OptimizationRequest
 from api.repositories.file_repository import FileRepository
 
-from optimizer.solver import TeamAssignmentSolver
+from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
+from optimizer.ports import AssignmentSolverPort
 from optimizer.models import (
     AssignmentWeights,
     PersonInput,
@@ -15,7 +16,7 @@ from optimizer.models import (
 )
 
 router = APIRouter()
-solver = TeamAssignmentSolver()
+solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
 
 
 @router.post("/solve", response_model=Team)

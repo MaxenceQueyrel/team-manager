@@ -1,44 +1,24 @@
-import numpy as np
-
 from optimizer.models import ProjectInput, PersonInput, AssignmentWeights
 
 
-def compute_score_matrix(
+def compute_person_scores(
     project: ProjectInput,
     people: list[PersonInput],
     weights: AssignmentWeights,
-) -> np.ndarray:
+) -> dict[str, float]:
     """
-    Returns an (n_slots × n_people) score matrix.
-    Chemistry is omitted here — it depends on the full assigned team and is
-    added as a post-assignment bonus in the solver.
+    Returns person_id → individual score (performance + growth + cost).
+    Chemistry is excluded — it depends on which other people are selected, so
+    solver adapters model it as a pairwise term rather than a per-person score.
     """
-    matrix = np.zeros((project.n_slots, len(people)))
-
-    for p_idx, person in enumerate(people):
-        combined = (
+    scores = {}
+    for person in people:
+        scores[person.id] = (
             weights.performance * _skill_score(project, person)
             + weights.growth * _growth_score(project, person)
             + weights.cost * (1.0 - _experience_score(person))
         )
-        matrix[:, p_idx] = combined
-
-    return matrix
-
-
-def affinity_bonus(
-    member_ids: list[str],
-    people_by_id: dict[str, PersonInput],
-) -> float:
-    """Sum of pairwise affinity scores for the selected team members."""
-    total = 0.0
-    for i in range(len(member_ids)):
-        person = people_by_id.get(member_ids[i])
-        if person is None:
-            continue
-        for j in range(i + 1, len(member_ids)):
-            total += person.affinities.get(member_ids[j], 0.0)
-    return total
+    return scores
 
 
 def _skill_score(project: ProjectInput, person: PersonInput) -> float:
@@ -49,7 +29,7 @@ def _skill_score(project: ProjectInput, person: PersonInput) -> float:
     for req in project.skill_requirements:
         level = person_skills.get(req.skill_id, 0.0)
         scores.append(min(level / req.min_level, 1.0) if req.min_level > 0 else 1.0)
-    return float(np.mean(scores))
+    return sum(scores) / len(scores)
 
 
 def _experience_score(person: PersonInput) -> float:

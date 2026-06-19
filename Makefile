@@ -1,5 +1,5 @@
 .PHONY: dev prod down down-prod logs build \
-        install-backend install-frontend \
+        sync install-backend install-frontend \
         run-backend run-frontend \
         test test-optimizer test-api \
         lint-backend lint-frontend
@@ -30,7 +30,7 @@ logs:             ## Tail logs from all dev containers
 
 # ── Local development (without Docker) ───────────────────────────────────────
 
-install-backend:  ## Install Python workspace dependencies (optimizer + backend) incl. dev
+sync:             ## Sync Python workspace dependencies from lockfile (incl. dev)
 	uv sync --all-groups
 
 install-frontend: ## Install frontend dependencies
