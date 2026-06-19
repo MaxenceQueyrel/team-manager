@@ -10,9 +10,9 @@
       {"role": "DevOps Engineer", "count": 1}
     ],
     "skill_requirements": [
-      {"skill_id": "python", "min_level": 3},
-      {"skill_id": "ml", "min_level": 3},
-      {"skill_id": "docker", "min_level": 2}
+      {"id": "python", "min_level": 3},
+      {"id": "ml", "min_level": 3},
+      {"id": "docker", "min_level": 2}
     ],
     "excluded_person_ids": [],
     "priority": "high"
@@ -27,9 +27,9 @@
       {"role": "Backend Developer", "count": 1}
     ],
     "skill_requirements": [
-      {"skill_id": "react", "min_level": 3},
-      {"skill_id": "typescript", "min_level": 3},
-      {"skill_id": "sql", "min_level": 2}
+      {"id": "react", "min_level": 3},
+      {"id": "typescript", "min_level": 3},
+      {"id": "sql", "min_level": 2}
     ],
     "excluded_person_ids": [],
     "priority": "medium"

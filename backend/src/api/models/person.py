@@ -1,9 +1,9 @@
 from pydantic import BaseModel, Field
+from .skill import Skill
 
 
-class SkillLevel(BaseModel):
-    skill_id: str
-    level: float = Field(ge=0, le=5)
+class SkillLevel(Skill):
+    level: float = Field(ge=0, le=5, description="Proficiency level in the skill, from 0 to 5.")
 
 
 class PersonBase(BaseModel):

@@ -24,10 +24,10 @@ def compute_person_scores(
 def _skill_score(project: ProjectInput, person: PersonInput) -> float:
     if not project.skill_requirements:
         return 1.0
-    person_skills = {s.skill_id: s.level for s in person.skills}
+    person_skills = {s.id: s.level for s in person.skills}
     scores = []
     for req in project.skill_requirements:
-        level = person_skills.get(req.skill_id, 0.0)
+        level = person_skills.get(req.id, 0.0)
         scores.append(min(level / req.min_level, 1.0) if req.min_level > 0 else 1.0)
     return sum(scores) / len(scores)
 
@@ -37,7 +37,7 @@ def _experience_score(person: PersonInput) -> float:
 
 
 def _growth_score(project: ProjectInput, person: PersonInput) -> float:
-    project_skills = {r.skill_id for r in project.skill_requirements}
+    project_skills = {r.id for r in project.skill_requirements}
     if not project_skills:
         return 0.0
     return len(project_skills & set(person.growth_targets)) / len(project_skills)

@@ -1,0 +1,35 @@
+# Python cache and virtual environments
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Build outputs and dependencies
+node_modules/
+.next/
+dist/
+build/
+*.egg
+
+# Lock files (use source pyproject.toml instead)
+uv.lock
+pnpm-lock.yaml
+yarn.lock
+
+# IDE and system files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Misc
+.claude/

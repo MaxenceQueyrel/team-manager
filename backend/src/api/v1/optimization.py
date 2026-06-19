@@ -36,7 +36,7 @@ def solve_assignment(request: OptimizationRequest):
         id=project.id,
         n_slots=sum(r.count for r in project.role_requirements) or 1,
         skill_requirements=[
-            SkillRequirement(skill_id=r.skill_id, min_level=r.min_level)
+            SkillRequirement(id=r.id, min_level=r.min_level)
             for r in project.skill_requirements
         ],
         excluded_person_ids=project.excluded_person_ids,
@@ -47,7 +47,7 @@ def solve_assignment(request: OptimizationRequest):
             id=p.id,
             years_of_experience=p.years_of_experience,
             fte_capacity=p.fte_capacity,
-            skills=[SkillLevel(skill_id=s.skill_id, level=s.level) for s in p.skills],
+            skills=[SkillLevel(id=s.id, level=s.level) for s in p.skills],
             growth_targets=p.growth_targets,
             affinities=p.affinities,
         )

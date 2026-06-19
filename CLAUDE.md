@@ -36,3 +36,19 @@ def solve(self, project: ProjectInput, people: list[PersonInput]) -> AssignmentR
 - **No orphan comments** — only add a comment when the *why* is non-obvious (a hidden constraint, a workaround, a subtle invariant). Never describe *what* the code does.
 - **Explicit over implicit** — prefer clear, direct code over clever one-liners.
 - **One responsibility per module** — keep the optimizer package free of HTTP/IO concerns; keep the API layer free of OR logic.
+
+## Files and directories Claude should ignore
+
+Claude Code should not read or include in context the following (cache, build artifacts, secrets):
+
+- `.venv/` — Python virtual environment
+- `.ruff_cache/` — Ruff linter cache
+- `__pycache__/` — Python bytecode cache
+- `.pytest_cache/` — Pytest cache
+- `*.egg-info/` — Setuptools metadata
+- `.env` / `.env.local` — Environment secrets
+- `node_modules/` — Frontend dependencies
+- `.next/`, `dist/`, `build/` — Build outputs
+- `uv.lock` — Lock file (only commit the source `pyproject.toml`, lock is derived)
+
+Use `make clean` to remove these artifacts.

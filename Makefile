@@ -2,7 +2,8 @@
         sync install-backend install-frontend \
         run-backend run-frontend \
         test test-optimizer test-api \
-        lint-backend lint-frontend
+        lint-backend lint-frontend \
+        clean
 
 COMPOSE     = docker compose
 DEV_FILE    = -f infra/docker-compose.dev.yml
@@ -66,3 +67,9 @@ lint-frontend:    ## Lint frontend with eslint
 help:             ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | \
 	  awk 'BEGIN {FS = ":.*##"}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
+
+clean:            ## Remove cache, build artifacts, and venv
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true

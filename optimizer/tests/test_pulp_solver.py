@@ -19,7 +19,7 @@ def project():
     return ProjectInput(
         id="proj-test",
         n_slots=1,
-        skill_requirements=[SkillRequirement(skill_id="python", min_level=3)],
+        skill_requirements=[SkillRequirement(id="python", min_level=3)],
         excluded_person_ids=[],
     )
 
@@ -31,7 +31,7 @@ def people():
             id="p1",
             years_of_experience=8.0,
             fte_capacity=1.0,
-            skills=[SkillLevel(skill_id="python", level=5)],
+            skills=[SkillLevel(id="python", level=5)],
             growth_targets=[],
             affinities={"p2": 4.0},
         ),
@@ -39,7 +39,7 @@ def people():
             id="p2",
             years_of_experience=1.0,
             fte_capacity=1.0,
-            skills=[SkillLevel(skill_id="react", level=3)],
+            skills=[SkillLevel(id="react", level=3)],
             growth_targets=["python"],
             affinities={"p1": 4.0},
         ),
