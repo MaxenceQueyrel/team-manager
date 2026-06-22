@@ -14,6 +14,13 @@ class SkillRequirement(Skill):
     min_level: float = Field(ge=0, le=5, description="Minimum proficiency level required, from 0 to 5.")
 
 
+class ProjectPhase(BaseModel):
+    id: str
+    n_slots: int = Field(default=1, ge=1)
+    skill_requirements: list[SkillRequirement] = []
+    date_range: Optional[DateRange] = None
+
+
 class ProjectBase(BaseModel):
     name: str
     description: str = ""
@@ -23,6 +30,7 @@ class ProjectBase(BaseModel):
     excluded_person_ids: list[str] = []
     included_person_ids: list[str] = []
     date_ranges: list[DateRange] = []
+    phases: list[ProjectPhase] = []
     priority: str = "medium"  # low | medium | high | critical
 
 

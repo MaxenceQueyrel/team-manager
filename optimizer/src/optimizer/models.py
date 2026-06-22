@@ -47,6 +47,17 @@ class PersonInput(BaseModel):
     affinities: dict[str, float] = Field(default={}, description="Mapping of person_id to affinity score, in [-5, +5].")
 
 
+class ProjectPhase(BaseModel):
+    id: str = Field(description="Identifier of the phase (e.g. a project stage).")
+    n_slots: int = Field(default=1, ge=1, description="Number of people to assign during this phase.")
+    skill_requirements: list[SkillRequirement] = Field(
+        default=[], description="Skills required during this phase, with minimum levels."
+    )
+    date_range: DateRange | None = Field(
+        default=None, description="Calendar span of this phase. None means no date constraint."
+    )
+
+
 class ProjectInput(BaseModel):
     id: str = Field(description="Identifier of the project.")
     n_slots: int = Field(default=1, ge=1, description="Number of people to assign to the project.")
@@ -63,6 +74,14 @@ class ProjectInput(BaseModel):
         default=[],
         description="Calendar spans during which the project runs. Empty means no date constraint.",
     )
+    phases: list[ProjectPhase] = Field(
+        default=[],
+        description=(
+            "Per-stage staffing needs. When non-empty, overrides the top-level n_slots, "
+            "skill_requirements, and date_ranges."
+        ),
+    )
+
 
 class AssignmentWeights(BaseModel):
     performance: float = Field(default=0.25, ge=0, le=1, description="Weight for skill fit and seniority.")
@@ -82,6 +101,9 @@ class AssignedMember(BaseModel):
         ge=0,
         le=1,
         description="Fraction of full-time equivalent allocated to the project.",
+    )
+    phase_id: str | None = Field(
+        default=None, description="Identifier of the phase this assignment belongs to, if the project uses phases."
     )
 
 

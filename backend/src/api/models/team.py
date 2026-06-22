@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 class TeamMember(BaseModel):
     person_id: str
     fte_allocation: float = Field(ge=0, le=1)
+    phase_id: Optional[str] = None
 
 
 class Team(BaseModel):

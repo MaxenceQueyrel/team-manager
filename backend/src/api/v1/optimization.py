@@ -13,6 +13,7 @@ from optimizer.models import (
     DateRange,
     PersonInput,
     ProjectInput,
+    ProjectPhase,
     SkillLevel,
     SkillRequirement,
 )
@@ -44,6 +45,17 @@ def solve_assignment(request: OptimizationRequest):
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,
         date_ranges=[DateRange(start=d.start, end=d.end) for d in project.date_ranges],
+        phases=[
+            ProjectPhase(
+                id=ph.id,
+                n_slots=ph.n_slots,
+                skill_requirements=[
+                    SkillRequirement(id=r.id, min_level=r.min_level) for r in ph.skill_requirements
+                ],
+                date_range=DateRange(start=ph.date_range.start, end=ph.date_range.end) if ph.date_range else None,
+            )
+            for ph in project.phases
+        ],
     )
 
     people_inputs = [

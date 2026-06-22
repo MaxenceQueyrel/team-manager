@@ -23,9 +23,40 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         weights: AssignmentWeights,
         respect_exclusions: bool = True,
     ) -> AssignmentResult:
+        if not project.phases:
+            members, score = self._solve_phase(project, people, weights, respect_exclusions)
+            return AssignmentResult(project_id=project.id, members=members, score=score)
+
+        all_members = []
+        total_score = 0.0
+        for phase in project.phases:
+            shadow = ProjectInput(
+                id=project.id,
+                n_slots=phase.n_slots,
+                skill_requirements=phase.skill_requirements,
+                excluded_person_ids=project.excluded_person_ids,
+                included_person_ids=project.included_person_ids,
+                date_ranges=[phase.date_range] if phase.date_range else [],
+            )
+            members, score = self._solve_phase(shadow, people, weights, respect_exclusions)
+            all_members += [
+                AssignedMember(person_id=m.person_id, fte_allocation=m.fte_allocation, phase_id=phase.id)
+                for m in members
+            ]
+            total_score += score
+
+        return AssignmentResult(project_id=project.id, members=all_members, score=round(total_score, 6))
+
+    def _solve_phase(
+        self,
+        project: ProjectInput,
+        people: list[PersonInput],
+        weights: AssignmentWeights,
+        respect_exclusions: bool,
+    ) -> tuple[list[AssignedMember], float]:
         candidates = feasible_people(project, people, respect_exclusions)
         if not candidates:
-            return AssignmentResult(project_id=project.id, members=[], score=0.0)
+            return [], 0.0
 
         included_ids = set(project.included_person_ids) & {p.id for p in candidates}
         n_selected = max(min(project.n_slots, len(candidates)), len(included_ids))
@@ -63,8 +94,4 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             if x[p.id].value() == 1
         ]
 
-        return AssignmentResult(
-            project_id=project.id,
-            members=members,
-            score=round(pulp.value(model.objective), 6),
-        )
+        return members, round(pulp.value(model.objective), 6)
