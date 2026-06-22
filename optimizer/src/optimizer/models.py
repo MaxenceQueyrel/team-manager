@@ -1,4 +1,17 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
+
+
+class DateRange(BaseModel):
+    start: date = Field(description="Start date of the range, inclusive.")
+    end: date = Field(description="End date of the range, inclusive.")
+
+
+class AvailabilityWindow(DateRange):
+    ratio: float = Field(
+        ge=0, le=1, description="Fraction of FTE available during this window, overriding fte_capacity."
+    )
 
 
 class Skill(BaseModel):
@@ -25,6 +38,10 @@ class PersonInput(BaseModel):
         description="Available capacity as a fraction of full-time equivalent.",
     )
     skills: list[SkillLevel] = Field(default=[], description="Skills the person has, with their proficiency levels.")
+    availability_windows: list[AvailabilityWindow] = Field(
+        default=[],
+        description="Exceptions to fte_capacity during specific date ranges (e.g. leave, part-time stints).",
+    )
     preferences: list[str] = Field(default=[], description="Skill IDs the person prefers to work on.")
     growth_targets: list[str] = Field(default=[], description="Skill IDs the person wants to grow in.")
     affinities: dict[str, float] = Field(default={}, description="Mapping of person_id to affinity score, in [-5, +5].")
@@ -41,6 +58,10 @@ class ProjectInput(BaseModel):
     )
     included_person_ids: list[str] = Field(
         default=[], description="Person IDs that must be assigned to the project."
+    )
+    date_ranges: list[DateRange] = Field(
+        default=[],
+        description="Calendar spans during which the project runs. Empty means no date constraint.",
     )
 
 class AssignmentWeights(BaseModel):

@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel, Field
 from .skill import Skill
+from .date_range import DateRange
 
 
 class RoleRequirement(BaseModel):
@@ -21,6 +22,7 @@ class ProjectBase(BaseModel):
     skill_requirements: list[SkillRequirement] = []
     excluded_person_ids: list[str] = []
     included_person_ids: list[str] = []
+    date_ranges: list[DateRange] = []
     priority: str = "medium"  # low | medium | high | critical
 
 

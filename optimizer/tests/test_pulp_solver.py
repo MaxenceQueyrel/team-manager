@@ -1,7 +1,11 @@
+from datetime import date
+
 import pytest
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.models import (
     AssignmentWeights,
+    AvailabilityWindow,
+    DateRange,
     PersonInput,
     ProjectInput,
     SkillLevel,
@@ -95,3 +99,24 @@ def test_forced_inclusion(solver, project, people):
     # p2 has no python skill, so performance weight alone would pick p1,
     # but p2 is forced in and n_slots=1 expands to fit it.
     assert any(m.person_id == "p2" for m in result.members)
+
+
+def test_unavailable_window_excludes_person(solver, project, people):
+    project.date_ranges = [DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))]
+    project.included_person_ids = ["p1"]
+    people[0].availability_windows = [
+        AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=0.0)
+    ]
+    result = solver.solve(project, people, AssignmentWeights())
+    assert all(m.person_id != "p1" for m in result.members)
+
+
+def test_fte_allocation_reflects_windowed_availability(solver, project, people):
+    project.date_ranges = [DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))]
+    project.included_person_ids = ["p1"]
+    people[0].availability_windows = [
+        AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=0.4)
+    ]
+    result = solver.solve(project, people, AssignmentWeights())
+    p1_member = next(m for m in result.members if m.person_id == "p1")
+    assert p1_member.fte_allocation == pytest.approx(0.4)

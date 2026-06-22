@@ -9,6 +9,7 @@ from optimizer.models import (
 )
 from optimizer.objectives import compute_person_scores
 from optimizer.constraints import feasible_people
+from optimizer.availability import effective_availability
 from optimizer.domain.solver import AssignmentSolverPort
 
 
@@ -57,7 +58,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         model.solve(pulp.PULP_CBC_CMD(msg=False))
 
         members = [
-            AssignedMember(person_id=p.id, fte_allocation=min(p.fte_capacity, 1.0))
+            AssignedMember(person_id=p.id, fte_allocation=min(effective_availability(p, project), 1.0))
             for p in candidates
             if x[p.id].value() == 1
         ]

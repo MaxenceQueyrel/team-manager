@@ -9,6 +9,8 @@ from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort
 from optimizer.models import (
     AssignmentWeights,
+    AvailabilityWindow,
+    DateRange,
     PersonInput,
     ProjectInput,
     SkillLevel,
@@ -41,6 +43,7 @@ def solve_assignment(request: OptimizationRequest):
         ],
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,
+        date_ranges=[DateRange(start=d.start, end=d.end) for d in project.date_ranges],
     )
 
     people_inputs = [
@@ -50,6 +53,9 @@ def solve_assignment(request: OptimizationRequest):
             years_of_experience=p.years_of_experience,
             fte_capacity=p.fte_capacity,
             skills=[SkillLevel(id=s.id, level=s.level) for s in p.skills],
+            availability_windows=[
+                AvailabilityWindow(start=w.start, end=w.end, ratio=w.ratio) for w in p.availability_windows
+            ],
             growth_targets=p.growth_targets,
             affinities=p.affinities,
         )

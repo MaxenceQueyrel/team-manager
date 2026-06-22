@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from .skill import Skill
+from .date_range import AvailabilityWindow
 
 
 class SkillLevel(Skill):
@@ -13,6 +14,7 @@ class PersonBase(BaseModel):
     years_of_experience: float = Field(ge=0)
     fte_capacity: float = Field(default=1.0, ge=0, le=1)
     skills: list[SkillLevel] = []
+    availability_windows: list[AvailabilityWindow] = []
     growth_targets: list[str] = []
     affinities: dict[str, float] = {}  # person_id → score (-5 to +5)
 
