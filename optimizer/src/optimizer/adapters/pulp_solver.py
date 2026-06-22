@@ -9,7 +9,7 @@ from optimizer.models import (
 )
 from optimizer.objectives import compute_person_scores
 from optimizer.constraints import feasible_people
-from optimizer.ports import AssignmentSolverPort
+from optimizer.domain.solver import AssignmentSolverPort
 
 
 class PuLPTeamAssignmentSolver(AssignmentSolverPort):
@@ -26,12 +26,15 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         if not candidates:
             return AssignmentResult(project_id=project.id, members=[], score=0.0)
 
-        n_selected = min(project.n_slots, len(candidates))
+        included_ids = set(project.included_person_ids) & {p.id for p in candidates}
+        n_selected = max(min(project.n_slots, len(candidates)), len(included_ids))
         scores = compute_person_scores(project, candidates, weights)
 
         model = pulp.LpProblem("team_assignment", pulp.LpMaximize)
         x = {p.id: pulp.LpVariable(f"x_{p.id}", cat="Binary") for p in candidates}
         model += pulp.lpSum(x.values()) == n_selected
+        for person_id in included_ids:
+            model += x[person_id] == 1
 
         objective_terms = [scores[p.id] * x[p.id] for p in candidates]
 

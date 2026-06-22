@@ -1,11 +1,6 @@
 from pydantic import BaseModel, Field
 
 
-class Subject(BaseModel):
-    id: str = Field(description="Identifier of the subject.")
-    description: str = Field(default="", description="Description of the subject.")
-
-
 class Skill(BaseModel):
     id: str = Field(description="Identifier of the skill.")
     description: str = Field(default="", description="Description of the skill.")
@@ -21,6 +16,7 @@ class SkillRequirement(Skill):
 
 class PersonInput(BaseModel):
     id: str = Field(description="Identifier of the person.")
+    seniority: str = Field(description="Seniority level in the company (e.g. junior, mid, senior, lead).")
     years_of_experience: float = Field(ge=0, description="Number of years of professional experience.")
     fte_capacity: float = Field(
         default=1.0,
@@ -29,12 +25,8 @@ class PersonInput(BaseModel):
         description="Available capacity as a fraction of full-time equivalent.",
     )
     skills: list[SkillLevel] = Field(default=[], description="Skills the person has, with their proficiency levels.")
-    preferences: list[str] = Field(
-        default=[], description="Skills or subjects the person prefers to work on."
-    )
-    growth_targets: list[str] = Field(
-        default=[], description="Skills or subjects the person wants to grow in."
-    )
+    preferences: list[str] = Field(default=[], description="Skill IDs the person prefers to work on.")
+    growth_targets: list[str] = Field(default=[], description="Skill IDs the person wants to grow in.")
     affinities: dict[str, float] = Field(default={}, description="Mapping of person_id to affinity score, in [-5, +5].")
 
 
@@ -47,7 +39,9 @@ class ProjectInput(BaseModel):
     excluded_person_ids: list[str] = Field(
         default=[], description="Person IDs that must not be assigned to the project."
     )
-
+    included_person_ids: list[str] = Field(
+        default=[], description="Person IDs that must be assigned to the project."
+    )
 
 class AssignmentWeights(BaseModel):
     performance: float = Field(default=0.25, ge=0, le=1, description="Weight for skill fit and seniority.")

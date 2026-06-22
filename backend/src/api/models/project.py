@@ -20,6 +20,7 @@ class ProjectBase(BaseModel):
     role_requirements: list[RoleRequirement] = []
     skill_requirements: list[SkillRequirement] = []
     excluded_person_ids: list[str] = []
+    included_person_ids: list[str] = []
     priority: str = "medium"  # low | medium | high | critical
 
 

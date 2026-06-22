@@ -29,6 +29,7 @@ def people():
     return [
         PersonInput(
             id="p1",
+            seniority="senior",
             years_of_experience=8.0,
             fte_capacity=1.0,
             skills=[SkillLevel(id="python", level=5)],
@@ -37,6 +38,7 @@ def people():
         ),
         PersonInput(
             id="p2",
+            seniority="junior",
             years_of_experience=1.0,
             fte_capacity=1.0,
             skills=[SkillLevel(id="react", level=3)],
@@ -84,3 +86,12 @@ def test_chemistry_bonus_applied(solver, project, people):
     weights = AssignmentWeights(performance=0.0, chemistry=1.0, growth=0.0, cost=0.0)
     result = solver.solve(project, people, weights)
     assert result.score > 0  # p1↔p2 affinity is +4
+
+
+def test_forced_inclusion(solver, project, people):
+    project.included_person_ids = ["p2"]
+    weights = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
+    result = solver.solve(project, people, weights)
+    # p2 has no python skill, so performance weight alone would pick p1,
+    # but p2 is forced in and n_slots=1 expands to fit it.
+    assert any(m.person_id == "p2" for m in result.members)

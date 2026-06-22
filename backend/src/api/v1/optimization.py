@@ -6,7 +6,7 @@ from api.models.team import Team, OptimizationRequest
 from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
-from optimizer.ports import AssignmentSolverPort
+from optimizer.domain.solver import AssignmentSolverPort
 from optimizer.models import (
     AssignmentWeights,
     PersonInput,
@@ -40,11 +40,13 @@ def solve_assignment(request: OptimizationRequest):
             for r in project.skill_requirements
         ],
         excluded_person_ids=project.excluded_person_ids,
+        included_person_ids=project.included_person_ids,
     )
 
     people_inputs = [
         PersonInput(
             id=p.id,
+            seniority=p.seniority,
             years_of_experience=p.years_of_experience,
             fte_capacity=p.fte_capacity,
             skills=[SkillLevel(id=s.id, level=s.level) for s in p.skills],

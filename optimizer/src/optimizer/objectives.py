@@ -7,9 +7,14 @@ def compute_person_scores(
     weights: AssignmentWeights,
 ) -> dict[str, float]:
     """
-    Returns person_id → individual score (performance + growth + cost).
-    Chemistry is excluded — it depends on which other people are selected, so
-    solver adapters model it as a pairwise term rather than a per-person score.
+
+    Args:
+        project (ProjectInput): 
+        people (list[PersonInput]): _description_
+        weights (AssignmentWeights): _description_
+
+    Returns:
+        dict[str, float]: _description_
     """
     scores = {}
     for person in people:
