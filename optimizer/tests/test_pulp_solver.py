@@ -9,6 +9,7 @@ from optimizer.models import (
     PersonInput,
     ProjectInput,
     ProjectPhase,
+    Seniority,
     SkillLevel,
     SkillRequirement,
 )
@@ -34,7 +35,7 @@ def people():
     return [
         PersonInput(
             id="p1",
-            seniority="senior",
+            seniority=Seniority.SENIOR,
             years_of_experience=8.0,
             fte_capacity=1.0,
             skills=[SkillLevel(id="python", level=5)],
@@ -43,7 +44,7 @@ def people():
         ),
         PersonInput(
             id="p2",
-            seniority="junior",
+            seniority=Seniority.JUNIOR,
             years_of_experience=1.0,
             fte_capacity=1.0,
             skills=[SkillLevel(id="react", level=3)],

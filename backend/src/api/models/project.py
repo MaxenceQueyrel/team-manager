@@ -1,12 +1,13 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+from optimizer.models import Seniority
 from .skill import Skill
 from .date_range import DateRange
 
 
 class RoleRequirement(BaseModel):
     role: str
-    seniority: Optional[str] = None
+    seniority: Optional[Seniority] = None
     count: int = Field(default=1, ge=1)
 
 

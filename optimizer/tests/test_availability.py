@@ -3,13 +3,13 @@ from datetime import date
 import pytest
 
 from optimizer.availability import effective_availability
-from optimizer.models import AvailabilityWindow, DateRange, PersonInput, ProjectInput
+from optimizer.models import AvailabilityWindow, DateRange, PersonInput, ProjectInput, Seniority
 
 
 def _person(fte_capacity=1.0, availability_windows=None):
     return PersonInput(
         id="p1",
-        seniority="senior",
+        seniority=Seniority.SENIOR,
         years_of_experience=5.0,
         fte_capacity=fte_capacity,
         availability_windows=availability_windows or [],

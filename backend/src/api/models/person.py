@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from optimizer.models import Seniority
 from .skill import Skill
 from .date_range import AvailabilityWindow
 
@@ -10,7 +11,7 @@ class SkillLevel(Skill):
 class PersonBase(BaseModel):
     name: str
     role: str
-    seniority: str  # junior | mid | senior | lead
+    seniority: Seniority
     years_of_experience: float = Field(ge=0)
     fte_capacity: float = Field(default=1.0, ge=0, le=1)
     skills: list[SkillLevel] = []
