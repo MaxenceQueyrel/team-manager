@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from api.models.skill import Skill
+from optimizer.models import Skill
 from api.repositories.file_repository import FileRepository
 
 router = APIRouter()

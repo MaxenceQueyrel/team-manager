@@ -2,7 +2,7 @@
 
 > Prescriptive analytics engine for team formation — blending HR management with Operations Research.
 
-Instead of guessing who works best where, the app treats team formation as a **constrained optimization problem** (Assignment Problem variant) and lets managers adjust multi-objective weights to reflect their priorities.
+Instead of guessing who works best where, the app treats team formation as a **multi-objective MILP** and lets managers adjust objective weights to reflect their priorities.
 
 ---
 
@@ -137,28 +137,98 @@ VITE_API_URL=http://localhost:8000
 
 ## Optimization model
 
-The solver (`optimizer/`) implements a **multi-objective assignment** using `scipy.optimize.linear_sum_assignment` (Hungarian algorithm).
+The solver (`optimizer/`) formulates team formation as a **Mixed-Integer Linear Program (MILP)** solved with [PuLP](https://coin-or.github.io/pulp/) / CBC.
 
-| Objective | What it optimises |
-|-----------|-------------------|
-| **Performance** | Skill-gap minimisation + seniority fit |
-| **Chemistry** | Pairwise affinity scores among assigned members |
-| **Growth** | Overlap between project skills and personal learning targets |
-| **Cost** | Prefers adequately-qualified over over-qualified staff |
+### Sets and indices
 
-Users control objective weights via sliders on the Optimization page.
+| Symbol | Definition |
+|--------|-----------|
+| $P$ | Set of feasible candidates (after pre-filtering) |
+| $K$ | Set of skill IDs required by the project / phase |
+| $\mathcal{F} \subseteq P$ | Forced inclusions — persons who must be assigned |
+| $i, j$ | Indices over persons in $P$ |
+| $k$ | Index over skills in $K$ |
 
-**Hard constraints** (always enforced):
-- Exclusion lists (legal, timezone, interpersonal conflicts)
-- FTE capacity (a person at 0 % availability is never assigned)
+### Parameters
+
+| Symbol | Definition |
+|--------|-----------|
+| $S$ | Number of slots to fill (project `n_slots`) |
+| $r_k$ | Minimum proficiency level required for skill $k$ |
+| $l_{ik}$ | Person $i$'s proficiency level for skill $k$ (0 if absent) |
+| $e_i$ | Person $i$'s years of professional experience |
+| $G_i$ | Set of skill IDs that person $i$ wants to grow in |
+| $a_{ij}$ | Affinity between persons $i$ and $j$, $a_{ij} \in [-5, +5]$ |
+| $w_\text{perf},\, w_\text{chem},\, w_\text{grow},\, w_\text{cost}$ | User-controlled objective weights |
+
+### Decision variables
+
+$$x_i \in \{0, 1\} \quad \forall i \in P \qquad \text{(1 if person } i \text{ is selected)}$$
+
+$$z_{ij} \in \{0, 1\} \quad \forall i < j \in P,\; a_{ij} \neq 0 \qquad \text{(1 if both } i \text{ and } j \text{ are selected)}$$
+
+### Per-person sub-scores
+
+**Skill (performance) score** — average capped coverage of each required skill:
+
+$$\text{skill}_i = \begin{cases} 1 & \text{if } K = \emptyset \\ \displaystyle\frac{1}{|K|} \sum_{k \in K} c_{ik} & \text{otherwise} \end{cases}$$
+
+where each per-skill contribution is:
+
+$$c_{ik} = \begin{cases} 1 & \text{if } r_k = 0 \\ \min\!\left(\dfrac{l_{ik}}{r_k},\; 1\right) & \text{otherwise} \end{cases}$$
+
+A requirement with $r_k = 0$ means "skill must be present but any level suffices", so it is always fully satisfied.
+
+**Growth score** — fraction of required skills that overlap with person $i$'s learning targets:
+
+$$\text{growth}_i = \begin{cases} 0 & \text{if } K = \emptyset \\ \displaystyle\frac{|K \cap G_i|}{|K|} & \text{otherwise} \end{cases}$$
+
+**Cost score** — inverse of experience, rewarding adequately-qualified over over-qualified staff:
+
+$$\text{cost}_i = 1 - \min\!\left(\frac{e_i}{20},\; 1\right)$$
+
+**Composite per-person score:**
+
+$$s_i = w_\text{perf} \cdot \text{skill}_i \;+\; w_\text{grow} \cdot \text{growth}_i \;+\; w_\text{cost} \cdot \text{cost}_i$$
+
+### Objective function (maximisation)
+
+$$\max \quad \sum_{i \in P} s_i \cdot x_i \;+\; w_\text{chem} \sum_{\substack{i,j \in P \\ i < j}} a_{ij} \cdot z_{ij}$$
+
+The chemistry term is pairwise — it captures team dynamics that cannot be expressed as a sum of individual scores. Because $z_{ij} = x_i \cdot x_j$ is a product of binary variables, it is **linearized** with the three constraints below.
+
+### Constraints
+
+**Cardinality** — fill exactly $S_\text{eff}$ slots, where the effective count guards against infeasibility:
+
+$$S_\text{eff} = \max\!\bigl(\min(n\_\text{slots},\; |P|),\; |\mathcal{F}|\bigr)$$
+
+$$\sum_{i \in P} x_i = S_\text{eff}$$
+
+$S_\text{eff}$ clamps down when there are fewer candidates than requested slots, and clamps up when forced inclusions exceed `n_slots`.
+
+**Forced inclusions:**
+
+$$x_i = 1 \qquad \forall i \in \mathcal{F}$$
+
+**Chemistry linearization** — $z_{ij}$ equals 1 if and only if both $i$ and $j$ are selected:
+
+$$z_{ij} \leq x_i \qquad \forall i < j \in P$$
+$$z_{ij} \leq x_j \qquad \forall i < j \in P$$
+$$z_{ij} \geq x_i + x_j - 1 \qquad \forall i < j \in P$$
+
+**Feasibility pre-filter** (enforced before the MILP is built — infeasible persons are never included in $P$):
+- Person must **not** appear in the project's exclusion list.
+- Person's effective FTE availability over the project's date ranges must be $> 0$.
+
+Effective availability is the day-weighted average of the person's FTE windows across the project's calendar:
+
+$$\text{avail}_i = \frac{\displaystyle\sum_{d \in \mathcal{D}} \text{ratio}_i(d)}{|\mathcal{D}|}$$
+
+where $\mathcal{D}$ is the union of all project date-range days and $\text{ratio}_i(d)$ comes from the person's `availability_windows`, falling back to `fte_capacity` for uncovered days.
+
+### Phased projects
+
+When a project defines phases, the MILP above is run **independently for each phase** using that phase's own $S$, $K$, and date range. The total score is the sum of phase scores.
 
 ---
-
-## Roadmap
-
-- [ ] Authentication (JWT)
-- [ ] Persistent database (PostgreSQL)
-- [ ] Affinity survey UI
-- [ ] Multi-project simultaneous optimisation
-- [ ] Kubernetes deployment (Helm chart)
-- [ ] Terraform cloud provisioning

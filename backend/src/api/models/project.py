@@ -1,25 +1,11 @@
-from typing import Optional
 from pydantic import BaseModel, Field
-from optimizer.models import Seniority
-from .skill import Skill
-from .date_range import DateRange
+from optimizer.models import Seniority, SkillRequirement, ProjectPhase, DateRange
 
 
 class RoleRequirement(BaseModel):
     role: str
-    seniority: Optional[Seniority] = None
+    seniority: Seniority | None = None
     count: int = Field(default=1, ge=1)
-
-
-class SkillRequirement(Skill):
-    min_level: float = Field(ge=0, le=5, description="Minimum proficiency level required, from 0 to 5.")
-
-
-class ProjectPhase(BaseModel):
-    id: str
-    n_slots: int = Field(default=1, ge=1)
-    skill_requirements: list[SkillRequirement] = []
-    date_range: Optional[DateRange] = None
 
 
 class ProjectBase(BaseModel):
@@ -32,7 +18,7 @@ class ProjectBase(BaseModel):
     included_person_ids: list[str] = []
     date_ranges: list[DateRange] = []
     phases: list[ProjectPhase] = []
-    priority: str = "medium"  # low | medium | high | critical
+    priority: str = "medium"
 
 
 class Project(ProjectBase):

@@ -1,11 +1,5 @@
 from pydantic import BaseModel, Field
-from optimizer.models import Seniority
-from .skill import Skill
-from .date_range import AvailabilityWindow
-
-
-class SkillLevel(Skill):
-    level: float = Field(ge=0, le=5, description="Proficiency level in the skill, from 0 to 5.")
+from optimizer.models import Seniority, SkillLevel, AvailabilityWindow
 
 
 class PersonBase(BaseModel):

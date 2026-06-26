@@ -3,20 +3,12 @@ from fastapi import APIRouter, HTTPException
 from api.models.person import Person
 from api.models.project import Project
 from api.models.team import Team, OptimizationRequest
+
 from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort
-from optimizer.models import (
-    AssignmentWeights,
-    AvailabilityWindow,
-    DateRange,
-    PersonInput,
-    ProjectInput,
-    ProjectPhase,
-    SkillLevel,
-    SkillRequirement,
-)
+from optimizer.models import AssignmentWeights, PersonInput, ProjectInput
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
@@ -34,28 +26,14 @@ def solve_assignment(request: OptimizationRequest):
 
     people = people_repo.list()
 
-    # ── Convert API models → optimizer domain types ───────────────────────────
     project_input = ProjectInput(
         id=project.id,
         n_slots=sum(r.count for r in project.role_requirements) or 1,
-        skill_requirements=[
-            SkillRequirement(id=r.id, min_level=r.min_level)
-            for r in project.skill_requirements
-        ],
+        skill_requirements=project.skill_requirements,
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,
-        date_ranges=[DateRange(start=d.start, end=d.end) for d in project.date_ranges],
-        phases=[
-            ProjectPhase(
-                id=ph.id,
-                n_slots=ph.n_slots,
-                skill_requirements=[
-                    SkillRequirement(id=r.id, min_level=r.min_level) for r in ph.skill_requirements
-                ],
-                date_range=DateRange(start=ph.date_range.start, end=ph.date_range.end) if ph.date_range else None,
-            )
-            for ph in project.phases
-        ],
+        date_ranges=project.date_ranges,
+        phases=project.phases,
     )
 
     people_inputs = [
@@ -64,10 +42,8 @@ def solve_assignment(request: OptimizationRequest):
             seniority=p.seniority,
             years_of_experience=p.years_of_experience,
             fte_capacity=p.fte_capacity,
-            skills=[SkillLevel(id=s.id, level=s.level) for s in p.skills],
-            availability_windows=[
-                AvailabilityWindow(start=w.start, end=w.end, ratio=w.ratio) for w in p.availability_windows
-            ],
+            skills=p.skills,
+            availability_windows=p.availability_windows,
             growth_targets=p.growth_targets,
             affinities=p.affinities,
         )
@@ -80,7 +56,6 @@ def solve_assignment(request: OptimizationRequest):
         growth=request.weights.growth_weight,
         cost=request.weights.cost_weight,
     )
-    # ─────────────────────────────────────────────────────────────────────────
 
     result = solver.solve(project_input, people_inputs, weights, request.respect_exclusions)
 

@@ -6,15 +6,16 @@ def compute_person_scores(
     people: list[PersonInput],
     weights: AssignmentWeights,
 ) -> dict[str, float]:
-    """
+    """Computes a weighted composite score for each person against a project.
 
     Args:
-        project (ProjectInput): 
-        people (list[PersonInput]): _description_
-        weights (AssignmentWeights): _description_
+        project: The project whose skill requirements define the scoring context.
+        people: Pool of candidate persons to score.
+        weights: Per-objective weights controlling how performance, growth, and cost contribute.
 
     Returns:
-        dict[str, float]: _description_
+        Mapping of person ID to composite score. Chemistry is excluded here because it is
+        pairwise and must be linearized separately in the MILP.
     """
     scores = {}
     for person in people:

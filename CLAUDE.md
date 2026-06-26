@@ -6,6 +6,10 @@
 - Test files live in the `tests/` directory of each package (`optimizer/tests/`, `backend/tests/`).
 - Run tests with `make test-optimizer` or `make test-api`, or directly via `uv run pytest tests/ -v`.
 
+## Typing
+
+Use latest convention. Don't use Optional use | None instead.
+
 ## Docstrings
 
 - Use **Google-style docstrings**.

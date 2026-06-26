@@ -1,19 +1,13 @@
-from typing import Optional
 from pydantic import BaseModel, Field
-
-
-class TeamMember(BaseModel):
-    person_id: str
-    fte_allocation: float = Field(ge=0, le=1)
-    phase_id: Optional[str] = None
+from optimizer.models import AssignedMember
 
 
 class Team(BaseModel):
     id: str
     project_id: str
-    members: list[TeamMember] = []
+    members: list[AssignedMember] = []
     is_optimized: bool = False
-    optimization_score: Optional[float] = None
+    optimization_score: float | None = None
 
 
 class OptimizationWeights(BaseModel):
