@@ -15,6 +15,7 @@ class OptimizationWeights(BaseModel):
     chemistry_weight: float = Field(default=0.25, ge=0, le=1)
     growth_weight: float = Field(default=0.25, ge=0, le=1)
     cost_weight: float = Field(default=0.25, ge=0, le=1)
+    handover_weight: float = Field(default=0.0, ge=0, le=1)
 
 
 class OptimizationRequest(BaseModel):

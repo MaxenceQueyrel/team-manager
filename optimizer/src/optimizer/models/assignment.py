@@ -11,6 +11,12 @@ class AssignmentWeights(BaseModel):
     )
     growth: float = Field(default=0.25, ge=0, le=1, description="Weight for learning opportunities.")
     cost: float = Field(default=0.25, ge=0, le=1, description="Weight for avoiding over-qualification.")
+    handover: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="Reward for keeping the same people across consecutive phases. 0 solves phases independently.",
+    )
 
 
 class AssignedMember(BaseModel):

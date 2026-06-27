@@ -55,6 +55,7 @@ def solve_assignment(request: OptimizationRequest):
         chemistry=request.weights.chemistry_weight,
         growth=request.weights.growth_weight,
         cost=request.weights.cost_weight,
+        handover=request.weights.handover_weight,
     )
 
     result = solver.solve(project_input, people_inputs, weights, request.respect_exclusions)

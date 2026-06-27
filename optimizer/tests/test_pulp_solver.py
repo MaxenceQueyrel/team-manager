@@ -146,6 +146,31 @@ def test_phases_produce_tagged_members_and_summed_score(solver, people):
     assert result.score == pytest.approx(expected_score)
 
 
+def test_handover_keeps_same_person_across_phases(solver):
+    # Each phase favours a different specialist on skill alone, but a strong
+    # handover reward should make the optimizer keep one person for both phases.
+    candidates = [
+        PersonInput(id="a", seniority=Seniority.SENIOR, years_of_experience=8.0,
+                    skills=[SkillLevel(id="python", level=5), SkillLevel(id="react", level=3)]),
+        PersonInput(id="b", seniority=Seniority.SENIOR, years_of_experience=8.0,
+                    skills=[SkillLevel(id="python", level=3), SkillLevel(id="react", level=5)]),
+    ]
+    phase1 = ProjectPhase(id="stage-1", n_slots=1, skill_requirements=[SkillRequirement(id="python", min_level=5)])
+    phase2 = ProjectPhase(id="stage-2", n_slots=1, skill_requirements=[SkillRequirement(id="react", min_level=5)])
+    project = ProjectInput(id="proj-test", phases=[phase1, phase2])
+
+    perf_only = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
+    independent = solver.solve(project, candidates, perf_only)
+    stage1 = next(m for m in independent.members if m.phase_id == "stage-1")
+    stage2 = next(m for m in independent.members if m.phase_id == "stage-2")
+    assert stage1.person_id != stage2.person_id  # different specialists without handover
+
+    with_handover = solver.solve(project, candidates, perf_only.model_copy(update={"handover": 0.5}))
+    stage1 = next(m for m in with_handover.members if m.phase_id == "stage-1")
+    stage2 = next(m for m in with_handover.members if m.phase_id == "stage-2")
+    assert stage1.person_id == stage2.person_id  # team kept stable across phases
+
+
 def test_phase_date_range_filters_unavailable_person(solver, people):
     people[0].availability_windows = [
         AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=0.0)
