@@ -125,6 +125,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             skill_requirements=phase.skill_requirements,
             excluded_person_ids=project.excluded_person_ids,
             included_person_ids=project.included_person_ids,
+            squads=project.squads,
             date_ranges=[phase.date_range] if phase.date_range else [],
         )
 
@@ -156,6 +157,13 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         model += pulp.lpSum(x.values()) == n_selected
         for person_id in included_ids:
             model += x[person_id] == 1
+
+        # Squads are co-selected (all-or-nothing) by chaining equalities across the
+        # members feasible in this phase; absent members are simply skipped.
+        for squad in project.squads:
+            present = [pid for pid in squad.member_ids if pid in x]
+            for a, b in zip(present, present[1:]):
+                model += x[a] == x[b]
 
         objective_terms = [scores[p.id] * x[p.id] for p in candidates]
 

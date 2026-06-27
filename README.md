@@ -146,6 +146,8 @@ The solver (`optimizer/`) formulates team formation as a **Mixed-Integer Linear 
 | $P$ | Set of feasible candidates (after pre-filtering) |
 | $K$ | Set of skill IDs required by the project / phase |
 | $\mathcal{F} \subseteq P$ | Forced inclusions — persons who must be assigned |
+| $\mathcal{Q}$ | Set of squads; each $Q \in \mathcal{Q}$ is a group of persons selected all-or-nothing |
+| $T$ | Ordered set of phases (phased projects only); index $t$ |
 | $i, j$ | Indices over persons in $P$ |
 | $k$ | Index over skills in $K$ |
 
@@ -160,6 +162,7 @@ The solver (`optimizer/`) formulates team formation as a **Mixed-Integer Linear 
 | $G_i$ | Set of skill IDs that person $i$ wants to grow in |
 | $a_{ij}$ | Affinity between persons $i$ and $j$, $a_{ij} \in [-5, +5]$ |
 | $w_\text{perf},\, w_\text{chem},\, w_\text{grow},\, w_\text{cost}$ | User-controlled objective weights |
+| $w_\text{hand}$ | Weight rewarding retention of people across consecutive phases (phased projects) |
 
 ### Decision variables
 
@@ -211,6 +214,12 @@ $S_\text{eff}$ clamps down when there are fewer candidates than requested slots,
 
 $$x_i = 1 \qquad \forall i \in \mathcal{F}$$
 
+**Squad co-selection** — every squad is selected all-or-nothing; its feasible members move together:
+
+$$x_i = x_j \qquad \forall\, i, j \in Q \cap P,\;\; \forall\, Q \in \mathcal{Q}$$
+
+A squad member that is infeasible (filtered out of $P$) is simply omitted, so the remaining members still bind to one another. Combined with forced inclusions, forcing in one squad member pulls in the whole squad; if the squad cannot fit the available slots, all its members are dropped.
+
 **Chemistry linearization** — $z_{ij}$ equals 1 if and only if both $i$ and $j$ are selected:
 
 $$z_{ij} \leq x_i \qquad \forall i < j \in P$$
@@ -229,6 +238,24 @@ where $\mathcal{D}$ is the union of all project date-range days and $\text{ratio
 
 ### Phased projects
 
-When a project defines phases, the MILP above is run **independently for each phase** using that phase's own $S$, $K$, and date range. The total score is the sum of phase scores.
+A phased project staffs each phase $t \in T$ with its own slots $S_t$, required skills $K_t$, and date range. There are two solving modes, selected by the handover weight.
+
+**Independent (default, $w_\text{hand} = 0$).** Each phase is solved as a separate MILP — its own cardinality, forced-inclusion, squad, and chemistry constraints. The project score is the sum of phase scores:
+
+$$\text{score} = \sum_{t \in T} \text{score}_t$$
+
+**Joint with handover ($w_\text{hand} > 0$).** All phases are solved in a single MILP so that keeping a person across consecutive phases can be rewarded. Selection variables become phase-indexed, $x_{it}$, and a retention variable links each consecutive pair of phases for persons feasible in both:
+
+$$y_{it} \in \{0, 1\} \qquad \forall\, t \in T \setminus \{\,\text{last}\,\},\;\; i \in P_t \cap P_{t+1}$$
+
+where $P_t$ is the feasible candidate set for phase $t$. The objective sums each phase's per-phase score and chemistry, then adds the handover bonus:
+
+$$\max \quad \sum_{t \in T}\Bigl( \sum_{i \in P_t} s_{it}\, x_{it} \;+\; w_\text{chem}\!\!\sum_{\substack{i,j \in P_t \\ i < j}} a_{ij}\, z_{ijt} \Bigr) \;+\; w_\text{hand} \sum_{t} \sum_{i \in P_t \cap P_{t+1}} y_{it}$$
+
+with $y_{it}$ linearized exactly like chemistry ($y_{it} = x_{it} \cdot x_{i,t+1}$):
+
+$$y_{it} \leq x_{it} \qquad y_{it} \leq x_{i,t+1} \qquad y_{it} \geq x_{it} + x_{i,t+1} - 1$$
+
+Every phase keeps its own cardinality, forced-inclusion, squad, and chemistry constraints. Because retention is rewarded rather than required, the solver keeps a person across phases when they remain a good-enough fit, trading marginal per-phase skill for team stability — and a person unavailable in a phase simply earns no handover bonus there.
 
 ---

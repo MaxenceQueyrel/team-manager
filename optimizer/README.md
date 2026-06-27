@@ -4,6 +4,8 @@ Framework-agnostic Operations Research engine for team assignment. Contains zero
 
 Managed with **uv** as a workspace member.
 
+> For the mathematical model (objective, constraints, squads, phased/handover formulation), see [the root README's "Optimization model" section](../README.md#optimization-model). This document covers the code structure only.
+
 ---
 
 ## Prerequisites
@@ -30,49 +32,50 @@ uv sync
 ```
 optimizer/
 ├── src/optimizer/
-│   ├── __init__.py
-│   ├── models.py        Input/output Pydantic models (ProjectInput, PersonInput, …)
-│   ├── objectives.py    Scoring functions (performance, chemistry, growth, cost)
-│   ├── constraints.py   Feasibility mask builder (exclusions, FTE capacity)
-│   └── solver.py        TeamAssignmentSolver — entry point
+│   ├── models/             Input/output Pydantic models
+│   │   ├── project.py        ProjectInput, ProjectPhase
+│   │   ├── person.py         PersonInput
+│   │   ├── squad.py          Squad (all-or-nothing co-selection group)
+│   │   ├── skill.py          Skill, SkillLevel, SkillRequirement
+│   │   ├── date_range.py     DateRange, AvailabilityWindow
+│   │   ├── seniority.py      Seniority
+│   │   └── assignment.py     AssignmentWeights, AssignedMember, AssignmentResult
+│   ├── objectives.py       Per-person scoring (skill, growth, cost)
+│   ├── constraints.py     Feasibility filter (exclusions, availability)
+│   ├── availability.py    Day-weighted FTE availability over a date range
+│   ├── domain/
+│   │   └── solver.py        AssignmentSolverPort — abstract interface callers depend on
+│   └── adapters/
+│       └── pulp_solver.py    PuLPTeamAssignmentSolver — MILP implementation (PuLP / CBC)
+├── example/                Jupyter notebooks demonstrating usage
 └── tests/
-    └── test_solver.py
 ```
+
+`domain/` defines the port; `adapters/` provides a concrete implementation. The backend depends only on `AssignmentSolverPort`, so the solving library (PuLP today) could be swapped for another MILP backend without touching callers.
 
 ---
 
 ## How the solver works
 
-`TeamAssignmentSolver.solve()` takes a project, a list of candidates, and weight sliders and returns the optimal assignment.
+`PuLPTeamAssignmentSolver.solve()` takes a project, a list of candidates, and weights, and returns the optimal assignment as an `AssignmentResult`.
 
-1. **Score matrix** — `compute_score_matrix()` builds an `(n_slots × n_people)` matrix where each cell is a weighted sum of objectives.
-2. **Feasibility mask** — `build_feasibility_mask()` sets infeasible cells (zero FTE, exclusion lists) to `-∞`.
-3. **Hungarian algorithm** — `scipy.optimize.linear_sum_assignment` finds the maximum-weight matching in O(n³).
-4. **Chemistry bonus** — pairwise affinity between assigned members is added after the main solve.
+1. **Feasibility filter** (`constraints.feasible_people`) — drops excluded persons and anyone with zero effective availability over the project's date range.
+2. **Per-person scores** (`objectives.compute_person_scores`) — weighted sum of skill fit, growth opportunity, and cost.
+3. **MILP build** — binary selection variables per candidate, a cardinality constraint, forced-inclusion constraints, squad co-selection constraints, and a chemistry term linearized via pairwise binaries.
+4. **Solve** — `pulp.PULP_CBC_CMD` maximises the objective.
+5. **Phased projects** — if the project defines `phases`, either solved independently per phase (`handover` weight = 0) or jointly in a single MILP with a retention bonus across consecutive phases (`handover` weight > 0).
 
-### Objectives
-
-| Objective | Weight key | Description |
-|-----------|-----------|-------------|
-| Performance | `performance` | Skill-gap minimisation + seniority fit |
-| Chemistry | `chemistry` | Pairwise affinity scores |
-| Growth | `growth` | Overlap with personal learning targets |
-| Cost | `cost` | Prefers adequately-qualified over over-qualified staff |
-
-### Hard constraints
-
-- **FTE capacity** — a person with `fte_capacity = 0` is never assigned.
-- **Exclusion lists** — per-project exclusions (legal, timezone, interpersonal) are always enforced regardless of weights.
+See the root README for the full formulation of each term.
 
 ---
 
 ## Usage (as a library)
 
 ```python
-from optimizer.solver import TeamAssignmentSolver
+from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.models import ProjectInput, PersonInput, AssignmentWeights
 
-solver = TeamAssignmentSolver()
+solver = PuLPTeamAssignmentSolver()
 result = solver.solve(
     project=ProjectInput(...),
     people=[PersonInput(...), ...],
@@ -81,6 +84,8 @@ result = solver.solve(
 print(result.members)   # list[AssignedMember]
 print(result.score)     # float
 ```
+
+See [example/](example/) for runnable notebooks, including phased allocation with and without the handover weight.
 
 ---
 

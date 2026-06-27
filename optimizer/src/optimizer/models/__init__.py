@@ -4,6 +4,7 @@ from optimizer.models.person import PersonInput
 from optimizer.models.project import ProjectInput, ProjectPhase
 from optimizer.models.seniority import Seniority
 from optimizer.models.skill import Skill, SkillLevel, SkillRequirement
+from optimizer.models.squad import Squad
 
 __all__ = [
     "AssignedMember",
@@ -15,6 +16,7 @@ __all__ = [
     "ProjectInput",
     "ProjectPhase",
     "Seniority",
+    "Squad",
     "Skill",
     "SkillLevel",
     "SkillRequirement",

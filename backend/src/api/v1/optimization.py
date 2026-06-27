@@ -32,6 +32,7 @@ def solve_assignment(request: OptimizationRequest):
         skill_requirements=project.skill_requirements,
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,
+        squads=project.squads,
         date_ranges=project.date_ranges,
         phases=project.phases,
     )

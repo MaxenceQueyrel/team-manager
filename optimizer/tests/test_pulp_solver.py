@@ -12,6 +12,7 @@ from optimizer.models import (
     Seniority,
     SkillLevel,
     SkillRequirement,
+    Squad,
 )
 
 
@@ -169,6 +170,32 @@ def test_handover_keeps_same_person_across_phases(solver):
     stage1 = next(m for m in with_handover.members if m.phase_id == "stage-1")
     stage2 = next(m for m in with_handover.members if m.phase_id == "stage-2")
     assert stage1.person_id == stage2.person_id  # team kept stable across phases
+
+
+def test_squad_pulls_in_partner(solver):
+    # On skill alone a DS project would pick the two best data scientists and
+    # never the developer; a squad tying the developer to a selected member
+    # forces the pair to move together.
+    candidates = [
+        PersonInput(id="ds_a", seniority=Seniority.SENIOR, years_of_experience=5, skills=[SkillLevel(id="ds", level=5.0)]),
+        PersonInput(id="ds_b", seniority=Seniority.SENIOR, years_of_experience=5, skills=[SkillLevel(id="ds", level=4.5)]),
+        PersonInput(id="dev", seniority=Seniority.SENIOR, years_of_experience=5, skills=[SkillLevel(id="dev", level=4.5)]),
+    ]
+    perf_only = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
+    base = ProjectInput(
+        id="proj-test",
+        n_slots=2,
+        skill_requirements=[SkillRequirement(id="ds", min_level=3.0)],
+        included_person_ids=["ds_a"],
+    )
+
+    without = solver.solve(base, candidates, perf_only)
+    assert {m.person_id for m in without.members} == {"ds_a", "ds_b"}  # developer skipped
+
+    with_squad = base.model_copy(update={"squads": [Squad(member_ids=["ds_a", "dev"])]})
+    result = solver.solve(with_squad, candidates, perf_only)
+    selected = {m.person_id for m in result.members}
+    assert selected == {"ds_a", "dev"}  # squad drags the developer in, displacing ds_b
 
 
 def test_phase_date_range_filters_unavailable_person(solver, people):

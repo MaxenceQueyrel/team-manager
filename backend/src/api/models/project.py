@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from optimizer.models import Seniority, SkillRequirement, ProjectPhase, DateRange
+from optimizer.models import Seniority, SkillRequirement, ProjectPhase, DateRange, Squad
 
 
 class RoleRequirement(BaseModel):
@@ -16,6 +16,7 @@ class ProjectBase(BaseModel):
     skill_requirements: list[SkillRequirement] = []
     excluded_person_ids: list[str] = []
     included_person_ids: list[str] = []
+    squads: list[Squad] = []
     date_ranges: list[DateRange] = []
     phases: list[ProjectPhase] = []
     priority: str = "medium"
