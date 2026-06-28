@@ -8,7 +8,7 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort
-from optimizer.models import AssignmentWeights, PersonInput, ProjectInput
+from optimizer.models import PersonInput, ProjectInput
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
@@ -28,7 +28,7 @@ def solve_assignment(request: OptimizationRequest):
 
     project_input = ProjectInput(
         id=project.id,
-        n_slots=sum(r.count for r in project.role_requirements) or 1,
+        n_slots=project.n_slots,
         skill_requirements=project.skill_requirements,
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,
@@ -45,21 +45,14 @@ def solve_assignment(request: OptimizationRequest):
             fte_capacity=p.fte_capacity,
             skills=p.skills,
             availability_windows=p.availability_windows,
+            preferences=p.preferences,
             growth_targets=p.growth_targets,
             affinities=p.affinities,
         )
         for p in people
     ]
 
-    weights = AssignmentWeights(
-        performance=request.weights.performance_weight,
-        chemistry=request.weights.chemistry_weight,
-        growth=request.weights.growth_weight,
-        cost=request.weights.cost_weight,
-        handover=request.weights.handover_weight,
-    )
-
-    result = solver.solve(project_input, people_inputs, weights, request.respect_exclusions)
+    result = solver.solve(project_input, people_inputs, request.weights, request.respect_exclusions)
 
     saved = teams_repo.create(
         {

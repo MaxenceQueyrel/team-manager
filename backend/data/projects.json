@@ -3,16 +3,20 @@
     "id": "proj1",
     "name": "ML Pipeline Modernization",
     "description": "Redesign the data ingestion and ML training pipeline with modern tooling.",
-    "required_fte": 2.8,
-    "role_requirements": [
-      {"role": "Data Scientist", "seniority": "senior", "count": 1},
-      {"role": "Backend Developer", "count": 1},
-      {"role": "DevOps Engineer", "count": 1}
-    ],
+    "n_slots": 3,
     "skill_requirements": [
-      {"id": "python", "min_level": 3},
-      {"id": "ml", "min_level": 3},
-      {"id": "docker", "min_level": 2}
+      {
+        "id": "python",
+        "min_level": 3
+      },
+      {
+        "id": "ml",
+        "min_level": 3
+      },
+      {
+        "id": "docker",
+        "min_level": 2
+      }
     ],
     "excluded_person_ids": [],
     "priority": "high"
@@ -21,15 +25,20 @@
     "id": "proj2",
     "name": "Customer Analytics Dashboard",
     "description": "Build a real-time customer analytics dashboard with interactive charts.",
-    "required_fte": 2.0,
-    "role_requirements": [
-      {"role": "Frontend Developer", "count": 1},
-      {"role": "Backend Developer", "count": 1}
-    ],
+    "n_slots": 2,
     "skill_requirements": [
-      {"id": "react", "min_level": 3},
-      {"id": "typescript", "min_level": 3},
-      {"id": "sql", "min_level": 2}
+      {
+        "id": "react",
+        "min_level": 3
+      },
+      {
+        "id": "typescript",
+        "min_level": 3
+      },
+      {
+        "id": "sql",
+        "min_level": 2
+      }
     ],
     "excluded_person_ids": [],
     "priority": "medium"

@@ -10,6 +10,7 @@ class PersonBase(BaseModel):
     fte_capacity: float = Field(default=1.0, ge=0, le=1)
     skills: list[SkillLevel] = []
     availability_windows: list[AvailabilityWindow] = []
+    preferences: list[str] = []
     growth_targets: list[str] = []
     affinities: dict[str, float] = {}  # person_id → score (-5 to +5)
 

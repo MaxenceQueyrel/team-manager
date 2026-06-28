@@ -4,10 +4,10 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     data_dir: Path = Path("data")
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: str = "http://localhost:3000"
     debug: bool = False
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 def get_configs() -> Settings:

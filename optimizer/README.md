@@ -35,7 +35,7 @@ optimizer/
 │   ├── models/             Input/output Pydantic models
 │   │   ├── project.py        ProjectInput, ProjectPhase
 │   │   ├── person.py         PersonInput
-│   │   ├── squad.py          Squad (all-or-nothing co-selection group)
+│   │   ├── squad.py          Squad (available members co-selected all-or-nothing; unavailable members skipped)
 │   │   ├── skill.py          Skill, SkillLevel, SkillRequirement
 │   │   ├── date_range.py     DateRange, AvailabilityWindow
 │   │   ├── seniority.py      Seniority

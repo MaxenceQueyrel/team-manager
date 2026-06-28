@@ -29,7 +29,7 @@ class ProjectInput(BaseModel):
         default=[], description="Person IDs that must be assigned to the project."
     )
     squads: list[Squad] = Field(
-        default=[], description="Groups of people that must be selected together (all-or-nothing)."
+        default=[], description="Groups of people co-selected together; members unavailable in a phase are skipped."
     )
     date_ranges: list[DateRange] = Field(
         default=[],

@@ -158,8 +158,8 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         for person_id in included_ids:
             model += x[person_id] == 1
 
-        # Squads are co-selected (all-or-nothing) by chaining equalities across the
-        # members feasible in this phase; absent members are simply skipped.
+        # Squads are co-selected by chaining equalities across members feasible in
+        # this phase; absent members are simply skipped.
         for squad in project.squads:
             present = [pid for pid in squad.member_ids if pid in x]
             for a, b in zip(present, present[1:]):
