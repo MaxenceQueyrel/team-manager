@@ -29,6 +29,7 @@ export const projectsApi = {
 export const teamsApi = {
   list: () => client.get<Team[]>("/api/v1/teams/").then((r) => r.data),
   get: (id: string) => client.get<Team>(`/api/v1/teams/${id}`).then((r) => r.data),
+  delete: (id: string) => client.delete(`/api/v1/teams/${id}`),
 };
 
 export const skillsApi = {

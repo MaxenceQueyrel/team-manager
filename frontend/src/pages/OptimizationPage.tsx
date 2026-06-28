@@ -1,19 +1,23 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "@/store";
 import { optimizationApi } from "@/services/api";
-import type { Team } from "@/types";
+import type { OptimizationWeights, Team } from "@/types";
+import { Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { TeamMembers } from "@/components/common/TeamMembers";
 
-const WEIGHT_KEYS = [
-  { key: "performance_weight", label: "Performance", description: "Maximize skill match & seniority" },
-  { key: "chemistry_weight", label: "Chemistry", description: "Maximize mutual affinity scores" },
-  { key: "growth_weight", label: "Growth", description: "Maximize learning opportunities" },
-  { key: "cost_weight", label: "Cost Efficiency", description: "Avoid over-qualification" },
-] as const;
+const WEIGHT_KEYS: { key: keyof OptimizationWeights; label: string; description: string }[] = [
+  { key: "performance", label: "Performance", description: "Skill fit & seniority" },
+  { key: "chemistry", label: "Chemistry", description: "Pairwise affinity between members" },
+  { key: "growth", label: "Growth", description: "Learning opportunities" },
+  { key: "cost", label: "Cost Efficiency", description: "Avoid over-qualification" },
+  { key: "handover", label: "Handover", description: "Keep the same people across consecutive phases" },
+];
 
 export default function OptimizationPage() {
-  const { projects, people, optimizationWeights, setWeights, fetchProjects, fetchPeople } =
+  const { projects, people, optimizationWeights, setWeights, fetchProjects, fetchPeople, fetchTeams } =
     useAppStore();
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [respectExclusions, setRespectExclusions] = useState(true);
   const [result, setResult] = useState<Team | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +27,8 @@ export default function OptimizationPage() {
     fetchPeople();
   }, [fetchProjects, fetchPeople]);
 
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
   const handleSolve = async () => {
     if (!selectedProjectId) return;
     setLoading(true);
@@ -31,33 +37,32 @@ export default function OptimizationPage() {
       const team = await optimizationApi.solve({
         project_id: selectedProjectId,
         weights: optimizationWeights,
-        respect_exclusions: true,
+        respect_exclusions: respectExclusions,
       });
       setResult(team);
+      fetchTeams();
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   };
 
-  const personById = Object.fromEntries(people.map((p) => [p.id, p]));
-
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div style={{ maxWidth: 680 }}>
       <h1>Optimization</h1>
 
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.1rem" }}>Objective Weights</h2>
-        <p style={{ color: "#6c757d", fontSize: "0.875rem" }}>
+      <Card style={{ marginBottom: "1.5rem" }}>
+        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Objective weights</h2>
+        <p style={{ color: colors.muted, fontSize: "0.875rem", marginTop: 0 }}>
           Adjust the sliders to define what "best team" means for this project.
         </p>
         {WEIGHT_KEYS.map(({ key, label, description }) => (
           <div key={key} style={{ marginBottom: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <label>
-                <strong>{label}</strong> — {description}
-              </label>
+              <span>
+                <strong>{label}</strong> <span style={{ color: colors.muted }}>— {description}</span>
+              </span>
               <span>{(optimizationWeights[key] * 100).toFixed(0)}%</span>
             </div>
             <input
@@ -71,50 +76,52 @@ export default function OptimizationPage() {
             />
           </div>
         ))}
-      </section>
+      </Card>
 
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.1rem" }}>Select Project</h2>
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            style={{ flex: 1, padding: "0.5rem" }}
-          >
+      <Card style={{ marginBottom: "1.5rem" }}>
+        <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Run</h2>
+        <Field label="Project">
+          <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} style={inputStyle}>
             <option value="">— choose a project —</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-          <button
-            onClick={handleSolve}
-            disabled={!selectedProjectId || loading}
-            style={{ padding: "0.5rem 1rem" }}
-          >
-            {loading ? "Solving…" : "Find Optimal Team"}
-          </button>
-        </div>
-        {error && <p style={{ color: "#dc3545", marginTop: "0.5rem" }}>{error}</p>}
-      </section>
+        </Field>
+
+        {selectedProject && (
+          <p style={{ fontSize: "0.82rem", color: colors.muted, marginTop: "-0.4rem" }}>
+            {selectedProject.phases.length
+              ? `${selectedProject.phases.length} phase(s)`
+              : `${selectedProject.n_slots} slot(s)`}
+            {selectedProject.squads.length > 0 && ` · ${selectedProject.squads.length} squad(s)`}
+            {selectedProject.included_person_ids.length > 0 && ` · ${selectedProject.included_person_ids.length} forced member(s)`}
+          </p>
+        )}
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.875rem", margin: "0.5rem 0 1rem" }}>
+          <input type="checkbox" checked={respectExclusions} onChange={(e) => setRespectExclusions(e.target.checked)} />
+          Respect excluded people
+        </label>
+
+        <Button variant="primary" onClick={handleSolve} disabled={!selectedProjectId || loading}>
+          {loading ? "Solving…" : "Find optimal team"}
+        </Button>
+        {error && <p style={{ color: colors.danger, marginTop: "0.75rem" }}>{error}</p>}
+      </Card>
 
       {result && (
-        <section>
-          <h2 style={{ fontSize: "1.1rem" }}>Result</h2>
-          <p>
-            Optimization score:{" "}
-            <strong>{result.optimization_score?.toFixed(4) ?? "—"}</strong>
+        <Card>
+          <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Result</h2>
+          <p style={{ marginTop: 0 }}>
+            Optimization score: <strong>{result.optimization_score?.toFixed(4) ?? "—"}</strong>
           </p>
-          <ul>
-            {result.members.map((m) => (
-              <li key={m.person_id}>
-                {personById[m.person_id]?.name ?? m.person_id} (
-                {personById[m.person_id]?.role}) — {(m.fte_allocation * 100).toFixed(0)}% FTE
-              </li>
-            ))}
-          </ul>
-        </section>
+          {result.members.length === 0 ? (
+            <p style={{ color: colors.muted }}>No feasible assignment found for these constraints.</p>
+          ) : (
+            <TeamMembers members={result.members} people={people} />
+          )}
+        </Card>
       )}
     </div>
   );

@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useAppStore } from "@/store";
+import { Badge, Button, Card, colors } from "@/components/common/ui";
+import { TeamMembers } from "@/components/common/TeamMembers";
 
 export default function TeamsPage() {
-  const { teams, people, projects, isLoading, fetchTeams, fetchPeople, fetchProjects } =
+  const { teams, people, projects, isLoading, fetchTeams, fetchPeople, fetchProjects, deleteTeam } =
     useAppStore();
 
   useEffect(() => {
@@ -11,9 +13,8 @@ export default function TeamsPage() {
     fetchProjects();
   }, [fetchTeams, fetchPeople, fetchProjects]);
 
-  if (isLoading) return <p>Loading…</p>;
+  if (isLoading && teams.length === 0) return <p>Loading…</p>;
 
-  const personById = Object.fromEntries(people.map((p) => [p.id, p]));
   const projectById = Object.fromEntries(projects.map((p) => [p.id, p]));
 
   return (
@@ -24,24 +25,23 @@ export default function TeamsPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
           {teams.map((t) => (
-            <div key={t.id} style={{ border: "1px solid #e9ecef", borderRadius: 8, padding: "1rem" }}>
-              <h3 style={{ margin: "0 0 0.5rem" }}>
-                {projectById[t.project_id]?.name ?? t.project_id}
-              </h3>
-              {t.optimization_score !== undefined && (
-                <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", color: "#6c757d" }}>
-                  Score: {t.optimization_score.toFixed(3)}
+            <Card key={t.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <h3 style={{ margin: 0 }}>{projectById[t.project_id]?.name ?? t.project_id}</h3>
+                  {t.is_optimized && <Badge color={colors.success}>optimized</Badge>}
+                </div>
+                <Button variant="danger" onClick={() => confirm("Delete this team?") && deleteTeam(t.id)}>
+                  Delete
+                </Button>
+              </div>
+              {t.optimization_score != null && (
+                <p style={{ margin: "0.4rem 0 0.75rem", fontSize: "0.875rem", color: colors.muted }}>
+                  Score: {t.optimization_score.toFixed(3)} · {t.members.length} member(s)
                 </p>
               )}
-              <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                {t.members.map((m) => (
-                  <li key={m.person_id}>
-                    {personById[m.person_id]?.name ?? m.person_id} —{" "}
-                    {(m.fte_allocation * 100).toFixed(0)}% FTE
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <TeamMembers members={t.members} people={people} />
+            </Card>
           ))}
         </div>
       )}

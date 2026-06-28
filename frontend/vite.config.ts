@@ -12,5 +12,10 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    // Mirror the production nginx setup: forward /api to the backend so the
+    // browser stays same-origin and import.meta.env.VITE_API_URL can be empty.
+    proxy: {
+      "/api": "http://localhost:8000",
+    },
   },
 });
