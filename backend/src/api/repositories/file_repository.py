@@ -37,7 +37,7 @@ class FileRepository(Generic[T]):
 
     def create(self, data: dict) -> T:
         items = self._load()
-        data = {**data, "id": str(uuid.uuid4())}
+        data = {**data, "id": data.get("id") or str(uuid.uuid4())}
         items.append(data)
         self._save(items)
         return self._model.model_validate(data)

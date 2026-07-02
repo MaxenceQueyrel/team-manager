@@ -146,5 +146,24 @@
     "affinities": {
       "p2": 3
     }
+  },
+  {
+    "name": "test",
+    "role": "new_role",
+    "seniority": "mid",
+    "years_of_experience": 5.0,
+    "fte_capacity": 1.0,
+    "skills": [
+      {
+        "id": "rust",
+        "description": "",
+        "level": 3.0
+      }
+    ],
+    "availability_windows": [],
+    "preferences": [],
+    "growth_targets": [],
+    "affinities": {},
+    "id": "8616c573-ac43-45ab-8598-9995923ac5bb"
   }
 ]

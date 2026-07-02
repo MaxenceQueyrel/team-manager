@@ -70,6 +70,7 @@ backend/
 │   │   ├── router.py       Aggregates all v1 routes under /api/v1
 │   │   ├── people.py
 │   │   ├── projects.py
+│   │   ├── roles.py
 │   │   ├── skills.py
 │   │   ├── teams.py
 │   │   └── optimization.py
@@ -77,6 +78,7 @@ backend/
 ├── data/                   JSON flat-file database
 │   ├── people.json
 │   ├── projects.json
+│   ├── roles.json
 │   ├── skills.json
 │   └── teams.json
 └── tests/
@@ -93,7 +95,8 @@ backend/
 | GET/PUT/DELETE | `/api/v1/people/{id}` | Read / update / delete a person |
 | GET/POST | `/api/v1/projects` | List / create projects |
 | GET/PUT/DELETE | `/api/v1/projects/{id}` | Read / update / delete a project |
-| GET/POST | `/api/v1/skills` | List / create skills |
+| GET/POST/PUT/DELETE | `/api/v1/skills` | Manage skills |
+| GET/POST/PUT/DELETE | `/api/v1/roles` | Manage roles |
 | GET/POST | `/api/v1/teams` | List / create teams |
 | POST | `/api/v1/optimization/solve` | Run the assignment solver |
 

@@ -1,11 +1,12 @@
 import { create } from "zustand";
-import type { Person, Project, Team, Skill, OptimizationWeights } from "@/types";
-import { peopleApi, projectsApi, teamsApi, skillsApi } from "@/services/api";
+import type { Person, Project, Role, Team, Skill, OptimizationWeights } from "@/types";
+import { peopleApi, projectsApi, rolesApi, teamsApi, skillsApi } from "@/services/api";
 
 interface AppState {
   people: Person[];
   projects: Project[];
   teams: Team[];
+  roles: Role[];
   skills: Skill[];
   optimizationWeights: OptimizationWeights;
   isLoading: boolean;
@@ -14,6 +15,7 @@ interface AppState {
   fetchPeople: () => Promise<void>;
   fetchProjects: () => Promise<void>;
   fetchTeams: () => Promise<void>;
+  fetchRoles: () => Promise<void>;
   fetchSkills: () => Promise<void>;
 
   savePerson: (data: Omit<Person, "id">, id?: string) => Promise<void>;
@@ -21,6 +23,8 @@ interface AppState {
   saveProject: (data: Omit<Project, "id">, id?: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
+  createRole: (data: Role) => Promise<void>;
+  createSkill: (data: Skill) => Promise<void>;
 
   setWeights: (weights: Partial<OptimizationWeights>) => void;
   clearError: () => void;
@@ -35,6 +39,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   people: [],
   projects: [],
   teams: [],
+  roles: [],
   skills: [],
   optimizationWeights: {
     performance: 0.25,
@@ -76,6 +81,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ error: message(e) });
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  fetchRoles: async () => {
+    try {
+      set({ roles: await rolesApi.list() });
+    } catch (e) {
+      set({ error: message(e) });
     }
   },
 
@@ -141,6 +154,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  createRole: async (data) => {
+    set({ error: null });
+    try {
+      await rolesApi.create(data);
+      await get().fetchRoles();
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
+    }
+  },
+
+  createSkill: async (data) => {
+    set({ error: null });
+    try {
+      await skillsApi.create(data);
+      await get().fetchSkills();
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
+    }
+  },
+
   setWeights: (weights) =>
     set((state) => ({
       optimizationWeights: { ...state.optimizationWeights, ...weights },
@@ -162,5 +197,13 @@ export function knownSkillIds(state: AppState): string[] {
     pr.skill_requirements.forEach((s) => ids.add(s.id));
     pr.phases.forEach((ph) => ph.skill_requirements.forEach((s) => ids.add(s.id)));
   });
+  return [...ids].filter(Boolean).sort();
+}
+
+/** Distinct role ids known across the role catalog and people. */
+export function knownRoleIds(state: AppState): string[] {
+  const ids = new Set<string>();
+  state.roles.forEach((r) => ids.add(r.id));
+  state.people.forEach((p) => ids.add(p.role));
   return [...ids].filter(Boolean).sort();
 }

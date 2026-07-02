@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Person, Project, Team, Skill, OptimizationRequest } from "@/types";
+import type { Person, Project, Role, Team, Skill, OptimizationRequest } from "@/types";
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "",
@@ -32,8 +32,20 @@ export const teamsApi = {
   delete: (id: string) => client.delete(`/api/v1/teams/${id}`),
 };
 
+export const rolesApi = {
+  list: () => client.get<Role[]>("/api/v1/roles/").then((r) => r.data),
+  get: (id: string) => client.get<Role>(`/api/v1/roles/${id}`).then((r) => r.data),
+  create: (data: Role) => client.post<Role>("/api/v1/roles/", data).then((r) => r.data),
+  update: (id: string, data: Role) => client.put<Role>(`/api/v1/roles/${id}`, data).then((r) => r.data),
+  delete: (id: string) => client.delete(`/api/v1/roles/${id}`),
+};
+
 export const skillsApi = {
   list: () => client.get<Skill[]>("/api/v1/skills/").then((r) => r.data),
+  get: (id: string) => client.get<Skill>(`/api/v1/skills/${id}`).then((r) => r.data),
+  create: (data: Skill) => client.post<Skill>("/api/v1/skills/", data).then((r) => r.data),
+  update: (id: string, data: Skill) => client.put<Skill>(`/api/v1/skills/${id}`, data).then((r) => r.data),
+  delete: (id: string) => client.delete(`/api/v1/skills/${id}`),
 };
 
 export const optimizationApi = {

@@ -1,6 +1,11 @@
 export type Seniority = "junior" | "mid" | "senior" | "lead";
 export type Priority = "low" | "medium" | "high" | "critical";
 
+export interface Role {
+  id: string;
+  description?: string;
+}
+
 export interface SkillLevel {
   id: string;
   description?: string;
