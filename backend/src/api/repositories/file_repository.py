@@ -25,7 +25,8 @@ class FileRepository(Generic[T]):
         return json.loads(self._path.read_text())
 
     def _save(self, data: list[dict]):
-        self._path.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        # default=str serializes date/datetime values to ISO strings at the file boundary.
+        self._path.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str))
 
     def list(self) -> list[T]:
         return [self._model.model_validate(item) for item in self._load()]
@@ -36,7 +37,7 @@ class FileRepository(Generic[T]):
 
     def create(self, data: dict) -> T:
         items = self._load()
-        data = {**data, "id": str(uuid.uuid4())}
+        data = {**data, "id": data.get("id") or str(uuid.uuid4())}
         items.append(data)
         self._save(items)
         return self._model.model_validate(data)

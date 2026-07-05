@@ -1,26 +1,18 @@
-from typing import Optional
 from pydantic import BaseModel, Field
-
-
-class RoleRequirement(BaseModel):
-    role: str
-    seniority: Optional[str] = None
-    count: int = Field(default=1, ge=1)
-
-
-class SkillRequirement(BaseModel):
-    skill_id: str
-    min_level: float = Field(ge=0, le=5)
+from optimizer.models import SkillRequirement, ProjectPhase, DateRange, Squad
 
 
 class ProjectBase(BaseModel):
     name: str
     description: str = ""
-    required_fte: float = Field(ge=0)
-    role_requirements: list[RoleRequirement] = []
+    n_slots: int = Field(default=1, ge=1)
     skill_requirements: list[SkillRequirement] = []
     excluded_person_ids: list[str] = []
-    priority: str = "medium"  # low | medium | high | critical
+    included_person_ids: list[str] = []
+    squads: list[Squad] = []
+    date_ranges: list[DateRange] = []
+    phases: list[ProjectPhase] = []
+    priority: str = "medium"
 
 
 class Project(ProjectBase):

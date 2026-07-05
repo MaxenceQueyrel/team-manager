@@ -7,12 +7,27 @@
     "years_of_experience": 8.0,
     "fte_capacity": 1.0,
     "skills": [
-      {"skill_id": "python", "level": 5},
-      {"skill_id": "sql", "level": 4},
-      {"skill_id": "docker", "level": 3}
+      {
+        "id": "python",
+        "level": 5
+      },
+      {
+        "id": "sql",
+        "level": 4
+      },
+      {
+        "id": "docker",
+        "level": 3
+      }
     ],
-    "growth_targets": ["ml"],
-    "affinities": {"p2": 4, "p3": 2, "p4": 3}
+    "growth_targets": [
+      "ml"
+    ],
+    "affinities": {
+      "p2": 4,
+      "p3": 2,
+      "p4": 3
+    }
   },
   {
     "id": "p2",
@@ -22,12 +37,28 @@
     "years_of_experience": 4.0,
     "fte_capacity": 1.0,
     "skills": [
-      {"skill_id": "react", "level": 5},
-      {"skill_id": "typescript", "level": 4},
-      {"skill_id": "design", "level": 2}
+      {
+        "id": "react",
+        "level": 5
+      },
+      {
+        "id": "typescript",
+        "level": 4
+      },
+      {
+        "id": "design",
+        "level": 2
+      }
     ],
-    "growth_targets": ["design", "sql"],
-    "affinities": {"p1": 4, "p3": 1, "p4": 2}
+    "growth_targets": [
+      "design",
+      "sql"
+    ],
+    "affinities": {
+      "p1": 4,
+      "p3": 1,
+      "p4": 2
+    }
   },
   {
     "id": "p3",
@@ -37,12 +68,27 @@
     "years_of_experience": 6.0,
     "fte_capacity": 0.8,
     "skills": [
-      {"skill_id": "python", "level": 4},
-      {"skill_id": "ml", "level": 5},
-      {"skill_id": "sql", "level": 5}
+      {
+        "id": "python",
+        "level": 4
+      },
+      {
+        "id": "ml",
+        "level": 5
+      },
+      {
+        "id": "sql",
+        "level": 5
+      }
     ],
-    "growth_targets": ["devops"],
-    "affinities": {"p1": 2, "p2": 1, "p4": 4}
+    "growth_targets": [
+      "devops"
+    ],
+    "affinities": {
+      "p1": 2,
+      "p2": 1,
+      "p4": 4
+    }
   },
   {
     "id": "p4",
@@ -52,12 +98,25 @@
     "years_of_experience": 12.0,
     "fte_capacity": 1.0,
     "skills": [
-      {"skill_id": "devops", "level": 5},
-      {"skill_id": "docker", "level": 5},
-      {"skill_id": "python", "level": 3}
+      {
+        "id": "devops",
+        "level": 5
+      },
+      {
+        "id": "docker",
+        "level": 5
+      },
+      {
+        "id": "python",
+        "level": 3
+      }
     ],
     "growth_targets": [],
-    "affinities": {"p1": 3, "p2": 2, "p3": 4}
+    "affinities": {
+      "p1": 3,
+      "p2": 2,
+      "p3": 4
+    }
   },
   {
     "id": "p5",
@@ -67,11 +126,44 @@
     "years_of_experience": 1.5,
     "fte_capacity": 1.0,
     "skills": [
-      {"skill_id": "react", "level": 3},
-      {"skill_id": "typescript", "level": 2},
-      {"skill_id": "design", "level": 4}
+      {
+        "id": "react",
+        "level": 3
+      },
+      {
+        "id": "typescript",
+        "level": 2
+      },
+      {
+        "id": "design",
+        "level": 4
+      }
     ],
-    "growth_targets": ["typescript", "sql"],
-    "affinities": {"p2": 3}
+    "growth_targets": [
+      "typescript",
+      "sql"
+    ],
+    "affinities": {
+      "p2": 3
+    }
+  },
+  {
+    "name": "test",
+    "role": "new_role",
+    "seniority": "mid",
+    "years_of_experience": 5.0,
+    "fte_capacity": 1.0,
+    "skills": [
+      {
+        "id": "rust",
+        "description": "",
+        "level": 3.0
+      }
+    ],
+    "availability_windows": [],
+    "preferences": [],
+    "growth_targets": [],
+    "affinities": {},
+    "id": "8616c573-ac43-45ab-8598-9995923ac5bb"
   }
 ]

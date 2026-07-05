@@ -1,0 +1,30 @@
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    command: bun run dev --host
+
+  backend:
+    build:
+      context: ..                  # repo root — needs optimizer/ and backend/ both
+      dockerfile: backend/Dockerfile
+      target: dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../optimizer:/app/optimizer
+      - ../backend:/app/backend
+      - ../backend/data:/app/backend/data
+    environment:
+      - DATA_DIR=/app/backend/data
+      - CORS_ORIGINS=http://localhost:3000
+      - DEBUG=true
