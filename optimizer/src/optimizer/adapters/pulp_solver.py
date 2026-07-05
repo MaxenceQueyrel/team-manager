@@ -7,6 +7,7 @@ from optimizer.models import (
     AssignedMember,
     AssignmentResult,
     ProjectPhase,
+    Squad,
 )
 from optimizer.objectives import compute_person_scores
 from optimizer.constraints import feasible_people
@@ -59,6 +60,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         x, objective_terms = self._build_phase(model, "0", project, candidates, weights)
         model += pulp.lpSum(objective_terms)
         model.solve(pulp.PULP_CBC_CMD(msg=False))
+        self._check_optimal(model, project)
 
         members = [
             AssignedMember(person_id=p.id, fte_allocation=min(effective_availability(p, project), 1.0))
@@ -102,6 +104,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
 
         model += pulp.lpSum(objective_terms)
         model.solve(pulp.PULP_CBC_CMD(msg=False))
+        self._check_optimal(model, project)
 
         all_members = [
             AssignedMember(
@@ -117,6 +120,36 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         return AssignmentResult(
             project_id=project.id, members=all_members, score=round(pulp.value(model.objective), 6)
         )
+
+    def _check_optimal(self, model: pulp.LpProblem, project: ProjectInput) -> None:
+        status = pulp.LpStatus[model.status]
+        if status != "Optimal":
+            raise ValueError(
+                f"Could not solve assignment for project '{project.id}': solver status is '{status}'. "
+                "Check for conflicting constraints (e.g. squads and n_slots that can't be satisfied together)."
+            )
+
+    def _expand_included_via_squads(
+        self, included_ids: set[str], squads: list[Squad], candidate_ids: set[str]
+    ) -> set[str]:
+        """Grows a forced-inclusion set to cover squad-mates of already-included people.
+
+        Without this, the slot-count constraint could be sized for the seed
+        ``included_ids`` while squad equality constraints silently force extra
+        people to ``1``, making the MILP infeasible.
+        """
+        expanded = set(included_ids)
+        changed = True
+        while changed:
+            changed = False
+            for squad in squads:
+                present = [pid for pid in squad.member_ids if pid in candidate_ids]
+                if expanded & set(present):
+                    newly_added = set(present) - expanded
+                    if newly_added:
+                        expanded |= newly_added
+                        changed = True
+        return expanded
 
     def _phase_shadow(self, project: ProjectInput, phase: ProjectPhase) -> ProjectInput:
         return ProjectInput(
@@ -150,7 +183,10 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             The per-person selection variables and the objective terms contributed by this phase.
         """
         scores = compute_person_scores(project, candidates, weights)
-        included_ids = set(project.included_person_ids) & {p.id for p in candidates}
+        candidate_ids = {p.id for p in candidates}
+        included_ids = self._expand_included_via_squads(
+            set(project.included_person_ids) & candidate_ids, project.squads, candidate_ids
+        )
         n_selected = max(min(project.n_slots, len(candidates)), len(included_ids))
 
         x = {p.id: pulp.LpVariable(f"x_{prefix}_{p.id}", cat="Binary") for p in candidates}

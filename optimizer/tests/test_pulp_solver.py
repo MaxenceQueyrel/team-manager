@@ -88,6 +88,14 @@ def test_growth_weight_prefers_learner(solver, project, people):
     assert result.members[0].person_id == "p2"
 
 
+def test_preference_weight_prefers_stated_preference(solver, project, people):
+    people[1].preferences = ["python"]
+    weights = AssignmentWeights(performance=0.0, chemistry=0.0, growth=0.0, cost=0.0, preference=1.0)
+    result = solver.solve(project, people, weights)
+    # p2 lists python as a preference; p1 doesn't → higher preference score
+    assert result.members[0].person_id == "p2"
+
+
 def test_chemistry_bonus_applied(solver, project, people):
     project.n_slots = 2
     weights = AssignmentWeights(performance=0.0, chemistry=1.0, growth=0.0, cost=0.0)
@@ -196,6 +204,37 @@ def test_squad_pulls_in_partner(solver):
     result = solver.solve(with_squad, candidates, perf_only)
     selected = {m.person_id for m in result.members}
     assert selected == {"ds_a", "dev"}  # squad drags the developer in, displacing ds_b
+
+
+def test_squad_larger_than_n_slots_is_still_solved(solver):
+    # n_slots=1 with a forced member whose squad partner isn't otherwise
+    # accounted for used to under-size the cardinality constraint and make
+    # the MILP silently infeasible. Both squad members should now be seated.
+    candidates = [
+        PersonInput(id="a", seniority=Seniority.SENIOR, years_of_experience=5),
+        PersonInput(id="b", seniority=Seniority.SENIOR, years_of_experience=5),
+    ]
+    project = ProjectInput(
+        id="proj-test",
+        n_slots=1,
+        included_person_ids=["a"],
+        squads=[Squad(member_ids=["a", "b"])],
+    )
+    result = solver.solve(project, candidates, AssignmentWeights())
+    assert {m.person_id for m in result.members} == {"a", "b"}
+
+
+def test_unsatisfiable_squad_raises(solver):
+    # A squad of 2 can only contribute 0 or 2 to the selection count, so it
+    # can never satisfy an odd, unforced n_slots=1 — this should surface as
+    # a clear error rather than a bogus empty/fractional result.
+    candidates = [
+        PersonInput(id="a", seniority=Seniority.SENIOR, years_of_experience=5),
+        PersonInput(id="b", seniority=Seniority.SENIOR, years_of_experience=5),
+    ]
+    project = ProjectInput(id="proj-test", n_slots=1, squads=[Squad(member_ids=["a", "b"])])
+    with pytest.raises(ValueError):
+        solver.solve(project, candidates, AssignmentWeights())
 
 
 def test_phase_date_range_filters_unavailable_person(solver, people):
