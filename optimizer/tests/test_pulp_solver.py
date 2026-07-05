@@ -60,12 +60,30 @@ def test_returns_result(solver, project, people):
     assert result.project_id == "proj-test"
     assert len(result.members) >= 1
     assert result.score >= 0.0
+    assert result.score <= result.max_score
 
 
 def test_empty_people(solver, project):
     result = solver.solve(project, [], AssignmentWeights())
     assert result.members == []
     assert result.score == 0.0
+    assert result.max_score == 0.0
+
+
+def test_max_score_reflects_slots_and_weights(solver, project, people):
+    weights = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0, preference=0.0)
+    result = solver.solve(project, people, weights)
+    # n_slots=1, per-person max is performance weight alone (1.0) → max_score = 1.0
+    assert result.max_score == pytest.approx(1.0)
+
+
+def test_max_score_accounts_for_chemistry(solver, project, people):
+    project.n_slots = 2
+    weights = AssignmentWeights(performance=0.0, chemistry=1.0, growth=0.0, cost=0.0)
+    result = solver.solve(project, people, weights)
+    # 2 selected → 1 pair, chemistry weight 1.0 × max affinity 5.0 = 5.0
+    assert result.max_score == pytest.approx(5.0)
+    assert result.score <= result.max_score
 
 
 def test_respects_exclusions(solver, project, people):
@@ -153,6 +171,12 @@ def test_phases_produce_tagged_members_and_summed_score(solver, people):
         + solver.solve(standalone_phase2, people, weights).score
     )
     assert result.score == pytest.approx(expected_score)
+
+    expected_max_score = (
+        solver.solve(standalone_phase1, people, weights).max_score
+        + solver.solve(standalone_phase2, people, weights).max_score
+    )
+    assert result.max_score == pytest.approx(expected_max_score)
 
 
 def test_handover_keeps_same_person_across_phases(solver):

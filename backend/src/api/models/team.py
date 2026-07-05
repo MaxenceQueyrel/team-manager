@@ -8,6 +8,7 @@ class Team(BaseModel):
     members: list[AssignedMember] = []
     is_optimized: bool = False
     optimization_score: float | None = None
+    optimization_max_score: float | None = None
 
 
 class OptimizationRequest(BaseModel):

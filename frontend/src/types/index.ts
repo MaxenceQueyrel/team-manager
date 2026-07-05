@@ -78,6 +78,7 @@ export interface Team {
   members: AssignedMember[];
   is_optimized: boolean;
   optimization_score?: number | null;
+  optimization_max_score?: number | null;
 }
 
 export interface Skill {

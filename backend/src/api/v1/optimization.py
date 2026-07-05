@@ -60,6 +60,7 @@ def solve_assignment(request: OptimizationRequest):
             "members": [m.model_dump() for m in result.members],
             "is_optimized": True,
             "optimization_score": result.score,
+            "optimization_max_score": result.max_score,
         }
     )
     return saved
