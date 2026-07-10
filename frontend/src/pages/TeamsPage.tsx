@@ -37,7 +37,9 @@ export default function TeamsPage() {
               </div>
               {t.optimization_score != null && (
                 <p style={{ margin: "0.4rem 0 0.75rem", fontSize: "0.875rem", color: colors.muted }}>
-                  Score: {t.optimization_score.toFixed(3)} · {t.members.length} member(s)
+                  Score: {t.optimization_score.toFixed(2)}
+                  {t.optimization_max_score != null && `/${t.optimization_max_score.toFixed(2)}`} ·{" "}
+                  {t.members.length} member(s)
                 </p>
               )}
               <TeamMembers members={t.members} people={people} />

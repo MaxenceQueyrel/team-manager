@@ -23,6 +23,7 @@ def compute_person_scores(
             weights.performance * _skill_score(project, person)
             + weights.growth * _growth_score(project, person)
             + weights.cost * (1.0 - _experience_score(person))
+            + weights.preference * _preference_score(project, person)
         )
     return scores
 
@@ -47,3 +48,10 @@ def _growth_score(project: ProjectInput, person: PersonInput) -> float:
     if not project_skills:
         return 0.0
     return len(project_skills & set(person.growth_targets)) / len(project_skills)
+
+
+def _preference_score(project: ProjectInput, person: PersonInput) -> float:
+    project_skills = {r.id for r in project.skill_requirements}
+    if not project_skills:
+        return 0.0
+    return len(project_skills & set(person.preferences)) / len(project_skills)

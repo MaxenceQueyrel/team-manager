@@ -114,7 +114,12 @@ export default function OptimizationPage() {
         <Card>
           <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Result</h2>
           <p style={{ marginTop: 0 }}>
-            Optimization score: <strong>{result.optimization_score?.toFixed(4) ?? "—"}</strong>
+            Optimization score:{" "}
+            <strong>
+              {result.optimization_score != null && result.optimization_max_score != null
+                ? `${result.optimization_score.toFixed(2)}/${result.optimization_max_score.toFixed(2)}`
+                : "—"}
+            </strong>
           </p>
           {result.members.length === 0 ? (
             <p style={{ color: colors.muted }}>No feasible assignment found for these constraints.</p>

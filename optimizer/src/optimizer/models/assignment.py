@@ -11,6 +11,9 @@ class AssignmentWeights(BaseModel):
     )
     growth: float = Field(default=0.25, ge=0, le=1, description="Weight for learning opportunities.")
     cost: float = Field(default=0.25, ge=0, le=1, description="Weight for avoiding over-qualification.")
+    preference: float = Field(
+        default=0.0, ge=0, le=1, description="Weight for alignment with the person's stated skill preferences."
+    )
     handover: float = Field(
         default=0.0,
         ge=0,
@@ -35,3 +38,4 @@ class AssignmentResult(BaseModel):
     project_id: str = Field(description="Identifier of the project the assignment was computed for.")
     members: list[AssignedMember] = Field(description="People assigned to the project, with their FTE allocation.")
     score: float = Field(description="Composite score of the assignment.")
+    max_score: float = Field(description="Theoretical maximum score achievable for this assignment's weights and slot count.")

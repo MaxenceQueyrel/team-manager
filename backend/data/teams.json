@@ -21,5 +21,23 @@
     "is_optimized": true,
     "optimization_score": 3.258333,
     "id": "e4d91ac7-104f-4d5f-ba13-f663ad61638d"
+  },
+  {
+    "project_id": "proj2",
+    "members": [
+      {
+        "person_id": "p1",
+        "fte_allocation": 1.0,
+        "phase_id": null
+      },
+      {
+        "person_id": "p2",
+        "fte_allocation": 1.0,
+        "phase_id": null
+      }
+    ],
+    "is_optimized": true,
+    "optimization_score": 4.283333,
+    "id": "711731b6-6e51-434a-b86c-2c28502121ed"
   }
 ]
