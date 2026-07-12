@@ -5,6 +5,7 @@ import PeoplePage from "@/pages/PeoplePage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import TeamsPage from "@/pages/TeamsPage";
 import OptimizationPage from "@/pages/OptimizationPage";
+import AvailabilityPage from "@/pages/AvailabilityPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="optimization" element={<OptimizationPage />} />
+        <Route path="availability" element={<AvailabilityPage />} />
       </Route>
     </Routes>
   );

@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Person, Project, Role, Team, Skill, OptimizationRequest } from "@/types";
+import type { Person, PersonAvailability, Project, Role, Team, Skill, OptimizationRequest } from "@/types";
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "",
@@ -14,6 +14,8 @@ export const peopleApi = {
   update: (id: string, data: Omit<Person, "id">) =>
     client.put<Person>(`/api/v1/people/${id}`, data).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/people/${id}`),
+  availability: (start: string, end: string) =>
+    client.get<PersonAvailability[]>("/api/v1/people/availability", { params: { start, end } }).then((r) => r.data),
 };
 
 export const projectsApi = {
