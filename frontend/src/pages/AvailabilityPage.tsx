@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
-  AvailabilityTimeline,
+  AvailabilityCalendar,
   ratioColor,
   type TimelineOverlay,
   type TimelineRow,
-} from "@/components/common/AvailabilityTimeline";
+} from "@/components/common/AvailabilityCalendar";
 import { Card, colors, Field, inputStyle } from "@/components/common/ui";
 import { TagSkillInput } from "@/components/editors/listEditors";
 import { peopleApi } from "@/services/api";
@@ -267,7 +267,7 @@ export default function AvailabilityPage() {
             {people.length === 0 ? "No people found." : "No people match the selected filters."}
           </p>
         ) : (
-          <AvailabilityTimeline start={start} end={end} rows={rows} overlays={overlays} />
+          <AvailabilityCalendar start={start} end={end} rows={rows} overlays={overlays} />
         )}
       </Card>
     </div>
