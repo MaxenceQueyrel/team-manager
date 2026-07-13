@@ -112,6 +112,7 @@ make run-frontend     Run frontend dev server locally
 make test             Run all tests (optimizer + API)
 make test-optimizer   Run optimizer unit tests only
 make test-api         Run backend API tests only
+make test-e2e         Run frontend Playwright end-to-end tests
 
 make lint-backend     Lint Python code with ruff
 make lint-frontend    Lint TypeScript with eslint

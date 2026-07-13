@@ -38,6 +38,27 @@ Opens at <http://localhost:3000> with HMR. The dev server proxies `/api` to the 
 | `bun run build` | Type-check + build for production (output in `dist/`) |
 | `bun run preview` | Serve the production build locally |
 | `bun run lint` | Run ESLint over `src/` |
+| `bun run test:e2e` | Run the Playwright end-to-end suite (see below) |
+
+---
+
+## End-to-end tests
+
+[Playwright](https://playwright.dev/) drives the real app through a handful of core user flows: creating a person, creating a project, running an optimization, and viewing the availability calendar. Specs live in `e2e/`.
+
+One-time setup:
+
+```bash
+cd frontend && bunx playwright install chromium
+```
+
+Run the whole suite, including an isolated backend so tests never touch `backend/data/*.json`:
+
+```bash
+make test-e2e            # from repo root; runs scripts/test-e2e.sh
+```
+
+Alternatively, run `bun run test:e2e` directly from `frontend/` against a backend you're already running (e.g. via `make run-backend`) — Playwright starts the frontend dev server itself.
 
 ---
 
