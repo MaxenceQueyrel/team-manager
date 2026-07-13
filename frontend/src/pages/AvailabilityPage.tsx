@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/shallow";
 import {
   AvailabilityTimeline,
   ratioColor,
@@ -6,9 +7,12 @@ import {
   type TimelineRow,
 } from "@/components/common/AvailabilityTimeline";
 import { Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { TagSkillInput } from "@/components/editors/listEditors";
 import { peopleApi } from "@/services/api";
-import { useAppStore } from "@/store";
-import type { PersonAvailability } from "@/types";
+import { knownSkillIds, useAppStore } from "@/store";
+import type { PersonAvailability, Seniority } from "@/types";
+
+const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];
 
 function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -22,17 +26,23 @@ function defaultRange(): { start: string; end: string } {
 }
 
 export default function AvailabilityPage() {
-  const { people, projects, fetchPeople, fetchProjects } = useAppStore();
+  const { people, projects, fetchPeople, fetchProjects, fetchSkills } = useAppStore();
+  const skillOptions = useAppStore(useShallow(knownSkillIds));
   const [{ start, end }, setRange] = useState(defaultRange);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [availability, setAvailability] = useState<PersonAvailability[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seniorityFilter, setSeniorityFilter] = useState<Seniority[]>([]);
+  const [skillFilter, setSkillFilter] = useState<string[]>([]);
+  const [minSkillLevel, setMinSkillLevel] = useState(0);
+  const [squadOnly, setSquadOnly] = useState(false);
 
   useEffect(() => {
     fetchPeople();
     fetchProjects();
-  }, [fetchPeople, fetchProjects]);
+    fetchSkills();
+  }, [fetchPeople, fetchProjects, fetchSkills]);
 
   useEffect(() => {
     if (start > end) {
@@ -49,17 +59,49 @@ export default function AvailabilityPage() {
   }, [start, end]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const squadFilterAvailable = (selectedProject?.squads.length ?? 0) > 0;
+
+  const squadMemberIds = useMemo(() => {
+    const ids = new Set<string>();
+    selectedProject?.squads.forEach((squad) => {
+      squad.member_ids.forEach((id) => {
+        ids.add(id);
+      });
+    });
+    return ids;
+  }, [selectedProject]);
+
+  const filteredPeople = useMemo(() => {
+    return people.filter((person) => {
+      if (seniorityFilter.length > 0 && !seniorityFilter.includes(person.seniority)) return false;
+      if (
+        skillFilter.length > 0 &&
+        !person.skills.some((s) => skillFilter.includes(s.id) && s.level >= minSkillLevel)
+      )
+        return false;
+      if (squadOnly && squadFilterAvailable && !squadMemberIds.has(person.id)) return false;
+      return true;
+    });
+  }, [
+    people,
+    seniorityFilter,
+    skillFilter,
+    minSkillLevel,
+    squadOnly,
+    squadFilterAvailable,
+    squadMemberIds,
+  ]);
 
   const rows: TimelineRow[] = useMemo(() => {
     const byPersonId = new Map(availability.map((a) => [a.person_id, a.segments]));
-    return people
+    return filteredPeople
       .map((person) => ({
         id: person.id,
         label: person.name,
         segments: byPersonId.get(person.id) ?? [],
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [people, availability]);
+  }, [filteredPeople, availability]);
 
   const overlays: TimelineOverlay[] = useMemo(() => {
     if (!selectedProject) return [];
@@ -105,7 +147,10 @@ export default function AvailabilityPage() {
           <Field label="Overlay project" hint="Highlights the project's period on the timeline">
             <select
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+              onChange={(e) => {
+                setSelectedProjectId(e.target.value);
+                setSquadOnly(false);
+              }}
               style={inputStyle}
             >
               <option value="">— none —</option>
@@ -118,6 +163,86 @@ export default function AvailabilityPage() {
           </Field>
         </div>
         {error && <p style={{ color: colors.danger, margin: "0.5rem 0 0" }}>{error}</p>}
+      </Card>
+
+      <Card style={{ marginBottom: "1.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 1rem" }}>
+          <Field label="Seniority" hint="Only show these levels">
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              {SENIORITIES.map((s) => (
+                <label
+                  key={s}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={seniorityFilter.includes(s)}
+                    onChange={() =>
+                      setSeniorityFilter((prev) =>
+                        prev.includes(s) ? prev.filter((v) => v !== s) : [...prev, s],
+                      )
+                    }
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+          </Field>
+          <Field label="Skills" hint="Only show people with at least one of these skills">
+            <TagSkillInput
+              value={skillFilter}
+              onChange={setSkillFilter}
+              skillOptions={skillOptions}
+            />
+            {skillFilter.length > 0 && (
+              <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: "0.8rem", color: colors.muted }}>Min. level</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={minSkillLevel}
+                  onChange={(e) => setMinSkillLevel(parseFloat(e.target.value) || 0)}
+                  style={{ ...inputStyle, width: 80 }}
+                />
+              </div>
+            )}
+          </Field>
+          <Field
+            label="Squad membership"
+            hint={
+              squadFilterAvailable
+                ? "Restrict to the selected project's squad members"
+                : "Select a project with at least one squad to enable"
+            }
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.85rem",
+                cursor: squadFilterAvailable ? "pointer" : "not-allowed",
+                opacity: squadFilterAvailable ? 1 : 0.5,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={squadOnly}
+                disabled={!squadFilterAvailable}
+                onChange={(e) => setSquadOnly(e.target.checked)}
+              />
+              Squad members only
+            </label>
+          </Field>
+        </div>
       </Card>
 
       <Card>
@@ -138,7 +263,9 @@ export default function AvailabilityPage() {
         {loading && rows.length === 0 ? (
           <p>Loading…</p>
         ) : rows.length === 0 ? (
-          <p style={{ color: colors.muted }}>No people found.</p>
+          <p style={{ color: colors.muted }}>
+            {people.length === 0 ? "No people found." : "No people match the selected filters."}
+          </p>
         ) : (
           <AvailabilityTimeline start={start} end={end} rows={rows} overlays={overlays} />
         )}
