@@ -6,9 +6,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "biome check src",
-    "lint:fix": "biome check --write src",
-    "format": "biome format --write src"
+    "lint": "biome check src e2e playwright.config.ts",
+    "lint:fix": "biome check --write src e2e playwright.config.ts",
+    "format": "biome format --write src e2e playwright.config.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "axios": "^1.7.0",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.3",
+    "@playwright/test": "^1.61.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",

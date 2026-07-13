@@ -1,7 +1,7 @@
 .PHONY: dev prod down down-prod logs build \
         sync install-backend install-frontend \
         run-backend run-frontend \
-        test test-optimizer test-api \
+        test test-optimizer test-api test-e2e \
         lint-backend lint-frontend format-frontend \
         clean
 
@@ -53,6 +53,9 @@ test-optimizer:   ## Run optimizer unit tests
 
 test-api:         ## Run backend API tests
 	cd backend && uv run pytest tests/ -v
+
+test-e2e:         ## Run frontend Playwright end-to-end tests (spins up an isolated backend)
+	./scripts/test-e2e.sh
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 

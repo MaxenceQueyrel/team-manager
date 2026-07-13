@@ -4,6 +4,11 @@ dist/
 .next/
 bun.lockb
 
+# ── Playwright ────────────────────────────────────────────────────────────────
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+
 # ── Environment & secrets ─────────────────────────────────────────────────────
 .env
 .env.local
