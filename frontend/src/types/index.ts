@@ -27,6 +27,15 @@ export interface AvailabilityWindow extends DateRange {
   ratio: number; // 0–1 fraction of FTE during the window
 }
 
+export interface AvailabilitySegment extends DateRange {
+  ratio: number; // 0–1 fraction of FTE available during the segment
+}
+
+export interface PersonAvailability {
+  person_id: string;
+  segments: AvailabilitySegment[];
+}
+
 export interface Person {
   id: string;
   name: string;

@@ -2,7 +2,7 @@
         sync install-backend install-frontend \
         run-backend run-frontend \
         test test-optimizer test-api \
-        lint-backend lint-frontend \
+        lint-backend lint-frontend format-frontend \
         clean
 
 COMPOSE     = docker compose
@@ -59,8 +59,11 @@ test-api:         ## Run backend API tests
 lint-backend:     ## Lint optimizer + backend with ruff
 	uv run ruff check optimizer/src backend/src
 
-lint-frontend:    ## Lint frontend with eslint
+lint-frontend:    ## Lint frontend with biome
 	cd frontend && bun run lint
+
+format-frontend:  ## Format frontend with biome
+	cd frontend && bun run format
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 

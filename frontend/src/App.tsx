@@ -1,10 +1,11 @@
-import { Routes, Route } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import Layout from "@/components/common/Layout";
+import AvailabilityPage from "@/pages/AvailabilityPage";
 import DashboardPage from "@/pages/DashboardPage";
+import OptimizationPage from "@/pages/OptimizationPage";
 import PeoplePage from "@/pages/PeoplePage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import TeamsPage from "@/pages/TeamsPage";
-import OptimizationPage from "@/pages/OptimizationPage";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="optimization" element={<OptimizationPage />} />
+        <Route path="availability" element={<AvailabilityPage />} />
       </Route>
     </Routes>
   );

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useEffect } from "react";
 
 export const colors = {
   border: "#e9ecef",
@@ -81,9 +81,12 @@ export function Field({
   style?: CSSProperties;
 }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: generic layout wrapper — callers always pass a form control as children
     <label style={{ display: "block", marginBottom: "0.85rem", ...style }}>
       <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      {hint && <div style={{ fontSize: "0.75rem", color: colors.muted, marginBottom: 4 }}>{hint}</div>}
+      {hint && (
+        <div style={{ fontSize: "0.75rem", color: colors.muted, marginBottom: 4 }}>{hint}</div>
+      )}
       {children}
     </label>
   );
@@ -134,7 +137,15 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: full-screen backdrop closes on click; Escape (handled above) is the keyboard equivalent
+    // biome-ignore lint/a11y/useKeyWithClickEvents: same as above
     <div
       onClick={onClose}
       style={{
@@ -149,6 +160,8 @@ export function Modal({
         zIndex: 100,
       }}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: stops backdrop click-to-close from bubbling; not itself an interactive control */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: same as above */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -170,8 +183,16 @@ export function Modal({
         >
           <h2 style={{ margin: 0, fontSize: "1.1rem" }}>{title}</h2>
           <button
+            type="button"
             onClick={onClose}
-            style={{ border: "none", background: "none", fontSize: "1.4rem", cursor: "pointer", lineHeight: 1, color: colors.muted }}
+            style={{
+              border: "none",
+              background: "none",
+              fontSize: "1.4rem",
+              cursor: "pointer",
+              lineHeight: 1,
+              color: colors.muted,
+            }}
             aria-label="Close"
           >
             ×

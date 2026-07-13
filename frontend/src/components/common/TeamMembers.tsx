@@ -1,5 +1,5 @@
-import type { AssignedMember, Person } from "@/types";
 import { colors } from "@/components/common/ui";
+import type { AssignedMember, Person } from "@/types";
 
 /** Renders assigned members, grouped by phase when the assignment is phased. */
 export function TeamMembers({ members, people }: { members: AssignedMember[]; people: Person[] }) {
@@ -26,7 +26,9 @@ export function TeamMembers({ members, people }: { members: AssignedMember[]; pe
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
       {phases.map((phaseId) => (
         <div key={phaseId ?? "unassigned"}>
-          <div style={{ fontSize: "0.78rem", fontWeight: 600, color: colors.primary, marginBottom: 2 }}>
+          <div
+            style={{ fontSize: "0.78rem", fontWeight: 600, color: colors.primary, marginBottom: 2 }}
+          >
             {phaseId ?? "Unassigned"}
           </div>
           <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>

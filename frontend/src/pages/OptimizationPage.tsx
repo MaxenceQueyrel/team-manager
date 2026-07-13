@@ -1,21 +1,32 @@
-import { useState, useEffect } from "react";
-import { useAppStore } from "@/store";
-import { optimizationApi } from "@/services/api";
-import type { OptimizationWeights, Team } from "@/types";
-import { Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { useEffect, useState } from "react";
 import { TeamMembers } from "@/components/common/TeamMembers";
+import { Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { optimizationApi } from "@/services/api";
+import { useAppStore } from "@/store";
+import type { OptimizationWeights, Team } from "@/types";
 
 const WEIGHT_KEYS: { key: keyof OptimizationWeights; label: string; description: string }[] = [
   { key: "performance", label: "Performance", description: "Skill fit & seniority" },
   { key: "chemistry", label: "Chemistry", description: "Pairwise affinity between members" },
   { key: "growth", label: "Growth", description: "Learning opportunities" },
   { key: "cost", label: "Cost Efficiency", description: "Avoid over-qualification" },
-  { key: "handover", label: "Handover", description: "Keep the same people across consecutive phases" },
+  {
+    key: "handover",
+    label: "Handover",
+    description: "Keep the same people across consecutive phases",
+  },
 ];
 
 export default function OptimizationPage() {
-  const { projects, people, optimizationWeights, setWeights, fetchProjects, fetchPeople, fetchTeams } =
-    useAppStore();
+  const {
+    projects,
+    people,
+    optimizationWeights,
+    setWeights,
+    fetchProjects,
+    fetchPeople,
+    fetchTeams,
+  } = useAppStore();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [respectExclusions, setRespectExclusions] = useState(true);
   const [result, setResult] = useState<Team | null>(null);
@@ -61,7 +72,8 @@ export default function OptimizationPage() {
           <div key={key} style={{ marginBottom: "1rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span>
-                <strong>{label}</strong> <span style={{ color: colors.muted }}>— {description}</span>
+                <strong>{label}</strong>{" "}
+                <span style={{ color: colors.muted }}>— {description}</span>
               </span>
               <span>{(optimizationWeights[key] * 100).toFixed(0)}%</span>
             </div>
@@ -81,10 +93,16 @@ export default function OptimizationPage() {
       <Card style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ fontSize: "1.05rem", marginTop: 0 }}>Run</h2>
         <Field label="Project">
-          <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} style={inputStyle}>
+          <select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            style={inputStyle}
+          >
             <option value="">— choose a project —</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
         </Field>
@@ -95,12 +113,25 @@ export default function OptimizationPage() {
               ? `${selectedProject.phases.length} phase(s)`
               : `${selectedProject.n_slots} slot(s)`}
             {selectedProject.squads.length > 0 && ` · ${selectedProject.squads.length} squad(s)`}
-            {selectedProject.included_person_ids.length > 0 && ` · ${selectedProject.included_person_ids.length} forced member(s)`}
+            {selectedProject.included_person_ids.length > 0 &&
+              ` · ${selectedProject.included_person_ids.length} forced member(s)`}
           </p>
         )}
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.875rem", margin: "0.5rem 0 1rem" }}>
-          <input type="checkbox" checked={respectExclusions} onChange={(e) => setRespectExclusions(e.target.checked)} />
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: "0.875rem",
+            margin: "0.5rem 0 1rem",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={respectExclusions}
+            onChange={(e) => setRespectExclusions(e.target.checked)}
+          />
           Respect excluded people
         </label>
 
@@ -122,7 +153,9 @@ export default function OptimizationPage() {
             </strong>
           </p>
           {result.members.length === 0 ? (
-            <p style={{ color: colors.muted }}>No feasible assignment found for these constraints.</p>
+            <p style={{ color: colors.muted }}>
+              No feasible assignment found for these constraints.
+            </p>
           ) : (
             <TeamMembers members={result.members} people={people} />
           )}

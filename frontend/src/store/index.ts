@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { Person, Project, Role, Team, Skill, OptimizationWeights } from "@/types";
-import { peopleApi, projectsApi, rolesApi, teamsApi, skillsApi } from "@/services/api";
+import { peopleApi, projectsApi, rolesApi, skillsApi, teamsApi } from "@/services/api";
+import type { OptimizationWeights, Person, Project, Role, Skill, Team } from "@/types";
 
 interface AppState {
   people: Person[];
@@ -31,7 +31,8 @@ interface AppState {
 }
 
 function message(e: unknown): string {
-  if (typeof e === "object" && e && "message" in e) return String((e as { message: unknown }).message);
+  if (typeof e === "object" && e && "message" in e)
+    return String((e as { message: unknown }).message);
   return String(e);
 }
 
@@ -187,15 +188,29 @@ export const useAppStore = create<AppState>((set, get) => ({
 /** Distinct skill ids known across the skills catalog, people, and projects. */
 export function knownSkillIds(state: AppState): string[] {
   const ids = new Set<string>();
-  state.skills.forEach((s) => ids.add(s.id));
+  state.skills.forEach((s) => {
+    ids.add(s.id);
+  });
   state.people.forEach((p) => {
-    p.skills.forEach((s) => ids.add(s.id));
-    p.preferences.forEach((s) => ids.add(s));
-    p.growth_targets.forEach((s) => ids.add(s));
+    p.skills.forEach((s) => {
+      ids.add(s.id);
+    });
+    p.preferences.forEach((s) => {
+      ids.add(s);
+    });
+    p.growth_targets.forEach((s) => {
+      ids.add(s);
+    });
   });
   state.projects.forEach((pr) => {
-    pr.skill_requirements.forEach((s) => ids.add(s.id));
-    pr.phases.forEach((ph) => ph.skill_requirements.forEach((s) => ids.add(s.id)));
+    pr.skill_requirements.forEach((s) => {
+      ids.add(s.id);
+    });
+    pr.phases.forEach((ph) => {
+      ph.skill_requirements.forEach((s) => {
+        ids.add(s.id);
+      });
+    });
   });
   return [...ids].filter(Boolean).sort();
 }
@@ -203,7 +218,11 @@ export function knownSkillIds(state: AppState): string[] {
 /** Distinct role ids known across the role catalog and people. */
 export function knownRoleIds(state: AppState): string[] {
   const ids = new Set<string>();
-  state.roles.forEach((r) => ids.add(r.id));
-  state.people.forEach((p) => ids.add(p.role));
+  state.roles.forEach((r) => {
+    ids.add(r.id);
+  });
+  state.people.forEach((p) => {
+    ids.add(p.role);
+  });
   return [...ids].filter(Boolean).sort();
 }
