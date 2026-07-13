@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/shallow";
-import { knownSkillIds, useAppStore } from "@/store";
 import { Card, colors } from "@/components/common/ui";
+import { knownSkillIds, useAppStore } from "@/store";
 
 export default function DashboardPage() {
-  const { people, projects, teams, fetchPeople, fetchProjects, fetchTeams, fetchSkills } = useAppStore();
+  const { people, projects, teams, fetchPeople, fetchProjects, fetchTeams, fetchSkills } =
+    useAppStore();
   const skills = useAppStore(useShallow(knownSkillIds));
 
   useEffect(() => {
@@ -21,7 +22,11 @@ export default function DashboardPage() {
     <div>
       <h1>Dashboard</h1>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1.5rem" }}>
-        <StatCard label="People" value={people.length} sub={`${totalCapacity.toFixed(1)} FTE total`} />
+        <StatCard
+          label="People"
+          value={people.length}
+          sub={`${totalCapacity.toFixed(1)} FTE total`}
+        />
         <StatCard label="Projects" value={projects.length} />
         <StatCard label="Teams" value={teams.length} sub={`${optimizedTeams} optimized`} />
         <StatCard label="Skills tracked" value={skills.length} />

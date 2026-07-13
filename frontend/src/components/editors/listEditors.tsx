@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Button, colors, inputStyle } from "@/components/common/ui";
 import type {
   AvailabilityWindow,
   DateRange,
@@ -8,9 +9,13 @@ import type {
   SkillRequirement,
   Squad,
 } from "@/types";
-import { Button, colors, inputStyle } from "@/components/common/ui";
 
-const rowStyle = { display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.5rem" } as const;
+const rowStyle = {
+  display: "flex",
+  gap: "0.5rem",
+  alignItems: "center",
+  marginBottom: "0.5rem",
+} as const;
 
 function num(value: string): number {
   const n = parseFloat(value);
@@ -130,7 +135,9 @@ export function SkillReqsEditor({
           <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
         </div>
       ))}
-      <Button onClick={() => onChange([...value, { id: "", min_level: 3 }])}>+ Add requirement</Button>
+      <Button onClick={() => onChange([...value, { id: "", min_level: 3 }])}>
+        + Add requirement
+      </Button>
     </div>
   );
 }
@@ -149,9 +156,19 @@ export function DateRangesEditor({
     <div>
       {value.map((d, i) => (
         <div key={i} style={rowStyle}>
-          <input type="date" value={d.start} onChange={(e) => update(i, { start: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+          <input
+            type="date"
+            value={d.start}
+            onChange={(e) => update(i, { start: e.target.value })}
+            style={{ ...inputStyle, flex: 1 }}
+          />
           <span style={{ color: colors.muted }}>→</span>
-          <input type="date" value={d.end} onChange={(e) => update(i, { end: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+          <input
+            type="date"
+            value={d.end}
+            onChange={(e) => update(i, { end: e.target.value })}
+            style={{ ...inputStyle, flex: 1 }}
+          />
           <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
         </div>
       ))}
@@ -174,9 +191,19 @@ export function AvailabilityEditor({
     <div>
       {value.map((w, i) => (
         <div key={i} style={rowStyle}>
-          <input type="date" value={w.start} onChange={(e) => update(i, { start: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+          <input
+            type="date"
+            value={w.start}
+            onChange={(e) => update(i, { start: e.target.value })}
+            style={{ ...inputStyle, flex: 1 }}
+          />
           <span style={{ color: colors.muted }}>→</span>
-          <input type="date" value={w.end} onChange={(e) => update(i, { end: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+          <input
+            type="date"
+            value={w.end}
+            onChange={(e) => update(i, { end: e.target.value })}
+            style={{ ...inputStyle, flex: 1 }}
+          />
           <input
             type="number"
             min={0}
@@ -190,7 +217,9 @@ export function AvailabilityEditor({
           <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
         </div>
       ))}
-      <Button onClick={() => onChange([...value, { start: "", end: "", ratio: 0.5 }])}>+ Add window</Button>
+      <Button onClick={() => onChange([...value, { start: "", end: "", ratio: 0.5 }])}>
+        + Add window
+      </Button>
     </div>
   );
 }
@@ -274,7 +303,14 @@ export function TagSkillInput({
 
   return (
     <div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: value.length ? "0.5rem" : 0 }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "0.35rem",
+          marginBottom: value.length ? "0.5rem" : 0,
+        }}
+      >
         {value.map((tag) => (
           <span
             key={tag}
@@ -293,7 +329,14 @@ export function TagSkillInput({
             <button
               type="button"
               onClick={() => onChange(value.filter((t) => t !== tag))}
-              style={{ border: "none", background: "none", cursor: "pointer", color: colors.primary, fontSize: "1rem", lineHeight: 1 }}
+              style={{
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                color: colors.primary,
+                fontSize: "1rem",
+                lineHeight: 1,
+              }}
             >
               ×
             </button>
@@ -331,7 +374,10 @@ export function PersonMultiSelect({
   const toggle = (id: string) =>
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
 
-  if (people.length === 0) return <p style={{ color: colors.muted, fontSize: "0.85rem", margin: 0 }}>No people available.</p>;
+  if (people.length === 0)
+    return (
+      <p style={{ color: colors.muted, fontSize: "0.85rem", margin: 0 }}>No people available.</p>
+    );
 
   return (
     <div
@@ -347,7 +393,16 @@ export function PersonMultiSelect({
       }}
     >
       {people.map((p) => (
-        <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", cursor: "pointer" }}>
+        <label
+          key={p.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: "0.85rem",
+            cursor: "pointer",
+          }}
+        >
           <input type="checkbox" checked={value.includes(p.id)} onChange={() => toggle(p.id)} />
           {p.name}
         </label>
@@ -371,12 +426,31 @@ export function SquadsEditor({
   return (
     <div>
       {value.map((squad, i) => (
-        <div key={i} style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: "0.6rem", marginBottom: "0.6rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+        <div
+          key={i}
+          style={{
+            border: `1px solid ${colors.border}`,
+            borderRadius: 6,
+            padding: "0.6rem",
+            marginBottom: "0.6rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "0.4rem",
+            }}
+          >
             <strong style={{ fontSize: "0.85rem" }}>Squad {i + 1}</strong>
             <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
           </div>
-          <PersonMultiSelect value={squad.member_ids} onChange={(ids) => update(i, ids)} people={people} />
+          <PersonMultiSelect
+            value={squad.member_ids}
+            onChange={(ids) => update(i, ids)}
+            people={people}
+          />
         </div>
       ))}
       <Button onClick={() => onChange([...value, { member_ids: [] }])}>+ Add squad</Button>
@@ -399,8 +473,19 @@ export function PhasesEditor({
   return (
     <div>
       {value.map((phase, i) => (
-        <div key={i} style={{ border: `1px solid ${colors.borderStrong}`, borderRadius: 8, padding: "0.85rem", marginBottom: "0.85rem", background: colors.light }}>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.6rem" }}>
+        <div
+          key={i}
+          style={{
+            border: `1px solid ${colors.borderStrong}`,
+            borderRadius: 8,
+            padding: "0.85rem",
+            marginBottom: "0.85rem",
+            background: colors.light,
+          }}
+        >
+          <div
+            style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.6rem" }}
+          >
             <input
               placeholder="phase id (e.g. design)"
               value={phase.id}
@@ -418,18 +503,30 @@ export function PhasesEditor({
             <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
           </div>
 
-          <div style={{ fontSize: "0.75rem", fontWeight: 600, margin: "0.25rem 0" }}>Skill requirements</div>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, margin: "0.25rem 0" }}>
+            Skill requirements
+          </div>
           <SkillReqsEditor
             value={phase.skill_requirements}
             onChange={(reqs) => update(i, { skill_requirements: reqs })}
             skillOptions={skillOptions}
           />
 
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem", margin: "0.6rem 0 0.3rem" }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: "0.8rem",
+              margin: "0.6rem 0 0.3rem",
+            }}
+          >
             <input
               type="checkbox"
               checked={phase.date_range !== null}
-              onChange={(e) => update(i, { date_range: e.target.checked ? { start: "", end: "" } : null })}
+              onChange={(e) =>
+                update(i, { date_range: e.target.checked ? { start: "", end: "" } : null })
+              }
             />
             Constrain to a date range
           </label>
@@ -438,21 +535,29 @@ export function PhasesEditor({
               <input
                 type="date"
                 value={phase.date_range.start}
-                onChange={(e) => update(i, { date_range: { ...phase.date_range!, start: e.target.value } })}
+                onChange={(e) =>
+                  update(i, { date_range: { ...phase.date_range!, start: e.target.value } })
+                }
                 style={{ ...inputStyle, flex: 1 }}
               />
               <span style={{ color: colors.muted }}>→</span>
               <input
                 type="date"
                 value={phase.date_range.end}
-                onChange={(e) => update(i, { date_range: { ...phase.date_range!, end: e.target.value } })}
+                onChange={(e) =>
+                  update(i, { date_range: { ...phase.date_range!, end: e.target.value } })
+                }
                 style={{ ...inputStyle, flex: 1 }}
               />
             </div>
           )}
         </div>
       ))}
-      <Button onClick={() => onChange([...value, { id: "", n_slots: 1, skill_requirements: [], date_range: null }])}>
+      <Button
+        onClick={() =>
+          onChange([...value, { id: "", n_slots: 1, skill_requirements: [], date_range: null }])
+        }
+      >
         + Add phase
       </Button>
     </div>

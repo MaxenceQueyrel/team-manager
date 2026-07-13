@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
+import {
+  Badge,
+  Button,
+  Card,
+  colors,
+  Field,
+  inputStyle,
+  Modal,
+  seniorityColors,
+} from "@/components/common/ui";
+import {
+  AffinitiesEditor,
+  AvailabilityEditor,
+  SkillsEditor,
+  TagSkillInput,
+} from "@/components/editors/listEditors";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import type { Person, Role, Seniority, Skill } from "@/types";
-import { Badge, Button, Card, colors, Field, inputStyle, Modal, seniorityColors } from "@/components/common/ui";
-import { AffinitiesEditor, AvailabilityEditor, SkillsEditor, TagSkillInput } from "@/components/editors/listEditors";
 
 const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];
 
@@ -53,7 +67,15 @@ export default function PeoplePage() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
         <h1 style={{ margin: 0 }}>People</h1>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>
@@ -64,7 +86,14 @@ export default function PeoplePage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "1rem",
+          marginTop: "1rem",
+        }}
+      >
         <CatalogCard
           title={`Roles (${roles.length})`}
           subtitle="Reusable labels people can select on the person form."
@@ -113,7 +142,10 @@ export default function PeoplePage() {
                   <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
                     Edit
                   </Button>
-                  <Button variant="danger" onClick={() => confirm(`Delete ${p.name}?`) && deletePerson(p.id)}>
+                  <Button
+                    variant="danger"
+                    onClick={() => confirm(`Delete ${p.name}?`) && deletePerson(p.id)}
+                  >
                     Delete
                   </Button>
                 </td>
@@ -170,10 +202,19 @@ function CatalogCard({
 }) {
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "0.75rem",
+        }}
+      >
         <div>
           <h3 style={{ margin: 0 }}>{title}</h3>
-          <p style={{ margin: "0.35rem 0 0", color: colors.muted, fontSize: "0.85rem" }}>{subtitle}</p>
+          <p style={{ margin: "0.35rem 0 0", color: colors.muted, fontSize: "0.85rem" }}>
+            {subtitle}
+          </p>
         </div>
         <Button onClick={onAdd}>Add</Button>
       </div>
@@ -188,7 +229,11 @@ function CatalogCard({
           ))
         )}
       </div>
-      {items.length > 10 && <p style={{ margin: "0.6rem 0 0", color: colors.muted, fontSize: "0.8rem" }}>+ {items.length - 10} more</p>}
+      {items.length > 10 && (
+        <p style={{ margin: "0.6rem 0 0", color: colors.muted, fontSize: "0.8rem" }}>
+          + {items.length - 10} more
+        </p>
+      )}
     </Card>
   );
 }
@@ -211,7 +256,7 @@ function CatalogModal({
 
   useEffect(() => {
     setDraft({ id: "", description: "" });
-  }, [kind]);
+  }, []);
 
   const submit = async () => {
     setSaving(true);
@@ -229,14 +274,25 @@ function CatalogModal({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={saving || !normalizedId || duplicate} onClick={submit}>
+          <Button
+            variant="primary"
+            disabled={saving || !normalizedId || duplicate}
+            onClick={submit}
+          >
             {saving ? "Saving…" : "Save"}
           </Button>
         </>
       }
     >
-      <Field label={kind === "role" ? "Role id" : "Skill id"} hint="Use the id that will be referenced on people and projects.">
-        <input value={draft.id} onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))} style={inputStyle} />
+      <Field
+        label={kind === "role" ? "Role id" : "Skill id"}
+        hint="Use the id that will be referenced on people and projects."
+      >
+        <input
+          value={draft.id}
+          onChange={(e) => setDraft((d) => ({ ...d, id: e.target.value }))}
+          style={inputStyle}
+        />
       </Field>
 
       <Field label="Description" hint="Optional label or note for the catalog.">
@@ -249,9 +305,15 @@ function CatalogModal({
       </Field>
 
       <div style={{ fontSize: "0.8rem", color: colors.muted }}>
-        {items.length === 0 ? "No entries yet." : `Existing ${kind === "role" ? "roles" : "skills"}: ${items.map((item) => item.id).join(", ")}`}
+        {items.length === 0
+          ? "No entries yet."
+          : `Existing ${kind === "role" ? "roles" : "skills"}: ${items.map((item) => item.id).join(", ")}`}
       </div>
-      {duplicate && <p style={{ margin: "0.5rem 0 0", color: colors.danger, fontSize: "0.8rem" }}>That id already exists.</p>}
+      {duplicate && (
+        <p style={{ margin: "0.5rem 0 0", color: colors.danger, fontSize: "0.8rem" }}>
+          That id already exists.
+        </p>
+      )}
     </Modal>
   );
 }
@@ -273,9 +335,12 @@ function PersonForm({
   onClose: () => void;
   onSave: (draft: Draft, id?: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => (person ? { ...emptyDraft(), ...person } : emptyDraft()));
+  const [draft, setDraft] = useState<Draft>(() =>
+    person ? { ...emptyDraft(), ...person } : emptyDraft(),
+  );
   const [saving, setSaving] = useState(false);
-  const set = <K extends keyof Draft>(key: K, val: Draft[K]) => setDraft((d) => ({ ...d, [key]: val }));
+  const set = <K extends keyof Draft>(key: K, val: Draft[K]) =>
+    setDraft((d) => ({ ...d, [key]: val }));
 
   const others = useMemo(() => people.filter((p) => p.id !== person?.id), [people, person]);
   const roleLabel = (id: string) => {
@@ -299,7 +364,11 @@ function PersonForm({
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={saving || !draft.name.trim() || !draft.role.trim()} onClick={submit}>
+          <Button
+            variant="primary"
+            disabled={saving || !draft.name.trim() || !draft.role.trim()}
+            onClick={submit}
+          >
             {saving ? "Saving…" : "Save"}
           </Button>
         </>
@@ -307,10 +376,18 @@ function PersonForm({
     >
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
         <Field label="Name">
-          <input value={draft.name} onChange={(e) => set("name", e.target.value)} style={inputStyle} />
+          <input
+            value={draft.name}
+            onChange={(e) => set("name", e.target.value)}
+            style={inputStyle}
+          />
         </Field>
         <Field label="Role" hint="Pick a reusable role from the catalog above.">
-          <select value={draft.role} onChange={(e) => set("role", e.target.value)} style={inputStyle}>
+          <select
+            value={draft.role}
+            onChange={(e) => set("role", e.target.value)}
+            style={inputStyle}
+          >
             <option value="">Select a role</option>
             {roleOptions.map((roleId) => (
               <option key={roleId} value={roleId}>
@@ -325,7 +402,11 @@ function PersonForm({
           )}
         </Field>
         <Field label="Seniority">
-          <select value={draft.seniority} onChange={(e) => set("seniority", e.target.value as Seniority)} style={inputStyle}>
+          <select
+            value={draft.seniority}
+            onChange={(e) => set("seniority", e.target.value as Seniority)}
+            style={inputStyle}
+          >
             {SENIORITIES.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -345,7 +426,10 @@ function PersonForm({
         </Field>
       </div>
 
-      <Field label={`FTE capacity — ${(draft.fte_capacity * 100).toFixed(0)}%`} hint="Baseline availability as a fraction of full-time">
+      <Field
+        label={`FTE capacity — ${(draft.fte_capacity * 100).toFixed(0)}%`}
+        hint="Baseline availability as a fraction of full-time"
+      >
         <input
           type="range"
           min={0}
@@ -358,23 +442,45 @@ function PersonForm({
       </Field>
 
       <Field label="Skills" hint="Add skill ids from the catalog above.">
-        <SkillsEditor value={draft.skills} onChange={(v) => set("skills", v)} skillOptions={skillOptions} />
+        <SkillsEditor
+          value={draft.skills}
+          onChange={(v) => set("skills", v)}
+          skillOptions={skillOptions}
+        />
       </Field>
 
       <Field label="Preferences" hint="Skills the person prefers to work on">
-        <TagSkillInput value={draft.preferences} onChange={(v) => set("preferences", v)} skillOptions={skillOptions} />
+        <TagSkillInput
+          value={draft.preferences}
+          onChange={(v) => set("preferences", v)}
+          skillOptions={skillOptions}
+        />
       </Field>
 
       <Field label="Growth targets" hint="Skills the person wants to grow in">
-        <TagSkillInput value={draft.growth_targets} onChange={(v) => set("growth_targets", v)} skillOptions={skillOptions} />
+        <TagSkillInput
+          value={draft.growth_targets}
+          onChange={(v) => set("growth_targets", v)}
+          skillOptions={skillOptions}
+        />
       </Field>
 
-      <Field label="Availability windows" hint="Exceptions to FTE capacity for specific date spans (e.g. leave)">
-        <AvailabilityEditor value={draft.availability_windows} onChange={(v) => set("availability_windows", v)} />
+      <Field
+        label="Availability windows"
+        hint="Exceptions to FTE capacity for specific date spans (e.g. leave)"
+      >
+        <AvailabilityEditor
+          value={draft.availability_windows}
+          onChange={(v) => set("availability_windows", v)}
+        />
       </Field>
 
       <Field label="Affinities" hint="Pairwise rapport with colleagues, from -5 to +5">
-        <AffinitiesEditor value={draft.affinities} onChange={(v) => set("affinities", v)} people={others} />
+        <AffinitiesEditor
+          value={draft.affinities}
+          onChange={(v) => set("affinities", v)}
+          people={others}
+        />
       </Field>
     </Modal>
   );

@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { knownSkillIds, useAppStore } from "@/store";
-import type { Priority, Project } from "@/types";
-import { Badge, Button, Card, colors, Field, inputStyle, Modal, priorityColors } from "@/components/common/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  colors,
+  Field,
+  inputStyle,
+  Modal,
+  priorityColors,
+} from "@/components/common/ui";
 import {
   DateRangesEditor,
   PersonMultiSelect,
@@ -10,6 +17,8 @@ import {
   SkillReqsEditor,
   SquadsEditor,
 } from "@/components/editors/listEditors";
+import { knownSkillIds, useAppStore } from "@/store";
+import type { Priority, Project } from "@/types";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
 
@@ -31,8 +40,16 @@ function emptyDraft(): Draft {
 }
 
 export default function ProjectsPage() {
-  const { projects, people, isLoading, fetchProjects, fetchPeople, fetchSkills, saveProject, deleteProject } =
-    useAppStore();
+  const {
+    projects,
+    people,
+    isLoading,
+    fetchProjects,
+    fetchPeople,
+    fetchSkills,
+    saveProject,
+    deleteProject,
+  } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
   const [editing, setEditing] = useState<Project | "new" | null>(null);
 
@@ -46,7 +63,9 @@ export default function ProjectsPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Projects</h1>
-        <Button variant="primary" onClick={() => setEditing("new")}>+ Add project</Button>
+        <Button variant="primary" onClick={() => setEditing("new")}>
+          + Add project
+        </Button>
       </div>
 
       {isLoading && projects.length === 0 ? (
@@ -57,25 +76,61 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
           {projects.map((p) => (
             <Card key={p.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "1rem",
+                }}
+              >
                 <div>
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                     <h3 style={{ margin: 0 }}>{p.name}</h3>
                     <Badge color={priorityColors[p.priority]}>{p.priority}</Badge>
                   </div>
-                  {p.description && <p style={{ margin: "0.5rem 0 0", color: colors.muted }}>{p.description}</p>}
-                  <div style={{ marginTop: "0.6rem", display: "flex", flexWrap: "wrap", gap: "0.4rem", fontSize: "0.8rem" }}>
-                    <Stat label="Slots" value={p.phases.length ? `${p.phases.length} phases` : String(p.n_slots)} />
-                    {p.skill_requirements.length > 0 && <Stat label="Skills" value={p.skill_requirements.map((s) => `${s.id}≥${s.min_level}`).join(", ")} />}
-                    {p.included_person_ids.length > 0 && <Stat label="Must include" value={String(p.included_person_ids.length)} />}
-                    {p.excluded_person_ids.length > 0 && <Stat label="Excluded" value={String(p.excluded_person_ids.length)} />}
+                  {p.description && (
+                    <p style={{ margin: "0.5rem 0 0", color: colors.muted }}>{p.description}</p>
+                  )}
+                  <div
+                    style={{
+                      marginTop: "0.6rem",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.4rem",
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    <Stat
+                      label="Slots"
+                      value={p.phases.length ? `${p.phases.length} phases` : String(p.n_slots)}
+                    />
+                    {p.skill_requirements.length > 0 && (
+                      <Stat
+                        label="Skills"
+                        value={p.skill_requirements.map((s) => `${s.id}≥${s.min_level}`).join(", ")}
+                      />
+                    )}
+                    {p.included_person_ids.length > 0 && (
+                      <Stat label="Must include" value={String(p.included_person_ids.length)} />
+                    )}
+                    {p.excluded_person_ids.length > 0 && (
+                      <Stat label="Excluded" value={String(p.excluded_person_ids.length)} />
+                    )}
                     {p.squads.length > 0 && <Stat label="Squads" value={String(p.squads.length)} />}
-                    {p.date_ranges.length > 0 && <Stat label="Date ranges" value={String(p.date_ranges.length)} />}
+                    {p.date_ranges.length > 0 && (
+                      <Stat label="Date ranges" value={String(p.date_ranges.length)} />
+                    )}
                   </div>
                 </div>
                 <div style={{ whiteSpace: "nowrap" }}>
-                  <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>Edit</Button>
-                  <Button variant="danger" onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}>
+                  <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
+                  >
                     Delete
                   </Button>
                 </div>
@@ -122,10 +177,13 @@ function ProjectForm({
   onClose: () => void;
   onSave: (draft: Draft, id?: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => (project ? { ...emptyDraft(), ...project } : emptyDraft()));
+  const [draft, setDraft] = useState<Draft>(() =>
+    project ? { ...emptyDraft(), ...project } : emptyDraft(),
+  );
   const [saving, setSaving] = useState(false);
   const usesPhases = draft.phases.length > 0;
-  const set = <K extends keyof Draft>(key: K, val: Draft[K]) => setDraft((d) => ({ ...d, [key]: val }));
+  const set = <K extends keyof Draft>(key: K, val: Draft[K]) =>
+    setDraft((d) => ({ ...d, [key]: val }));
 
   const submit = async () => {
     setSaving(true);
@@ -151,12 +209,22 @@ function ProjectForm({
     >
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 1rem" }}>
         <Field label="Name">
-          <input value={draft.name} onChange={(e) => set("name", e.target.value)} style={inputStyle} />
+          <input
+            value={draft.name}
+            onChange={(e) => set("name", e.target.value)}
+            style={inputStyle}
+          />
         </Field>
         <Field label="Priority">
-          <select value={draft.priority} onChange={(e) => set("priority", e.target.value as Priority)} style={inputStyle}>
+          <select
+            value={draft.priority}
+            onChange={(e) => set("priority", e.target.value as Priority)}
+            style={inputStyle}
+          >
             {PRIORITIES.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>
+                {p}
+              </option>
             ))}
           </select>
         </Field>
@@ -178,13 +246,19 @@ function ProjectForm({
               type="number"
               min={1}
               value={draft.n_slots}
-              onChange={(e) => set("n_slots", Math.max(1, Math.round(parseFloat(e.target.value) || 1)))}
+              onChange={(e) =>
+                set("n_slots", Math.max(1, Math.round(parseFloat(e.target.value) || 1)))
+              }
               style={{ ...inputStyle, maxWidth: 120 }}
             />
           </Field>
 
           <Field label="Skill requirements" hint="Minimum proficiency required, 0 to 5">
-            <SkillReqsEditor value={draft.skill_requirements} onChange={(v) => set("skill_requirements", v)} skillOptions={skillOptions} />
+            <SkillReqsEditor
+              value={draft.skill_requirements}
+              onChange={(v) => set("skill_requirements", v)}
+              skillOptions={skillOptions}
+            />
           </Field>
 
           <Field label="Date ranges" hint="Calendar spans during which the project runs">
@@ -201,7 +275,11 @@ function ProjectForm({
             : "Add phases for multi-stage staffing (e.g. design → build → handover). Leave empty for a single team."
         }
       >
-        <PhasesEditor value={draft.phases} onChange={(v) => set("phases", v)} skillOptions={skillOptions} />
+        <PhasesEditor
+          value={draft.phases}
+          onChange={(v) => set("phases", v)}
+          skillOptions={skillOptions}
+        />
       </Field>
 
       <Field label="Must include" hint="People that must be on the team">
@@ -212,7 +290,10 @@ function ProjectForm({
         />
       </Field>
 
-      <Field label="Excluded" hint="People that must not be assigned (when exclusions are respected)">
+      <Field
+        label="Excluded"
+        hint="People that must not be assigned (when exclusions are respected)"
+      >
         <PersonMultiSelect
           value={draft.excluded_person_ids}
           onChange={(v) => set("excluded_person_ids", v)}

@@ -1,6 +1,6 @@
 import { Fragment } from "react";
-import type { AvailabilitySegment } from "@/types";
 import { colors } from "@/components/common/ui";
+import type { AvailabilitySegment } from "@/types";
 
 export interface TimelineRow {
   id: string;
@@ -26,7 +26,12 @@ function daysBetween(startIso: string, endIso: string): number {
 }
 
 /** Left offset and width, as percentages of [rangeStart, rangeEnd], clipped to that window. */
-function toPercentSpan(rangeStart: string, rangeEnd: string, spanStart: string, spanEnd: string): { leftPct: number; widthPct: number } | null {
+function toPercentSpan(
+  rangeStart: string,
+  rangeEnd: string,
+  spanStart: string,
+  spanEnd: string,
+): { leftPct: number; widthPct: number } | null {
   const totalDays = daysBetween(rangeStart, rangeEnd) + 1;
   const clippedStart = spanStart < rangeStart ? rangeStart : spanStart;
   const clippedEnd = spanEnd > rangeEnd ? rangeEnd : spanEnd;
@@ -57,8 +62,22 @@ export function AvailabilityTimeline({
   if (start > end) return null;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", rowGap: "0.4rem", columnGap: "0.75rem", position: "relative" }}>
-      <div style={{ gridColumn: 2, gridRow: `1 / span ${Math.max(rows.length, 1)}`, position: "relative" }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "180px 1fr",
+        rowGap: "0.4rem",
+        columnGap: "0.75rem",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          gridColumn: 2,
+          gridRow: `1 / span ${Math.max(rows.length, 1)}`,
+          position: "relative",
+        }}
+      >
         {overlays.map((overlay) => {
           const span = toPercentSpan(start, end, overlay.start, overlay.end);
           if (!span) return null;
@@ -83,18 +102,33 @@ export function AvailabilityTimeline({
 
       {rows.map((row, i) => (
         <Fragment key={row.id}>
-          <div style={{ gridColumn: 1, gridRow: i + 1, display: "flex", alignItems: "center", fontSize: "0.85rem" }}>
+          <div
+            style={{
+              gridColumn: 1,
+              gridRow: i + 1,
+              display: "flex",
+              alignItems: "center",
+              fontSize: "0.85rem",
+            }}
+          >
             {row.label}
           </div>
           <div
-            style={{ gridColumn: 2, gridRow: i + 1, position: "relative", height: 26, background: colors.light, borderRadius: 4 }}
+            style={{
+              gridColumn: 2,
+              gridRow: i + 1,
+              position: "relative",
+              height: 26,
+              background: colors.light,
+              borderRadius: 4,
+            }}
           >
-            {row.segments.map((segment, si) => {
+            {row.segments.map((segment) => {
               const span = toPercentSpan(start, end, segment.start, segment.end);
               if (!span) return null;
               return (
                 <div
-                  key={si}
+                  key={`${segment.start}-${segment.end}`}
                   title={`${segment.start} → ${segment.end}: ${(segment.ratio * 100).toFixed(0)}%`}
                   style={{
                     position: "absolute",

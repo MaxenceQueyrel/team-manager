@@ -1,11 +1,11 @@
-import { Routes, Route } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import Layout from "@/components/common/Layout";
+import AvailabilityPage from "@/pages/AvailabilityPage";
 import DashboardPage from "@/pages/DashboardPage";
+import OptimizationPage from "@/pages/OptimizationPage";
 import PeoplePage from "@/pages/PeoplePage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import TeamsPage from "@/pages/TeamsPage";
-import OptimizationPage from "@/pages/OptimizationPage";
-import AvailabilityPage from "@/pages/AvailabilityPage";
 
 export default function App() {
   return (

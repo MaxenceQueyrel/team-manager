@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAppStore } from "@/store";
-import { peopleApi } from "@/services/api";
-import type { PersonAvailability } from "@/types";
+import {
+  AvailabilityTimeline,
+  ratioColor,
+  type TimelineOverlay,
+  type TimelineRow,
+} from "@/components/common/AvailabilityTimeline";
 import { Card, colors, Field, inputStyle } from "@/components/common/ui";
-import { AvailabilityTimeline, ratioColor, type TimelineOverlay, type TimelineRow } from "@/components/common/AvailabilityTimeline";
+import { peopleApi } from "@/services/api";
+import { useAppStore } from "@/store";
+import type { PersonAvailability } from "@/types";
 
 function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -48,7 +53,11 @@ export default function AvailabilityPage() {
   const rows: TimelineRow[] = useMemo(() => {
     const byPersonId = new Map(availability.map((a) => [a.person_id, a.segments]));
     return people
-      .map((person) => ({ id: person.id, label: person.name, segments: byPersonId.get(person.id) ?? [] }))
+      .map((person) => ({
+        id: person.id,
+        label: person.name,
+        segments: byPersonId.get(person.id) ?? [],
+      }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [people, availability]);
 
@@ -78,13 +87,27 @@ export default function AvailabilityPage() {
       <Card style={{ marginBottom: "1.5rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 1rem" }}>
           <Field label="From">
-            <input type="date" value={start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} style={inputStyle} />
+            <input
+              type="date"
+              value={start}
+              onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
+              style={inputStyle}
+            />
           </Field>
           <Field label="To">
-            <input type="date" value={end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} style={inputStyle} />
+            <input
+              type="date"
+              value={end}
+              onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
+              style={inputStyle}
+            />
           </Field>
           <Field label="Overlay project" hint="Highlights the project's period on the timeline">
-            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} style={inputStyle}>
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              style={inputStyle}
+            >
               <option value="">— none —</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -98,7 +121,14 @@ export default function AvailabilityPage() {
       </Card>
 
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem",
+          }}
+        >
           <span style={{ fontSize: "0.85rem", color: colors.muted }}>
             {start} → {end}
           </span>
@@ -120,7 +150,15 @@ export default function AvailabilityPage() {
 function Legend() {
   const stops = [0, 0.25, 0.5, 0.75, 1];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: colors.muted }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.35rem",
+        fontSize: "0.75rem",
+        color: colors.muted,
+      }}
+    >
       <span>0%</span>
       <div style={{ display: "flex", width: 100, height: 10, borderRadius: 5, overflow: "hidden" }}>
         {stops.map((ratio) => (
