@@ -5,8 +5,9 @@ from pydantic import BaseModel, Field
 
 from api.models.person import Person, PersonCreate
 from api.repositories.file_repository import FileRepository
+from api.v1 import assignments as assignments_module
 from optimizer.availability import daily_availability
-from optimizer.models import DateRange, PersonInput
+from optimizer.models import AvailabilityWindow, DateRange, PersonInput
 
 router = APIRouter()
 repo: FileRepository[Person] = FileRepository("people", Person)
@@ -35,11 +36,19 @@ def list_people_availability(start: date, end: date):
             segments=[
                 AvailabilitySegment(start=seg_start, end=seg_end, ratio=ratio)
                 for seg_start, seg_end, ratio in daily_availability(
-                    _to_person_input(person), date_range
+                    _to_person_input(person), date_range, _assignment_windows(person.id)
                 )
             ],
         )
         for person in repo.list()
+    ]
+
+
+def _assignment_windows(person_id: str) -> list[AvailabilityWindow]:
+    return [
+        AvailabilityWindow(start=a.start, end=a.end, ratio=a.ratio)
+        for a in assignments_module.repo.list()
+        if a.person_id == person_id
     ]
 
 
