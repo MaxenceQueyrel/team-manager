@@ -139,3 +139,68 @@ def test_daily_availability_agrees_with_effective_availability_weighted_average(
 
     project = _project([date_range])
     assert weighted_average == pytest.approx(effective_availability(person, project))
+
+
+def test_daily_availability_assignment_reduces_default_ratio():
+    person = _person(fte_capacity=1.0)
+    date_range = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))
+    assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 10), ratio=0.4)]
+
+    assert daily_availability(person, date_range, assignments) == [
+        (date(2026, 1, 1), date(2026, 1, 10), 0.6)
+    ]
+
+
+def test_daily_availability_sums_overlapping_assignments():
+    person = _person(fte_capacity=1.0)
+    date_range = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))
+    assignments = [
+        AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 10), ratio=0.3),
+        AvailabilityWindow(start=date(2026, 1, 5), end=date(2026, 1, 10), ratio=0.4),
+    ]
+
+    segments = daily_availability(person, date_range, assignments)
+    assert [(seg_start, seg_end) for seg_start, seg_end, _ in segments] == [
+        (date(2026, 1, 1), date(2026, 1, 4)),
+        (date(2026, 1, 5), date(2026, 1, 10)),
+    ]
+    assert [ratio for _, _, ratio in segments] == pytest.approx([0.7, 0.3])
+
+
+def test_daily_availability_assignment_reduction_floors_at_zero():
+    person = _person(fte_capacity=0.5)
+    date_range = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))
+    assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 10), ratio=0.8)]
+
+    assert daily_availability(person, date_range, assignments) == [
+        (date(2026, 1, 1), date(2026, 1, 10), 0.0)
+    ]
+
+
+def test_daily_availability_window_overrides_assignment_reduction():
+    person = _person(
+        fte_capacity=1.0,
+        availability_windows=[AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 5), ratio=0.0)],
+    )
+    date_range = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))
+    assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 10), ratio=0.4)]
+
+    assert daily_availability(person, date_range, assignments) == [
+        (date(2026, 1, 1), date(2026, 1, 5), 0.0),
+        (date(2026, 1, 6), date(2026, 1, 10), 0.6),
+    ]
+
+
+def test_daily_availability_no_assignments_is_unchanged():
+    person = _person(fte_capacity=0.7)
+    date_range = DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))
+
+    assert daily_availability(person, date_range) == daily_availability(person, date_range, [])
+
+
+def test_effective_availability_assignment_reduces_ratio():
+    person = _person(fte_capacity=1.0)
+    project = _project([DateRange(start=date(2026, 1, 1), end=date(2026, 1, 10))])
+    assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 10), ratio=0.4)]
+
+    assert effective_availability(person, project, assignments) == pytest.approx(0.6)
