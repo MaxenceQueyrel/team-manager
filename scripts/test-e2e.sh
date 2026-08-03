@@ -32,4 +32,5 @@ for _ in $(seq 1 30); do
 done
 
 cd "$ROOT_DIR/frontend"
+bunx playwright install chromium
 bun run test:e2e
