@@ -236,3 +236,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dev Container
+.devcontainer
+/docker/
