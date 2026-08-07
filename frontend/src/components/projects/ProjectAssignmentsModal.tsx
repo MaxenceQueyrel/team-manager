@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Badge, Card, colors, Field, Modal, inputStyle } from "@/components/common/ui";
+import { Badge, Button, Card, colors, Field, inputStyle, Modal } from "@/components/common/ui";
 import { assignmentsApi } from "@/services/api";
 import type { Assignment, Person, Project } from "@/types";
 
@@ -17,7 +17,8 @@ function toISODate(date: Date): string {
 }
 
 function defaultRange(project: Project): { start: string; end: string } {
-  const range = project.date_ranges[0] ?? project.phases.find((phase) => phase.date_range)?.date_range;
+  const range =
+    project.date_ranges[0] ?? project.phases.find((phase) => phase.date_range)?.date_range;
   if (range) return range;
 
   const start = new Date();
@@ -77,8 +78,14 @@ export function ProjectAssignmentsModal({
   const roster = useMemo(
     () =>
       [...assignments].sort((a, b) => {
-        const byPerson = assignmentLabel(people.find((p) => p.id === a.person_id), a).localeCompare(
-          assignmentLabel(people.find((p) => p.id === b.person_id), b),
+        const byPerson = assignmentLabel(
+          people.find((p) => p.id === a.person_id),
+          a,
+        ).localeCompare(
+          assignmentLabel(
+            people.find((p) => p.id === b.person_id),
+            b,
+          ),
         );
         return byPerson || a.start.localeCompare(b.start);
       }),
@@ -95,7 +102,7 @@ export function ProjectAssignmentsModal({
       const created = await assignmentsApi.create({
         person_id: selectedPersonId,
         project_id: project.id,
-        ratio: commitment === "custom" ? ratio : preset?.ratio ?? ratio,
+        ratio: commitment === "custom" ? ratio : (preset?.ratio ?? ratio),
         start: range.start,
         end: range.end,
         phase_id: null,
@@ -200,7 +207,9 @@ export function ProjectAssignmentsModal({
                 max={1}
                 step={0.05}
                 value={ratio}
-                onChange={(e) => setRatio(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
+                onChange={(e) =>
+                  setRatio(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))
+                }
                 style={inputStyle}
               />
             </Field>

@@ -10,7 +10,6 @@ import {
   Modal,
   priorityColors,
 } from "@/components/common/ui";
-import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
 import {
   DateRangesEditor,
   PersonMultiSelect,
@@ -18,6 +17,7 @@ import {
   SkillReqsEditor,
   SquadsEditor,
 } from "@/components/editors/listEditors";
+import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
 import { knownSkillIds, useAppStore } from "@/store";
 import type { Priority, Project } from "@/types";
 
@@ -155,7 +155,7 @@ export default function ProjectsPage() {
             await saveProject(draft, id);
             setEditing(null);
           }}
-          />
+        />
       )}
 
       {assigning && (
