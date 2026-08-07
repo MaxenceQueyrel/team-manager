@@ -3,7 +3,22 @@
 # scratch copy of backend/data so e2e runs never mutate the checked-in
 # sample data. The frontend dev server itself is started by Playwright's
 # webServer (see frontend/playwright.config.ts).
+#
+# Usage: scripts/test-e2e.sh [headed|ui]
+#   (no arg)  run headless, no UI (default)
+#   headed    run with the browser window visible
+#   ui        launch Playwright's interactive UI mode
 set -euo pipefail
+
+case "${1:-}" in
+  "")     BUN_SCRIPT="e2e" ;;
+  headed) BUN_SCRIPT="e2e:headed" ;;
+  ui)     BUN_SCRIPT="e2e:ui" ;;
+  *)
+    echo "usage: $0 [headed|ui]" >&2
+    exit 1
+    ;;
+esac
 
 if curl -sf http://localhost:8000/api/v1/roles/ >/dev/null 2>&1; then
   echo "error: something is already listening on port 8000 (e.g. 'make run-backend')." >&2
@@ -33,4 +48,4 @@ done
 
 cd "$ROOT_DIR/frontend"
 bunx playwright install chromium
-bun run test:e2e
+bun run "$BUN_SCRIPT"

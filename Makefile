@@ -1,7 +1,7 @@
 .PHONY: dev prod down down-prod logs build \
         sync install-backend install-frontend \
         run-backend run-frontend \
-        test test-optimizer test-api test-e2e \
+        test test-optimizer test-api test-e2e test-e2e-headed test-e2e-ui \
         lint-backend lint-frontend format-frontend \
         clean
 
@@ -56,6 +56,12 @@ test-api:         ## Run backend API tests
 
 test-e2e:         ## Run frontend Playwright end-to-end tests (spins up an isolated backend)
 	./scripts/test-e2e.sh
+
+test-e2e-headed:  ## Run e2e tests with the browser window visible
+	./scripts/test-e2e.sh headed
+
+test-e2e-ui:      ## Run e2e tests in Playwright's interactive UI mode
+	./scripts/test-e2e.sh ui
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 
