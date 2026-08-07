@@ -75,6 +75,16 @@ export interface Project {
   priority: Priority;
 }
 
+export interface Assignment {
+  id: string;
+  person_id: string;
+  project_id: string;
+  ratio: number;
+  start: string;
+  end: string;
+  phase_id: string | null;
+}
+
 export interface AssignedMember {
   person_id: string;
   fte_allocation: number; // 0–1

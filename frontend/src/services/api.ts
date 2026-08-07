@@ -1,5 +1,6 @@
 import axios from "axios";
 import type {
+  Assignment,
   OptimizationRequest,
   Person,
   PersonAvailability,
@@ -36,6 +37,19 @@ export const projectsApi = {
   update: (id: string, data: Omit<Project, "id">) =>
     client.put<Project>(`/api/v1/projects/${id}`, data).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/projects/${id}`),
+};
+
+type AssignmentPayload = Omit<Assignment, "id">;
+
+export const assignmentsApi = {
+  list: (params?: { person_id?: string; project_id?: string }) =>
+    client.get<Assignment[]>("/api/v1/assignments/", { params }).then((r) => r.data),
+  get: (id: string) => client.get<Assignment>(`/api/v1/assignments/${id}`).then((r) => r.data),
+  create: (data: AssignmentPayload) =>
+    client.post<Assignment>("/api/v1/assignments/", data).then((r) => r.data),
+  update: (id: string, data: AssignmentPayload) =>
+    client.put<Assignment>(`/api/v1/assignments/${id}`, data).then((r) => r.data),
+  delete: (id: string) => client.delete(`/api/v1/assignments/${id}`),
 };
 
 export const teamsApi = {

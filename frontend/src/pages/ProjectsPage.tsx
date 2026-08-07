@@ -17,6 +17,7 @@ import {
   SkillReqsEditor,
   SquadsEditor,
 } from "@/components/editors/listEditors";
+import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
 import { knownSkillIds, useAppStore } from "@/store";
 import type { Priority, Project } from "@/types";
 
@@ -52,6 +53,7 @@ export default function ProjectsPage() {
   } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
   const [editing, setEditing] = useState<Project | "new" | null>(null);
+  const [assigning, setAssigning] = useState<Project | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -127,6 +129,9 @@ export default function ProjectsPage() {
                   <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
                     Edit
                   </Button>
+                  <Button onClick={() => setAssigning(p)} style={{ marginRight: "0.4rem" }}>
+                    View / assign
+                  </Button>
                   <Button
                     variant="danger"
                     onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
@@ -150,6 +155,15 @@ export default function ProjectsPage() {
             await saveProject(draft, id);
             setEditing(null);
           }}
+        />
+      )}
+
+      {assigning && (
+        <ProjectAssignmentsModal
+          key={assigning.id}
+          project={assigning}
+          people={people}
+          onClose={() => setAssigning(null)}
         />
       )}
     </div>
