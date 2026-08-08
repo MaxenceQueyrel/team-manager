@@ -6,7 +6,7 @@ test("creating a project adds it to the list", async ({ page }) => {
 
   await page.goto("/projects");
   await page.getByRole("button", { name: "+ Add project" }).click();
-  await page.getByLabel("Name").fill(name);
+  await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByRole("heading", { name })).toBeVisible();
@@ -21,15 +21,17 @@ test("assigning a person to a project shows the roster entry", async ({ page }) 
 
   await page.goto("/projects");
   await page.getByRole("button", { name: "+ Add project" }).click();
-  await page.getByLabel("Name").fill(projectName);
+  await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
 
-  await page.getByRole("button", { name: "View / assign" }).click();
+  await page.getByRole("button", { name: `View / assign ${projectName}`, exact: true }).click();
   await page.getByLabel("Person").selectOption({ label: personName });
   await page.getByLabel("Commitment").selectOption("half-time");
-  await page.getByLabel("Start date").fill("2026-01-01");
-  await page.getByLabel("End date").fill("2026-01-31");
+  await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("End date", { exact: true }).fill("2026-01-31");
   await page.getByRole("button", { name: "Assign to project" }).click();
 
-  await expect(page.getByText(`${personName} · Half-time`)).toBeVisible();
+  const rosterEntry = page.getByRole("listitem").filter({ hasText: personName });
+  await expect(rosterEntry).toBeVisible();
+  await expect(rosterEntry).toContainText("Half-time");
 });

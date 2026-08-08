@@ -6,7 +6,7 @@ test("running an optimization for a project produces a result", async ({ page })
 
   await page.goto("/projects");
   await page.getByRole("button", { name: "+ Add project" }).click();
-  await page.getByLabel("Name").fill(name);
+  await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 

@@ -10,18 +10,18 @@ test("assignment-driven reductions show up on the availability calendar", async 
 
   await page.goto("/projects");
   await page.getByRole("button", { name: "+ Add project" }).click();
-  await page.getByLabel("Name").fill(projectName);
+  await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
-  await page.getByRole("button", { name: "View / assign" }).click();
+  await page.getByRole("button", { name: `View / assign ${projectName}`, exact: true }).click();
   await page.getByLabel("Person").selectOption({ label: name });
   await page.getByLabel("Commitment").selectOption("half-time");
-  await page.getByLabel("Start date").fill("2026-01-01");
-  await page.getByLabel("End date").fill("2026-01-10");
+  await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
   await page.getByRole("button", { name: "Assign to project" }).click();
 
   await page.goto("/availability");
-  await page.getByLabel("From").fill("2026-01-01");
-  await page.getByLabel("To").fill("2026-01-10");
+  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
 
   await expect(page.getByText(name)).toBeVisible();
   await expect(page.getByTitle("2026-01-01: 50%")).toBeVisible();

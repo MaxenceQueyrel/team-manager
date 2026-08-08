@@ -40,6 +40,7 @@ export function Button({
   disabled,
   type = "button",
   style,
+  ariaLabel,
 }: {
   children: ReactNode;
   variant?: ButtonVariant;
@@ -47,12 +48,14 @@ export function Button({
   disabled?: boolean;
   type?: "button" | "submit";
   style?: CSSProperties;
+  ariaLabel?: string;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
       style={{
         padding: "0.45rem 0.9rem",
         borderRadius: 6,

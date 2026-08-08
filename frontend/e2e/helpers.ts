@@ -9,7 +9,7 @@ export async function createPerson(page: Page, name: string, roleId: string): Pr
   await page.getByRole("button", { name: "Save" }).click();
 
   await page.getByRole("button", { name: "+ Add person" }).click();
-  await page.getByLabel("Name").fill(name);
+  await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Role", { exact: false }).selectOption(roleId);
   await page.getByRole("button", { name: "Save" }).click();
 }

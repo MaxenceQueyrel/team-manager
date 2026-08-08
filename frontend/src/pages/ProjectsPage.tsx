@@ -129,7 +129,11 @@ export default function ProjectsPage() {
                   <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
                     Edit
                   </Button>
-                  <Button onClick={() => setAssigning(p)} style={{ marginRight: "0.4rem" }}>
+                  <Button
+                    onClick={() => setAssigning(p)}
+                    ariaLabel={`View / assign ${p.name}`}
+                    style={{ marginRight: "0.4rem" }}
+                  >
                     View / assign
                   </Button>
                   <Button
