@@ -28,3 +28,26 @@ services:
       - DATA_DIR=/app/backend/data
       - CORS_ORIGINS=http://localhost:3000
       - DEBUG=true
+      - DATABASE_URL=postgresql+psycopg://team_manager:team_manager@postgres:5432/team_manager
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=team_manager
+      - POSTGRES_PASSWORD=team_manager
+      - POSTGRES_DB=team_manager
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U team_manager"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
