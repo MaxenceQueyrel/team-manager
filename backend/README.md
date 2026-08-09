@@ -52,6 +52,10 @@ Set in the repo-root `.env` (copy from `.env.example`):
 | `DATA_DIR` | `./backend/data` | Directory for JSON data files |
 | `DEBUG` | `false` | Enable debug logging |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins |
+| `DATABASE_URL` | `postgresql+psycopg://team_manager:team_manager@localhost:5432/team_manager` | Postgres connection string — auth data only, see [Database (auth schema)](#database-auth-schema) |
+| `JWT_SECRET` | `change-me` | Signing secret for access/refresh tokens |
+| `JWT_ACCESS_TTL_MINUTES` | `15` | Access token lifetime |
+| `REFRESH_TTL_DAYS` | `30` | Refresh token lifetime |
 
 ---
 
@@ -63,6 +67,10 @@ backend/
 │   ├── main.py             FastAPI app + middleware setup
 │   ├── core/
 │   │   └── config.py       Pydantic Settings (reads env vars)
+│   ├── db/                 SQLAlchemy layer — auth data only (Postgres)
+│   │   ├── base.py         Declarative Base
+│   │   ├── session.py      Engine, SessionLocal, get_db() dependency
+│   │   └── models.py       User, Role, Permission, RefreshToken, ...
 │   ├── models/             Pydantic domain models (Person, Project, Skill, Team)
 │   ├── repositories/
 │   │   └── file_repository.py  Generic JSON file-backed repository
@@ -81,6 +89,8 @@ backend/
 │   ├── roles.json
 │   ├── skills.json
 │   └── teams.json
+├── alembic/                Migrations for the auth schema (Postgres)
+│   └── versions/
 └── tests/
 ```
 
@@ -131,4 +141,50 @@ uv run ruff check backend/src
 
 ## Data layer
 
-All data is stored as JSON files in `backend/data/`. The `FileRepository[T]` generic class handles CRUD over these files. Replacing it with a real database (PostgreSQL, SQLite) only requires implementing the same interface — the service layer is unaffected.
+People/Projects/Teams/Roles/Skills/Assignments are stored as JSON files in `backend/data/`. The `FileRepository[T]` generic class handles CRUD over these files. Replacing it with a real database (PostgreSQL, SQLite) only requires implementing the same interface — the service layer is unaffected.
+
+Auth data (users, roles, permissions, refresh tokens) lives in Postgres instead — see below.
+
+---
+
+## Database (auth schema)
+
+Postgres is scoped to **auth data only** (`users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `refresh_tokens`) via SQLAlchemy 2.0 + Alembic. Everything else stays on the JSON data layer described above.
+
+Start local Postgres first:
+
+```bash
+# Full dev stack (from repo root)
+make dev
+
+# Or just the database, if running the API locally
+docker compose -f infra/docker-compose.dev.yml up -d postgres
+```
+
+`DATABASE_URL` (see [Environment variables](#environment-variables)) already points at this service by default. All commands below run from `backend/`:
+
+```bash
+# Apply all migrations (creates the schema + seeds manager/employee roles)
+uv run alembic upgrade head
+
+# Roll back one migration / everything
+uv run alembic downgrade -1
+uv run alembic downgrade base
+
+# Generate a new migration from ORM model changes in db/models.py
+uv run alembic revision --autogenerate -m "describe the change"
+
+# Inspect current revision / history
+uv run alembic current
+uv run alembic history
+```
+
+Inside the Docker dev stack, run them in the running `backend` container instead:
+
+```bash
+docker compose -f infra/docker-compose.dev.yml exec backend uv run alembic upgrade head
+```
+
+`alembic/env.py` reads the connection string from `Settings.database_url` (`.env`-driven), not from `alembic.ini`, so no separate DB URL configuration is needed.
+
+`get_db()` (in `src/api/db/session.py`) is a synchronous SQLAlchemy session `Depends()` — the first `Depends()` pattern in this codebase — for any route handler that needs auth-schema access.

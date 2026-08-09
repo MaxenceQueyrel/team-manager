@@ -131,10 +131,16 @@ Copy `.env.example` to `.env` and adjust as needed:
 DATA_DIR=./backend/data      # path to JSON data files
 DEBUG=false
 CORS_ORIGINS=http://localhost:3000
+DATABASE_URL=postgresql+psycopg://team_manager:team_manager@localhost:5432/team_manager
+JWT_SECRET=change-me
+JWT_ACCESS_TTL_MINUTES=15
+REFRESH_TTL_DAYS=30
 
 # Frontend (VITE_ prefix exposes the value to the browser build)
 VITE_API_URL=http://localhost:8000
 ```
+
+`DATABASE_URL` is for **auth data only** (users, roles, permissions, refresh tokens) — see [backend/README.md](backend/README.md#database-auth-schema). Existing People/Projects/Teams/Roles/Skills/Assignments stay on the JSON flat-file store.
 
 ---
 
