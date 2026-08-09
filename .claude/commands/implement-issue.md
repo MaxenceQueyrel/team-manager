@@ -26,32 +26,38 @@ Examples:
    - Review the sub-tasks to understand the implementation order
    - Incorporate any additional instructions provided as a second parameter
 
-3. **Investigate the codebase** to understand current implementation:
+3. **Ensure a development branch exists for the issue**:
+   - Check for a local or remote branch matching `<issue-id>-*` (e.g. `git branch --all | grep -E "/?<issue-id>-"`)
+   - If one exists, check it out (`git checkout <branch-name>`, tracking the remote if it only exists there)
+   - If none exists, create it from `dev` and switch to it with `gh issue develop <issue-id> --base dev --checkout` (this also links the branch to the issue)
+   - Never implement directly on `main` or `dev`
+
+4. **Investigate the codebase** to understand current implementation:
    - Read relevant files mentioned in the issue
    - Understand the current code structure and patterns
    - Identify all files that need to be modified
 
-4. **Implement the solution** by:
+5. **Implement the solution** by:
    - Following the sub-tasks in order (or as indicated by additional instructions)
    - Making changes to necessary files using Edit/Write tools
    - Following the code style and patterns documented in CLAUDE.md
    - Writing tests if applicable (pytest for Python, etc.)
 
-5. **Verify the implementation** by:
+6. **Verify the implementation** by:
    - Running relevant tests (`make test-optimizer`, `make test-api`, etc.)
    - Testing the feature in the app if UI changes are involved (using `/run` skill)
    - Confirming all sub-tasks are completed
-
-6. **Create a commit** with a clear message:
-   - Reference the issue number in the commit message (e.g., "Fixes #10")
-   - Write a clear summary of the changes
-   - Use conventional commit format if applicable
 
 7. **Report completion** to the user with:
    - Summary of changes made
    - Test results
    - Link to the created commit(s)
    - Any blockers or deviations from the original plan
+
+8. **Do not Create a commit but wait for it and then create one** with a clear message:
+   - Reference the issue number in the commit message (e.g., "Fixes #10")
+   - Write a clear summary of the changes
+   - Use conventional commit format if applicable
 
 ## Notes
 
