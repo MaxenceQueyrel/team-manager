@@ -72,10 +72,13 @@ backend/
 │   │   ├── session.py      Engine, SessionLocal, get_db() dependency
 │   │   └── models.py       User, Role, Permission, RefreshToken, ...
 │   ├── models/             Pydantic domain models (Person, Project, Skill, Team)
+│   ├── schemas/
+│   │   └── auth.py         Pydantic request/response models for the auth router
 │   ├── repositories/
 │   │   └── file_repository.py  Generic JSON file-backed repository
 │   ├── v1/                 API v1 routers
 │   │   ├── router.py       Aggregates all v1 routes under /api/v1
+│   │   ├── auth.py         Register/login/refresh/logout/me + user management
 │   │   ├── people.py
 │   │   ├── projects.py
 │   │   ├── roles.py
@@ -91,6 +94,8 @@ backend/
 │   └── teams.json
 ├── alembic/                Migrations for the auth schema (Postgres)
 │   └── versions/
+├── scripts/
+│   └── bootstrap_manager.py  One-off CLI to promote the first manager account
 └── tests/
 ```
 
@@ -101,6 +106,13 @@ backend/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
+| POST | `/api/v1/auth/register` | Create a user account (assigned the `employee` role) |
+| POST | `/api/v1/auth/login` | Verify credentials, issue an access token + refresh cookie |
+| POST | `/api/v1/auth/refresh` | Rotate the refresh cookie, issue a new access token |
+| POST | `/api/v1/auth/logout` | Revoke the current refresh token |
+| GET | `/api/v1/auth/me` | Current user + roles/permissions |
+| GET | `/api/v1/auth/users` | List accounts (manager only) |
+| POST | `/api/v1/auth/users/{id}/roles` | Grant/revoke a role on a user (manager only) |
 | GET/POST | `/api/v1/people` | List / create people |
 | GET/PUT/DELETE | `/api/v1/people/{id}` | Read / update / delete a person |
 | GET/POST | `/api/v1/projects` | List / create projects |
@@ -188,3 +200,15 @@ docker compose -f infra/docker-compose.dev.yml exec backend uv run alembic upgra
 `alembic/env.py` reads the connection string from `Settings.database_url` (`.env`-driven), not from `alembic.ini`, so no separate DB URL configuration is needed.
 
 `get_db()` (in `src/api/db/session.py`) is a synchronous SQLAlchemy session `Depends()` — the first `Depends()` pattern in this codebase — for any route handler that needs auth-schema access.
+
+### Bootstrapping the first manager
+
+`POST /api/v1/auth/users/{id}/roles` (how a `manager` grants roles to other accounts) requires an existing manager caller. On a fresh database there isn't one yet, so promote the first account directly:
+
+```bash
+# Register a normal account first via POST /api/v1/auth/register, then:
+cd backend
+uv run python scripts/bootstrap_manager.py <email>
+```
+
+Every promotion after that can go through the API.
