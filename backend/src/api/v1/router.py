@@ -1,7 +1,17 @@
 from fastapi import APIRouter
-from api.v1 import assignments, optimization, people, projects, roles, skills, teams
+from api.v1 import (
+    assignments,
+    auth,
+    optimization,
+    people,
+    projects,
+    roles,
+    skills,
+    teams,
+)
 
 router = APIRouter()
+router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(people.router, prefix="/people", tags=["people"])
 router.include_router(projects.router, prefix="/projects", tags=["projects"])
 router.include_router(teams.router, prefix="/teams", tags=["teams"])

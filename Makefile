@@ -34,6 +34,9 @@ logs:             ## Tail logs from all dev containers
 sync:             ## Sync Python workspace dependencies from lockfile (incl. dev)
 	uv sync --all-groups
 
+install-backend: ## Install backend dependencies
+	cd backend && uv sync --active
+
 install-frontend: ## Install frontend dependencies
 	cd frontend && bun install
 
