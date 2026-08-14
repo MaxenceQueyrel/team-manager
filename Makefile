@@ -1,8 +1,8 @@
 .PHONY: dev prod down down-prod logs build \
-        sync install-backend install-frontend \
+        sync install-backend install-frontend hooks-install \
         run-backend run-frontend \
         test test-optimizer test-api test-e2e test-e2e-headed test-e2e-ui \
-        lint-backend typecheck-backend lint-frontend format-frontend \
+        lint-backend typecheck-optimizer typecheck-backend lint-frontend format-frontend \
         clean
 
 COMPOSE     = docker compose
@@ -40,6 +40,9 @@ install-backend: ## Install backend dependencies
 install-frontend: ## Install frontend dependencies
 	cd frontend && bun install
 
+hooks-install:   ## Install git pre-commit hooks (lefthook)
+	lefthook install
+
 run-backend:      ## Run the API server locally with hot-reload
 	cd backend && uv run uvicorn api.main:app --reload --port 8000
 
@@ -70,6 +73,9 @@ test-e2e-ui:      ## Run e2e tests in Playwright's interactive UI mode
 
 lint-backend:     ## Lint optimizer + backend with ruff
 	uv run ruff check optimizer/src backend/src
+
+typecheck-optimizer: ## Type-check the optimizer with ty
+	cd optimizer && uv run ty check
 
 typecheck-backend: ## Type-check the backend with ty
 	cd backend && uv run ty check

@@ -37,6 +37,7 @@ Each module has its own README:
 | [Docker](https://docs.docker.com/get-docker/) + [Compose](https://docs.docker.com/compose/) | Docker 24 | Run the full stack |
 | [uv](https://docs.astral.sh/uv/getting-started/installation/) | 0.5 | Python workspace (backend + optimizer) |
 | [bun](https://bun.sh/) | 1.1 | Frontend package manager & dev server |
+| [lefthook](https://lefthook.dev/installation/) | 2.1 | Git pre-commit hooks (ruff, ty, biome) |
 | Python | 3.12 | Required by uv — installed automatically |
 
 ---
@@ -86,10 +87,13 @@ make install-backend
 # 4. Install frontend dependencies
 make install-frontend
 
-# 5. In a first terminal — API server
+# 5. Install git pre-commit hooks (lefthook: ruff, ty, biome)
+make hooks-install
+
+# 6. In a first terminal — API server
 make run-backend      # runs on http://localhost:8000
 
-# 6. In a second terminal — Frontend dev server
+# 7. In a second terminal — Frontend dev server
 make run-frontend     # runs on http://localhost:3000
 ```
 
@@ -106,6 +110,7 @@ make logs             Tail dev container logs
 
 make install-backend  Install Python workspace dependencies (uv sync)
 make install-frontend Install frontend dependencies (bun install)
+make hooks-install    Install git pre-commit hooks (lefthook)
 make run-backend      Run API server locally with hot-reload
 make run-frontend     Run frontend dev server locally
 
@@ -116,8 +121,10 @@ make test-e2e         Run frontend Playwright end-to-end tests
 make test-e2e-headed  Run e2e tests with the browser window visible
 make test-e2e-ui      Run e2e tests in Playwright's interactive UI mode
 
-make lint-backend     Lint Python code with ruff
-make lint-frontend    Lint TypeScript with eslint
+make lint-backend        Lint Python code with ruff
+make typecheck-optimizer Type-check the optimizer with ty
+make typecheck-backend   Type-check the backend with ty
+make lint-frontend       Lint TypeScript with eslint
 ```
 
 ---

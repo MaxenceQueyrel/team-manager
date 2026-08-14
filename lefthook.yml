@@ -1,0 +1,30 @@
+# Lefthook configuration — see https://lefthook.dev
+#
+# Install the git hooks after cloning with `make hooks-install`
+# (or `uv run lefthook install` directly).
+
+glob_matcher: doublestar
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: ruff-check
+      glob:
+        - "optimizer/src/**/*.py"
+        - "backend/src/**/*.py"
+      run: uv run ruff check {staged_files}
+
+    - name: ty-check-optimizer
+      root: "optimizer/"
+      glob: "optimizer/src/**/*.py"
+      run: uv run ty check
+
+    - name: ty-check-backend
+      root: "backend/"
+      glob: "backend/src/**/*.py"
+      run: uv run ty check
+
+    - name: biome-check
+      root: "frontend/"
+      glob: "frontend/**/*.{ts,tsx,js,jsx,json}"
+      run: bunx biome check --staged --no-errors-on-unmatched

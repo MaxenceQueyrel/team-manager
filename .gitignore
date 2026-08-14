@@ -240,3 +240,6 @@ __marimo__/
 # Dev Container
 .devcontainer
 /docker/
+
+# Lefthook local overrides (personal, not shared)
+lefthook-local.yml
