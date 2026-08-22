@@ -17,5 +17,7 @@ router.include_router(projects.router, prefix="/projects", tags=["projects"])
 router.include_router(teams.router, prefix="/teams", tags=["teams"])
 router.include_router(roles.router, prefix="/roles", tags=["roles"])
 router.include_router(skills.router, prefix="/skills", tags=["skills"])
-router.include_router(optimization.router, prefix="/optimization", tags=["optimization"])
+router.include_router(
+    optimization.router, prefix="/optimization", tags=["optimization"]
+)
 router.include_router(assignments.router, prefix="/assignments", tags=["assignments"])

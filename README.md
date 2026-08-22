@@ -124,8 +124,29 @@ make test-e2e-ui      Run e2e tests in Playwright's interactive UI mode
 make lint-backend        Lint Python code with ruff
 make typecheck-optimizer Type-check the optimizer with ty
 make typecheck-backend   Type-check the backend with ty
-make lint-frontend       Lint TypeScript with eslint
+make lint-frontend       Lint TypeScript with biome
 ```
+
+---
+
+## Continuous integration
+
+Every pull request (and every push to `main`/`dev`) runs [.github/workflows/ci.yml](.github/workflows/ci.yml), which mirrors the Makefile targets above as independent, parallel jobs:
+
+| Job | What it runs |
+|-----|--------------|
+| `lint-backend` | `make lint-backend` (ruff) |
+| `format-backend` | `ruff format --check` over `optimizer/src` and `backend/src` |
+| `typecheck-optimizer` | `make typecheck-optimizer` (ty) |
+| `typecheck-backend` | `make typecheck-backend` (ty) |
+| `test-optimizer` | `make test-optimizer` (pytest) |
+| `test-api` | Applies Alembic migrations against a Postgres service container, then `make test-api` (pytest) |
+| `lint-frontend` | `make lint-frontend` (biome) |
+| `format-frontend` | `biome format` check (no `--write`) over the frontend source |
+| `build-frontend` | `bun run build` (`tsc -b && vite build`) |
+| `e2e` | `make test-e2e` (Playwright) — only on pushes to `main` or a manual [workflow dispatch](https://github.com/MaxenceQueyrel/team-manager/actions/workflows/ci.yml), since it spins up the full stack |
+
+A job failing blocks the PR from merging once branch protection on `main`/`dev` requires these checks (Settings → Branches → Branch protection rules → "Require status checks to pass").
 
 ---
 

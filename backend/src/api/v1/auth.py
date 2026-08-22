@@ -75,10 +75,10 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=AccessToken)
 def login(data: UserLogin, response: Response, db: Session = Depends(get_db)):
-    user = db.execute(
-        select(User).where(User.email == data.email)
-    ).scalar_one_or_none()
-    if user is None or not security.verify_password(data.password, user.hashed_password):
+    user = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
+    if user is None or not security.verify_password(
+        data.password, user.hashed_password
+    ):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")

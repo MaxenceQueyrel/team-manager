@@ -52,7 +52,9 @@ def solve_assignment(request: OptimizationRequest):
         for p in people
     ]
 
-    result = solver.solve(project_input, people_inputs, request.weights, request.respect_exclusions)
+    result = solver.solve(
+        project_input, people_inputs, request.weights, request.respect_exclusions
+    )
 
     saved = teams_repo.create(
         {

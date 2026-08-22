@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint-backend:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: make lint-backend
+
+  format-backend:
+    name: Format check (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv run ruff format --check optimizer/src backend/src
+
+  typecheck-optimizer:
+    name: Typecheck optimizer (ty)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: make typecheck-optimizer
+
+  typecheck-backend:
+    name: Typecheck backend (ty)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: make typecheck-backend
+
+  test-optimizer:
+    name: Test optimizer (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: make test-optimizer
+
+  test-api:
+    name: Test backend (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: team_manager
+          POSTGRES_PASSWORD: team_manager
+          POSTGRES_DB: team_manager
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U team_manager"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Apply auth-schema migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - run: make test-api
+
+  lint-frontend:
+    name: Lint (biome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Cache bun install cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('frontend/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - working-directory: frontend
+        run: bun install --frozen-lockfile
+      - run: make lint-frontend
+
+  format-frontend:
+    name: Format check (biome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Cache bun install cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('frontend/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - working-directory: frontend
+        run: bun install --frozen-lockfile
+      - name: Check formatting
+        working-directory: frontend
+        run: bunx biome format src e2e playwright.config.ts
+
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Cache bun install cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('frontend/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - working-directory: frontend
+        run: bun install --frozen-lockfile
+      - working-directory: frontend
+        run: bun run build
+
+  # Spins up the full stack (Postgres + backend + frontend dev server), so it
+  # only runs on pushes to main rather than on every PR/push — trigger a run
+  # manually (workflow_dispatch) to validate e2e behaviour before merging.
+  e2e:
+    name: E2E (Playwright)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: team_manager
+          POSTGRES_PASSWORD: team_manager
+          POSTGRES_DB: team_manager
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U team_manager"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: oven-sh/setup-bun@v2
+      - name: Apply auth-schema migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - working-directory: frontend
+        run: bun install --frozen-lockfile
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: bunx playwright install --with-deps chromium
+      - run: make test-e2e
