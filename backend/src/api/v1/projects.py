@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from api.core.deps import require_permission
 from api.models.project import Project, ProjectCreate
 from api.repositories.file_repository import FileRepository
 
@@ -19,12 +20,21 @@ def get_project(project_id: str):
     return project
 
 
-@router.post("/", response_model=Project, status_code=201)
+@router.post(
+    "/",
+    response_model=Project,
+    status_code=201,
+    dependencies=[Depends(require_permission("projects:write"))],
+)
 def create_project(data: ProjectCreate):
     return repo.create(data.model_dump())
 
 
-@router.put("/{project_id}", response_model=Project)
+@router.put(
+    "/{project_id}",
+    response_model=Project,
+    dependencies=[Depends(require_permission("projects:write"))],
+)
 def update_project(project_id: str, data: ProjectCreate):
     project = repo.update(project_id, data.model_dump())
     if not project:
@@ -32,7 +42,11 @@ def update_project(project_id: str, data: ProjectCreate):
     return project
 
 
-@router.delete("/{project_id}", status_code=204)
+@router.delete(
+    "/{project_id}",
+    status_code=204,
+    dependencies=[Depends(require_permission("projects:delete"))],
+)
 def delete_project(project_id: str):
     if not repo.delete(project_id):
         raise HTTPException(status_code=404, detail="Project not found")

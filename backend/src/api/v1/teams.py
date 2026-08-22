@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from api.core.deps import require_permission
 from api.models.team import Team
 from api.repositories.file_repository import FileRepository
 
@@ -19,7 +20,11 @@ def get_team(team_id: str):
     return team
 
 
-@router.delete("/{team_id}", status_code=204)
+@router.delete(
+    "/{team_id}",
+    status_code=204,
+    dependencies=[Depends(require_permission("teams:delete"))],
+)
 def delete_team(team_id: str):
     if not repo.delete(team_id):
         raise HTTPException(status_code=404, detail="Team not found")

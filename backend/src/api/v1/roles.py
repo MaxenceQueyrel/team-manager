@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from api.core.deps import require_permission
 from api.models.role import Role, RoleCreate
 from api.repositories.file_repository import FileRepository
 
@@ -20,7 +21,12 @@ def get_role(role_id: str):
     return role
 
 
-@router.post("/", response_model=Role, status_code=201)
+@router.post(
+    "/",
+    response_model=Role,
+    status_code=201,
+    dependencies=[Depends(require_permission("roles:write"))],
+)
 def create_role(data: RoleCreate):
     if not data.id.strip():
         raise HTTPException(status_code=400, detail="Role id is required")
@@ -29,7 +35,11 @@ def create_role(data: RoleCreate):
     return repo.create(data.model_dump())
 
 
-@router.put("/{role_id}", response_model=Role)
+@router.put(
+    "/{role_id}",
+    response_model=Role,
+    dependencies=[Depends(require_permission("roles:write"))],
+)
 def update_role(role_id: str, data: RoleCreate):
     role = repo.update(role_id, data.model_dump())
     if not role:
@@ -37,7 +47,11 @@ def update_role(role_id: str, data: RoleCreate):
     return role
 
 
-@router.delete("/{role_id}", status_code=204)
+@router.delete(
+    "/{role_id}",
+    status_code=204,
+    dependencies=[Depends(require_permission("roles:delete"))],
+)
 def delete_role(role_id: str):
     if not repo.delete(role_id):
         raise HTTPException(status_code=404, detail="Role not found")

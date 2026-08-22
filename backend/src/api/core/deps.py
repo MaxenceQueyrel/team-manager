@@ -56,3 +56,42 @@ def require_manager(user: User = Depends(get_current_user)) -> User:
             status_code=status.HTTP_403_FORBIDDEN, detail="Manager role required"
         )
     return user
+
+
+def require_permission(code: str):
+    """Builds a dependency that requires the current user to hold permission `code`.
+
+    Usable as `Depends(require_permission("people:write"))`.
+    """
+
+    def dependency(user: User = Depends(get_current_user)) -> User:
+        permission_codes = {
+            permission.code for role in user.roles for permission in role.permissions
+        }
+        if code not in permission_codes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing required permission: {code}",
+            )
+        return user
+
+    return dependency
+
+
+def require_self_or_manager(
+    person_id: str, user: User = Depends(get_current_user)
+) -> User:
+    """Allows a request through if it targets the caller's own Person record or the caller is a manager.
+
+    `person_id` is taken from the path parameter of the same name, so this
+    can be used directly as `Depends(require_self_or_manager)` on any route
+    shaped like `/{person_id}`.
+    """
+    is_own_record = user.person_id is not None and user.person_id == person_id
+    is_manager = "manager" in {role.name for role in user.roles}
+    if not (is_own_record or is_manager):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized for this person's record",
+        )
+    return user
