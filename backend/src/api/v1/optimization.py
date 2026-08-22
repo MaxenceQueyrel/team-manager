@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from api.core.deps import require_permission
 from api.models.person import Person
 from api.models.project import Project
 from api.models.team import Team, OptimizationRequest
@@ -14,7 +15,11 @@ router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
 
 
-@router.post("/solve", response_model=Team)
+@router.post(
+    "/solve",
+    response_model=Team,
+    dependencies=[Depends(require_permission("optimization:run"))],
+)
 def solve_assignment(request: OptimizationRequest):
     projects_repo: FileRepository[Project] = FileRepository("projects", Project)
     people_repo: FileRepository[Person] = FileRepository("people", Person)

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from api.core.deps import require_permission
 from api.models.assignment import Assignment, AssignmentCreate
 from api.repositories.file_repository import FileRepository
 
@@ -43,13 +44,22 @@ def get_assignment(assignment_id: str):
     return assignment
 
 
-@router.post("/", response_model=Assignment, status_code=201)
+@router.post(
+    "/",
+    response_model=Assignment,
+    status_code=201,
+    dependencies=[Depends(require_permission("assignments:write"))],
+)
 def create_assignment(data: AssignmentCreate):
     _validate_fte(data)
     return repo.create(data.model_dump())
 
 
-@router.put("/{assignment_id}", response_model=Assignment)
+@router.put(
+    "/{assignment_id}",
+    response_model=Assignment,
+    dependencies=[Depends(require_permission("assignments:write"))],
+)
 def update_assignment(assignment_id: str, data: AssignmentCreate):
     _validate_fte(data, exclude_id=assignment_id)
     assignment = repo.update(assignment_id, data.model_dump())
@@ -58,7 +68,11 @@ def update_assignment(assignment_id: str, data: AssignmentCreate):
     return assignment
 
 
-@router.delete("/{assignment_id}", status_code=204)
+@router.delete(
+    "/{assignment_id}",
+    status_code=204,
+    dependencies=[Depends(require_permission("assignments:delete"))],
+)
 def delete_assignment(assignment_id: str):
     if not repo.delete(assignment_id):
         raise HTTPException(status_code=404, detail="Assignment not found")

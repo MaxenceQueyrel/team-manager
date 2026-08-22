@@ -8,6 +8,9 @@ class PersonBase(BaseModel):
     seniority: Seniority
     years_of_experience: float = Field(ge=0)
     fte_capacity: float = Field(default=1.0, ge=0, le=1)
+    manager_id: str | None = (
+        None  # Person.id of this person's manager (org reporting line)
+    )
     skills: list[SkillLevel] = []
     availability_windows: list[AvailabilityWindow] = []
     preferences: list[str] = []

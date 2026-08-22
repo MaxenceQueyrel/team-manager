@@ -1,8 +1,9 @@
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from api.core.deps import require_permission, require_self_or_manager
 from api.models.person import Person, PersonCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
@@ -79,12 +80,24 @@ def get_person(person_id: str):
     return person
 
 
-@router.post("/", response_model=Person, status_code=201)
+@router.post(
+    "/",
+    response_model=Person,
+    status_code=201,
+    dependencies=[Depends(require_permission("people:write"))],
+)
 def create_person(data: PersonCreate):
     return repo.create(data.model_dump())
 
 
-@router.put("/{person_id}", response_model=Person)
+@router.put(
+    "/{person_id}",
+    response_model=Person,
+    dependencies=[
+        Depends(require_permission("people:write")),
+        Depends(require_self_or_manager),
+    ],
+)
 def update_person(person_id: str, data: PersonCreate):
     person = repo.update(person_id, data.model_dump())
     if not person:
@@ -92,7 +105,11 @@ def update_person(person_id: str, data: PersonCreate):
     return person
 
 
-@router.delete("/{person_id}", status_code=204)
+@router.delete(
+    "/{person_id}",
+    status_code=204,
+    dependencies=[Depends(require_permission("people:delete"))],
+)
 def delete_person(person_id: str):
     if not repo.delete(person_id):
         raise HTTPException(status_code=404, detail="Person not found")

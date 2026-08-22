@@ -16,11 +16,13 @@ from optimizer.models import AvailabilityWindow, Seniority
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setattr(people_module, "repo", FileRepository("people", Person))
-    monkeypatch.setattr(assignments_module, "repo", FileRepository("assignments", Assignment))
+    monkeypatch.setattr(
+        assignments_module, "repo", FileRepository("assignments", Assignment)
+    )
     return TestClient(app)
 
 
-def _create_person(client, **overrides):
+def _create_person(client, headers, **overrides):
     payload = {
         "name": "Alice Martin",
         "role": "Backend Developer",
@@ -30,13 +32,13 @@ def _create_person(client, **overrides):
         "availability_windows": [],
         **overrides,
     }
-    response = client.post("/api/v1/people/", json=payload)
+    response = client.post("/api/v1/people/", json=payload, headers=headers)
     assert response.status_code == 201
     return response.json()
 
 
-def test_empty_windows_falls_back_to_flat_capacity(client):
-    person = _create_person(client, fte_capacity=0.6)
+def test_empty_windows_falls_back_to_flat_capacity(client, manager_headers):
+    person = _create_person(client, manager_headers, fte_capacity=0.6)
 
     response = client.get(
         "/api/v1/people/availability",
@@ -53,11 +55,13 @@ def test_empty_windows_falls_back_to_flat_capacity(client):
     ]
 
 
-def test_partial_period_overlap_splits_into_segments(client):
+def test_partial_period_overlap_splits_into_segments(client, manager_headers):
     window = AvailabilityWindow(
         start=date(2026, 1, 5), end=date(2026, 1, 31), ratio=0.5
     ).model_dump(mode="json")
-    person = _create_person(client, fte_capacity=1.0, availability_windows=[window])
+    person = _create_person(
+        client, manager_headers, fte_capacity=1.0, availability_windows=[window]
+    )
 
     response = client.get(
         "/api/v1/people/availability",
@@ -82,8 +86,8 @@ def test_missing_date_params_returns_422(client):
     assert response.status_code == 422
 
 
-def test_end_before_start_returns_400(client):
-    _create_person(client)
+def test_end_before_start_returns_400(client, manager_headers):
+    _create_person(client, manager_headers)
     response = client.get(
         "/api/v1/people/availability",
         params={"start": "2026-01-10", "end": "2026-01-01"},
@@ -91,8 +95,8 @@ def test_end_before_start_returns_400(client):
     assert response.status_code == 400
 
 
-def test_assignment_reduces_computed_availability(client):
-    person = _create_person(client, fte_capacity=1.0)
+def test_assignment_reduces_computed_availability(client, manager_headers):
+    person = _create_person(client, manager_headers, fte_capacity=1.0)
     assignment_response = client.post(
         "/api/v1/assignments/",
         json={
@@ -102,6 +106,7 @@ def test_assignment_reduces_computed_availability(client):
             "start": "2026-01-01",
             "end": "2026-01-10",
         },
+        headers=manager_headers,
     )
     assert assignment_response.status_code == 201
 
@@ -120,9 +125,13 @@ def test_assignment_reduces_computed_availability(client):
     ]
 
 
-def test_availability_window_overrides_assignment_reduction(client):
-    window = AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 5), ratio=0.0).model_dump(mode="json")
-    person = _create_person(client, fte_capacity=1.0, availability_windows=[window])
+def test_availability_window_overrides_assignment_reduction(client, manager_headers):
+    window = AvailabilityWindow(
+        start=date(2026, 1, 1), end=date(2026, 1, 5), ratio=0.0
+    ).model_dump(mode="json")
+    person = _create_person(
+        client, manager_headers, fte_capacity=1.0, availability_windows=[window]
+    )
     client.post(
         "/api/v1/assignments/",
         json={
@@ -132,6 +141,7 @@ def test_availability_window_overrides_assignment_reduction(client):
             "start": "2026-01-01",
             "end": "2026-01-10",
         },
+        headers=manager_headers,
     )
 
     response = client.get(
