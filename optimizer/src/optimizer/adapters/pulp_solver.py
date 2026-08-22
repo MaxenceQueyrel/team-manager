@@ -132,8 +132,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
 
         max_score = round(
             sum(self._max_phase_score(n, weights) for n in n_selected_per_phase)
-            + weights.handover
-            * sum(min(a, b) for a, b in zip(n_selected_per_phase, n_selected_per_phase[1:])),
+            + weights.handover * sum(min(a, b) for a, b in zip(n_selected_per_phase, n_selected_per_phase[1:])),
             6,
         )
 

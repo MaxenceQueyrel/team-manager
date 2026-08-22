@@ -25,9 +25,7 @@ class ProjectInput(BaseModel):
     excluded_person_ids: list[str] = Field(
         default=[], description="Person IDs that must not be assigned to the project."
     )
-    included_person_ids: list[str] = Field(
-        default=[], description="Person IDs that must be assigned to the project."
-    )
+    included_person_ids: list[str] = Field(default=[], description="Person IDs that must be assigned to the project.")
     squads: list[Squad] = Field(
         default=[], description="Groups of people co-selected together; members unavailable in a phase are skipped."
     )

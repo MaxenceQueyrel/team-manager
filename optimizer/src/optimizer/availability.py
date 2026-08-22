@@ -28,9 +28,7 @@ def effective_availability(
     weighted_days = 0.0
     total_days = 0
     for date_range in project.date_ranges:
-        weighted_days += _weighted_ratio_sum(
-            date_range, person.availability_windows, person.fte_capacity, assignments
-        )
+        weighted_days += _weighted_ratio_sum(date_range, person.availability_windows, person.fte_capacity, assignments)
         total_days += _days_in(date_range)
 
     return weighted_days / total_days
