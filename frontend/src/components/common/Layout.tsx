@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/store/authStore";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
@@ -10,6 +11,10 @@ const navItems = [
 ];
 
 export default function Layout() {
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <nav
@@ -19,6 +24,8 @@ export default function Layout() {
           background: "#f8f9fa",
           borderRight: "1px solid #e9ecef",
           flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <h2 style={{ margin: "0 0 1.5rem", fontSize: "1.1rem" }}>Team Manager</h2>
@@ -42,6 +49,28 @@ export default function Layout() {
             </li>
           ))}
         </ul>
+        <div style={{ marginTop: "auto", paddingTop: "1rem", fontSize: "0.8rem" }}>
+          <div style={{ color: "#6c757d", marginBottom: "0.5rem", wordBreak: "break-all" }}>
+            {user?.email}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate("/login", { replace: true });
+            }}
+            style={{
+              border: "none",
+              background: "none",
+              padding: 0,
+              color: "#4f6ef7",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Sign out
+          </button>
+        </div>
       </nav>
       <main style={{ flex: 1, padding: "2rem", overflow: "auto" }}>
         <Outlet />

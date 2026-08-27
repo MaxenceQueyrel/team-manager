@@ -118,3 +118,12 @@ export interface OptimizationRequest {
   weights: OptimizationWeights;
   respect_exclusions: boolean;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  is_active: boolean;
+  person_id: string | null;
+  roles: string[];
+  permissions: string[];
+}
