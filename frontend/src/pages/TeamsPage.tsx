@@ -2,10 +2,12 @@ import { useEffect } from "react";
 import { TeamMembers } from "@/components/common/TeamMembers";
 import { Badge, Button, Card, colors } from "@/components/common/ui";
 import { useAppStore } from "@/store";
+import { useAuthStore } from "@/store/authStore";
 
 export default function TeamsPage() {
   const { teams, people, projects, isLoading, fetchTeams, fetchPeople, fetchProjects, deleteTeam } =
     useAppStore();
+  const canDeleteTeams = useAuthStore((s) => s.permissions.has("teams:delete"));
 
   useEffect(() => {
     fetchTeams();
@@ -37,12 +39,14 @@ export default function TeamsPage() {
                   <h3 style={{ margin: 0 }}>{projectById[t.project_id]?.name ?? t.project_id}</h3>
                   {t.is_optimized && <Badge color={colors.success}>optimized</Badge>}
                 </div>
-                <Button
-                  variant="danger"
-                  onClick={() => confirm("Delete this team?") && deleteTeam(t.id)}
-                >
-                  Delete
-                </Button>
+                {canDeleteTeams && (
+                  <Button
+                    variant="danger"
+                    onClick={() => confirm("Delete this team?") && deleteTeam(t.id)}
+                  >
+                    Delete
+                  </Button>
+                )}
               </div>
               {t.optimization_score != null && (
                 <p

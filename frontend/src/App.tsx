@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import Layout from "@/components/common/Layout";
 import RequireAuth from "@/components/common/RequireAuth";
+import RequirePermission from "@/components/common/RequirePermission";
 import AvailabilityPage from "@/pages/AvailabilityPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
@@ -29,7 +30,9 @@ export default function App() {
           <Route path="people" element={<PeoplePage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="teams" element={<TeamsPage />} />
-          <Route path="optimization" element={<OptimizationPage />} />
+          <Route element={<RequirePermission permission="optimization:run" />}>
+            <Route path="optimization" element={<OptimizationPage />} />
+          </Route>
           <Route path="availability" element={<AvailabilityPage />} />
         </Route>
       </Route>
