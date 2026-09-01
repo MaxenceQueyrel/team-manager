@@ -17,6 +17,7 @@ import {
   TagSkillInput,
 } from "@/components/editors/listEditors";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
+import { useAuthStore } from "@/store/authStore";
 import type { Person, Role, Seniority, Skill } from "@/types";
 
 const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];
@@ -56,6 +57,12 @@ export default function PeoplePage() {
   } = useAppStore();
   const roleOptions = useAppStore(useShallow(knownRoleIds));
   const skillOptions = useAppStore(useShallow(knownSkillIds));
+  const canWritePeople = useAuthStore((s) => s.permissions.has("people:write"));
+  const canDeletePeople = useAuthStore((s) => s.permissions.has("people:delete"));
+  const canWriteRoles = useAuthStore((s) => s.permissions.has("roles:write"));
+  const canWriteSkills = useAuthStore((s) => s.permissions.has("skills:write"));
+  const isManager = useAuthStore((s) => s.user?.roles.includes("manager") ?? false);
+  const ownPersonId = useAuthStore((s) => s.user?.person_id ?? null);
   const [editing, setEditing] = useState<Person | "new" | null>(null);
   const [catalogKind, setCatalogKind] = useState<CatalogKind | null>(null);
 
@@ -78,11 +85,13 @@ export default function PeoplePage() {
       >
         <h1 style={{ margin: 0 }}>People</h1>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>
-          <Button onClick={() => setCatalogKind("skill")}>+ Add skill</Button>
-          <Button variant="primary" onClick={() => setEditing("new")}>
-            + Add person
-          </Button>
+          {canWriteRoles && <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>}
+          {canWriteSkills && <Button onClick={() => setCatalogKind("skill")}>+ Add skill</Button>}
+          {canWritePeople && (
+            <Button variant="primary" onClick={() => setEditing("new")}>
+              + Add person
+            </Button>
+          )}
         </div>
       </div>
 
@@ -98,13 +107,13 @@ export default function PeoplePage() {
           title={`Roles (${roles.length})`}
           subtitle="Reusable labels people can select on the person form."
           items={roles}
-          onAdd={() => setCatalogKind("role")}
+          onAdd={canWriteRoles ? () => setCatalogKind("role") : undefined}
         />
         <CatalogCard
           title={`Skills (${skills.length})`}
           subtitle="Reusable skill ids for people and projects."
           items={skills}
-          onAdd={() => setCatalogKind("skill")}
+          onAdd={canWriteSkills ? () => setCatalogKind("skill") : undefined}
         />
       </div>
 
@@ -139,15 +148,19 @@ export default function PeoplePage() {
                   {p.skills.map((s) => `${s.id} (${s.level})`).join(", ") || "—"}
                 </td>
                 <td style={{ padding: "0.5rem", textAlign: "right", whiteSpace: "nowrap" }}>
-                  <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
-                    Edit
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => confirm(`Delete ${p.name}?`) && deletePerson(p.id)}
-                  >
-                    Delete
-                  </Button>
+                  {canWritePeople && (isManager || p.id === ownPersonId) && (
+                    <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
+                      Edit
+                    </Button>
+                  )}
+                  {canDeletePeople && (
+                    <Button
+                      variant="danger"
+                      onClick={() => confirm(`Delete ${p.name}?`) && deletePerson(p.id)}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -198,7 +211,7 @@ function CatalogCard({
   title: string;
   subtitle: string;
   items: CatalogItem[];
-  onAdd: () => void;
+  onAdd?: () => void;
 }) {
   return (
     <Card>
@@ -216,7 +229,7 @@ function CatalogCard({
             {subtitle}
           </p>
         </div>
-        <Button onClick={onAdd}>Add</Button>
+        {onAdd && <Button onClick={onAdd}>Add</Button>}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "0.9rem" }}>
         {items.length === 0 ? (

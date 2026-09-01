@@ -19,6 +19,7 @@ import {
 } from "@/components/editors/listEditors";
 import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
 import { knownSkillIds, useAppStore } from "@/store";
+import { useAuthStore } from "@/store/authStore";
 import type { Priority, Project } from "@/types";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
@@ -52,6 +53,8 @@ export default function ProjectsPage() {
     deleteProject,
   } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
+  const canWriteProjects = useAuthStore((s) => s.permissions.has("projects:write"));
+  const canDeleteProjects = useAuthStore((s) => s.permissions.has("projects:delete"));
   const [editing, setEditing] = useState<Project | "new" | null>(null);
   const [assigning, setAssigning] = useState<Project | null>(null);
 
@@ -65,9 +68,11 @@ export default function ProjectsPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Projects</h1>
-        <Button variant="primary" onClick={() => setEditing("new")}>
-          + Add project
-        </Button>
+        {canWriteProjects && (
+          <Button variant="primary" onClick={() => setEditing("new")}>
+            + Add project
+          </Button>
+        )}
       </div>
 
       {isLoading && projects.length === 0 ? (
@@ -126,9 +131,11 @@ export default function ProjectsPage() {
                   </div>
                 </div>
                 <div style={{ whiteSpace: "nowrap" }}>
-                  <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
-                    Edit
-                  </Button>
+                  {canWriteProjects && (
+                    <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
+                      Edit
+                    </Button>
+                  )}
                   <Button
                     onClick={() => setAssigning(p)}
                     ariaLabel={`View / assign ${p.name}`}
@@ -136,12 +143,14 @@ export default function ProjectsPage() {
                   >
                     View / assign
                   </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
-                  >
-                    Delete
-                  </Button>
+                  {canDeleteProjects && (
+                    <Button
+                      variant="danger"
+                      onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
+                    >
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
