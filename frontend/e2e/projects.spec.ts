@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createPerson, uniqueSuffix } from "./helpers";
 
 test("creating a project adds it to the list", async ({ page }) => {

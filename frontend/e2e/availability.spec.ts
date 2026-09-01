@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createPerson, uniqueSuffix } from "./helpers";
 
 test("assignment-driven reductions show up on the availability calendar", async ({ page }) => {
