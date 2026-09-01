@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { uniqueSuffix } from "./helpers";
 
 test("running an optimization for a project produces a result", async ({ page }) => {
