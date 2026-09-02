@@ -149,6 +149,69 @@ def test_logout_revokes_refresh_token(client):
     assert refresh_response.status_code == 401
 
 
+def test_update_me_changes_password(client):
+    _register(client)
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "hunter2pass"},
+    )
+    access_token = login_response.json()["access_token"]
+
+    response = client.patch(
+        "/api/v1/auth/me",
+        json={"password": "newpassword1"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "alice@example.com"
+
+    # The old password must no longer work, the new one must.
+    old_password_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "hunter2pass"},
+    )
+    assert old_password_login.status_code == 401
+    new_password_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "newpassword1"},
+    )
+    assert new_password_login.status_code == 200
+
+
+def test_update_me_without_token_returns_401(client):
+    response = client.patch("/api/v1/auth/me", json={"password": "newpassword1"})
+    assert response.status_code == 401
+
+
+def test_delete_me_removes_account_and_revokes_refresh_token(client):
+    _register(client)
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "hunter2pass"},
+    )
+    access_token = login_response.json()["access_token"]
+    issued_refresh_cookie = client.cookies.get("refresh_token")
+
+    response = client.delete(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 204
+
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.email == "alice@example.com").first() is None
+
+    # The refresh token issued before deletion must not survive it.
+    client.cookies.set("refresh_token", issued_refresh_cookie)
+    refresh_response = client.post("/api/v1/auth/refresh")
+    assert refresh_response.status_code == 401
+
+
+def test_delete_me_without_token_returns_401(client):
+    response = client.delete("/api/v1/auth/me")
+    assert response.status_code == 401
+
+
 def test_users_list_requires_manager_role(client):
     _register(client)
     login_response = client.post(
