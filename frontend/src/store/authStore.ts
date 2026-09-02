@@ -14,6 +14,8 @@ interface AuthState {
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -84,6 +86,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set(loggedOutState());
     } finally {
       set({ isHydrated: true });
+    }
+  },
+
+  updatePassword: async (password) => {
+    set({ isLoading: true, error: null });
+    try {
+      await authApi.updateMe({ password });
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      await authApi.deleteMe();
+      set(loggedOutState());
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
+    } finally {
+      set({ isLoading: false });
     }
   },
 

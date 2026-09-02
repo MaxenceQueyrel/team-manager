@@ -90,6 +90,9 @@ export const authApi = {
       .post<{ access_token: string; token_type: string }>("/api/v1/auth/refresh")
       .then((r) => r.data),
   me: () => client.get<User>("/api/v1/auth/me").then((r) => r.data),
+  updateMe: (data: { password?: string }) =>
+    client.patch<User>("/api/v1/auth/me", data).then((r) => r.data),
+  deleteMe: () => client.delete("/api/v1/auth/me"),
 };
 
 export const peopleApi = {
