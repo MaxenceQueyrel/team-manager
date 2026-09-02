@@ -8,6 +8,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import OptimizationPage from "@/pages/OptimizationPage";
 import PeoplePage from "@/pages/PeoplePage";
+import ProfilePage from "@/pages/ProfilePage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import RegisterPage from "@/pages/RegisterPage";
 import TeamsPage from "@/pages/TeamsPage";
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="optimization" element={<OptimizationPage />} />
           </Route>
           <Route path="availability" element={<AvailabilityPage />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Route>
     </Routes>

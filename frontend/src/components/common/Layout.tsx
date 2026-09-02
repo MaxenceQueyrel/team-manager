@@ -54,9 +54,18 @@ export default function Layout() {
           ))}
         </ul>
         <div style={{ marginTop: "auto", paddingTop: "1rem", fontSize: "0.8rem" }}>
-          <div style={{ color: "#6c757d", marginBottom: "0.5rem", wordBreak: "break-all" }}>
+          <NavLink
+            to="/profile"
+            style={({ isActive }) => ({
+              display: "block",
+              color: isActive ? "#4f6ef7" : "#6c757d",
+              marginBottom: "0.5rem",
+              wordBreak: "break-all",
+              textDecoration: "none",
+            })}
+          >
             {user?.email}
-          </div>
+          </NavLink>
           <button
             type="button"
             onClick={() => {
