@@ -36,3 +36,7 @@ class AccessToken(BaseModel):
 class RoleAssignment(BaseModel):
     role: str
     grant: bool = True
+
+
+class UserUpdateMe(BaseModel):
+    password: str | None = Field(default=None, min_length=8)

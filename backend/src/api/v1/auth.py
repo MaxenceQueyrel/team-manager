@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from api.core import security
@@ -17,6 +17,7 @@ from api.schemas.auth import (
     UserMeOut,
     UserOut,
     UserRegister,
+    UserUpdateMe,
 )
 
 router = APIRouter()
@@ -45,6 +46,19 @@ def _issue_tokens(user: User, db: Session, response: Response) -> AccessToken:
         max_age=settings.refresh_ttl_days * 24 * 60 * 60,
     )
     return AccessToken(access_token=security.create_access_token(user.id))
+
+
+def _user_me_out(user: User) -> UserMeOut:
+    return UserMeOut(
+        id=user.id,
+        email=user.email,
+        is_active=user.is_active,
+        person_id=user.person_id,
+        roles=[role.name for role in user.roles],
+        permissions=sorted(
+            {permission.code for role in user.roles for permission in role.permissions}
+        ),
+    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -139,20 +153,34 @@ def logout(
 
 @router.get("/me", response_model=UserMeOut)
 def me(current_user: User = Depends(get_current_user)):
-    return UserMeOut(
-        id=current_user.id,
-        email=current_user.email,
-        is_active=current_user.is_active,
-        person_id=current_user.person_id,
-        roles=[role.name for role in current_user.roles],
-        permissions=sorted(
-            {
-                permission.code
-                for role in current_user.roles
-                for permission in role.permissions
-            }
-        ),
-    )
+    return _user_me_out(current_user)
+
+
+@router.patch("/me", response_model=UserMeOut)
+def update_me(
+    data: UserUpdateMe,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if data.password is not None:
+        current_user.hashed_password = security.hash_password(data.password)
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+
+    return _user_me_out(current_user)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_me(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.execute(delete(RefreshToken).where(RefreshToken.user_id == current_user.id))
+    db.delete(current_user)
+    db.commit()
+    response.delete_cookie(REFRESH_COOKIE_NAME)
 
 
 @router.get(
