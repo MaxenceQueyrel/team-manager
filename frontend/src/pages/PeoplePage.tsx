@@ -61,8 +61,6 @@ export default function PeoplePage() {
   const canDeletePeople = useAuthStore((s) => s.permissions.has("people:delete"));
   const canWriteRoles = useAuthStore((s) => s.permissions.has("roles:write"));
   const canWriteSkills = useAuthStore((s) => s.permissions.has("skills:write"));
-  const isManager = useAuthStore((s) => s.user?.roles.includes("manager") ?? false);
-  const ownPersonId = useAuthStore((s) => s.user?.person_id ?? null);
   const [editing, setEditing] = useState<Person | "new" | null>(null);
   const [catalogKind, setCatalogKind] = useState<CatalogKind | null>(null);
 
@@ -148,7 +146,7 @@ export default function PeoplePage() {
                   {p.skills.map((s) => `${s.id} (${s.level})`).join(", ") || "—"}
                 </td>
                 <td style={{ padding: "0.5rem", textAlign: "right", whiteSpace: "nowrap" }}>
-                  {canWritePeople && (isManager || p.id === ownPersonId) && (
+                  {canWritePeople && (
                     <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
                       Edit
                     </Button>
