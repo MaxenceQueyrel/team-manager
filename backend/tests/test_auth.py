@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from api.db.models import Role, User
+from api.db.models import User
 from api.db.session import SessionLocal
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -26,17 +26,7 @@ def _register(client, email="alice@example.com", password="hunter2pass", **overr
     return response.json()
 
 
-def _promote_to_manager(email):
-    with SessionLocal() as db:
-        user = db.query(User).filter(User.email == email).first()
-        manager_role = db.query(Role).filter(Role.name == "manager").first()
-        assert user is not None
-        assert manager_role is not None
-        user.roles.append(manager_role)
-        db.commit()
-
-
-def test_register_creates_user_with_employee_role(client):
+def test_register_creates_user_with_manager_role(client):
     body = _register(client)
 
     assert body["email"] == "alice@example.com"
@@ -46,7 +36,7 @@ def test_register_creates_user_with_employee_role(client):
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == "alice@example.com").first()
         assert user is not None
-        assert [role.name for role in user.roles] == ["employee"]
+        assert [role.name for role in user.roles] == ["manager"]
         assert user.hashed_password != "hunter2pass"
 
 
@@ -96,7 +86,7 @@ def test_me_returns_current_user_with_roles_and_permissions(client):
     assert response.status_code == 200
     body = response.json()
     assert body["email"] == "alice@example.com"
-    assert body["roles"] == ["employee"]
+    assert body["roles"] == ["manager"]
     assert "people:read" in body["permissions"]
 
 
@@ -213,24 +203,41 @@ def test_delete_me_without_token_returns_401(client):
 
 
 def test_users_list_requires_manager_role(client):
-    _register(client)
-    login_response = client.post(
+    admin = _register(client, email="admin@example.com")
+    admin_login = client.post(
         "/api/v1/auth/login",
-        json={"email": "alice@example.com", "password": "hunter2pass"},
+        json={"email": "admin@example.com", "password": "hunter2pass"},
     )
-    access_token = login_response.json()["access_token"]
+    admin_headers = {
+        "Authorization": f"Bearer {admin_login.json()['access_token']}"
+    }
 
-    response = client.get(
-        "/api/v1/auth/users", headers={"Authorization": f"Bearer {access_token}"}
+    # Every account starts as a manager; strip alice's role to exercise the
+    # 403 path for an account that holds no roles at all.
+    alice = _register(client, email="alice@example.com", password="anotherpass1")
+    client.post(
+        f"/api/v1/auth/users/{alice['id']}/roles",
+        json={"role": "manager", "grant": False},
+        headers=admin_headers,
     )
+
+    alice_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": "alice@example.com", "password": "anotherpass1"},
+    )
+    alice_headers = {
+        "Authorization": f"Bearer {alice_login.json()['access_token']}"
+    }
+
+    response = client.get("/api/v1/auth/users", headers=alice_headers)
 
     assert response.status_code == 403
+    assert admin["email"] == "admin@example.com"
 
 
 def test_manager_can_list_users_and_grant_roles(client):
     manager = _register(client, email="manager@example.com")
-    _promote_to_manager("manager@example.com")
-    employee = _register(client, email="bob@example.com", password="anotherpass1")
+    bob = _register(client, email="bob@example.com", password="anotherpass1")
 
     login_response = client.post(
         "/api/v1/auth/login",
@@ -244,20 +251,8 @@ def test_manager_can_list_users_and_grant_roles(client):
     emails = {user["email"] for user in list_response.json()}
     assert emails == {"manager@example.com", "bob@example.com"}
 
-    grant_response = client.post(
-        f"/api/v1/auth/users/{employee['id']}/roles",
-        json={"role": "manager", "grant": True},
-        headers=headers,
-    )
-    assert grant_response.status_code == 200
-
-    with SessionLocal() as db:
-        user = db.query(User).filter(User.email == "bob@example.com").first()
-        assert user is not None
-        assert {role.name for role in user.roles} == {"employee", "manager"}
-
     revoke_response = client.post(
-        f"/api/v1/auth/users/{employee['id']}/roles",
+        f"/api/v1/auth/users/{bob['id']}/roles",
         json={"role": "manager", "grant": False},
         headers=headers,
     )
@@ -266,7 +261,19 @@ def test_manager_can_list_users_and_grant_roles(client):
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == "bob@example.com").first()
         assert user is not None
-        assert {role.name for role in user.roles} == {"employee"}
+        assert {role.name for role in user.roles} == set()
+
+    grant_response = client.post(
+        f"/api/v1/auth/users/{bob['id']}/roles",
+        json={"role": "manager", "grant": True},
+        headers=headers,
+    )
+    assert grant_response.status_code == 200
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == "bob@example.com").first()
+        assert user is not None
+        assert {role.name for role in user.roles} == {"manager"}
 
     assert manager["email"] == "manager@example.com"
 

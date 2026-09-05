@@ -14,7 +14,6 @@ from api.v1 import projects as projects_module
 from api.v1 import roles as roles_module
 from api.v1 import teams as teams_module
 from optimizer.models import Seniority
-from tests.conftest import register_and_login
 
 
 @pytest.fixture
@@ -49,23 +48,15 @@ def test_create_person_without_auth_returns_401(client):
     assert response.status_code == 401
 
 
-def test_create_person_with_people_write_permission_succeeds(client, employee_headers):
-    # Employees hold people:write per the seeded permission set.
-    response = client.post(
-        "/api/v1/people/", json=_person_payload(), headers=employee_headers
-    )
-    assert response.status_code == 201
-
-
 def test_delete_person_without_people_delete_permission_returns_403(
-    client, manager_headers, employee_headers
+    client, manager_headers, unprivileged_headers
 ):
     created = client.post(
         "/api/v1/people/", json=_person_payload(), headers=manager_headers
     ).json()
 
     response = client.delete(
-        f"/api/v1/people/{created['id']}", headers=employee_headers
+        f"/api/v1/people/{created['id']}", headers=unprivileged_headers
     )
     assert response.status_code == 403
 
@@ -79,42 +70,7 @@ def test_delete_person_with_people_delete_permission_succeeds(client, manager_he
     assert response.status_code == 204
 
 
-# ── require_self_or_manager ──────────────────────────────────────────────────
-
-
-def test_employee_can_update_own_person_record(client, manager_headers):
-    person = client.post(
-        "/api/v1/people/", json=_person_payload(), headers=manager_headers
-    ).json()
-    owner_headers = register_and_login(
-        client, "owner@example.com", person_id=person["id"]
-    )
-
-    response = client.put(
-        f"/api/v1/people/{person['id']}",
-        json=_person_payload(name="Alice M."),
-        headers=owner_headers,
-    )
-
-    assert response.status_code == 200
-    assert response.json()["name"] == "Alice M."
-
-
-def test_employee_cannot_update_someone_elses_person_record(client, manager_headers):
-    person = client.post(
-        "/api/v1/people/", json=_person_payload(), headers=manager_headers
-    ).json()
-    other_headers = register_and_login(
-        client, "other@example.com", person_id="not-alice"
-    )
-
-    response = client.put(
-        f"/api/v1/people/{person['id']}",
-        json=_person_payload(name="Someone Else"),
-        headers=other_headers,
-    )
-
-    assert response.status_code == 403
+# ── people:write on update ────────────────────────────────────────────────────
 
 
 def test_manager_can_update_anyones_person_record(client, manager_headers):
@@ -161,9 +117,9 @@ def test_person_manager_id_round_trips(client, manager_headers):
 # ── Wiring smoke tests on other routers ──────────────────────────────────────
 
 
-def test_project_create_requires_projects_write_permission(client, employee_headers):
+def test_project_create_requires_projects_write_permission(client, unprivileged_headers):
     response = client.post(
-        "/api/v1/projects/", json={"name": "Project X"}, headers=employee_headers
+        "/api/v1/projects/", json={"name": "Project X"}, headers=unprivileged_headers
     )
     assert response.status_code == 403
 
@@ -175,40 +131,40 @@ def test_project_create_allowed_for_manager(client, manager_headers):
     assert response.status_code == 201
 
 
-def test_team_delete_requires_teams_delete_permission(client, employee_headers):
-    response = client.delete("/api/v1/teams/does-not-exist", headers=employee_headers)
+def test_team_delete_requires_teams_delete_permission(client, unprivileged_headers):
+    response = client.delete("/api/v1/teams/does-not-exist", headers=unprivileged_headers)
     assert response.status_code == 403
 
 
-def test_role_create_requires_roles_write_permission(client, employee_headers):
+def test_role_create_requires_roles_write_permission(client, unprivileged_headers):
     response = client.post(
-        "/api/v1/roles/", json={"id": "designer"}, headers=employee_headers
+        "/api/v1/roles/", json={"id": "designer"}, headers=unprivileged_headers
     )
     assert response.status_code == 403
 
 
-def test_skill_create_requires_skills_write_permission(client, employee_headers):
+def test_skill_create_requires_skills_write_permission(client, unprivileged_headers):
     response = client.post(
-        "/api/v1/skills/", json={"id": "python"}, headers=employee_headers
+        "/api/v1/skills/", json={"id": "python"}, headers=unprivileged_headers
     )
     assert response.status_code == 403
 
 
 def test_optimization_solve_requires_optimization_run_permission(
-    client, employee_headers
+    client, unprivileged_headers
 ):
     response = client.post(
         "/api/v1/optimization/solve",
         json={"project_id": "does-not-exist"},
-        headers=employee_headers,
+        headers=unprivileged_headers,
     )
     assert response.status_code == 403
 
 
 def test_assignment_delete_requires_assignments_delete_permission(
-    client, employee_headers
+    client, unprivileged_headers
 ):
     response = client.delete(
-        "/api/v1/assignments/does-not-exist", headers=employee_headers
+        "/api/v1/assignments/does-not-exist", headers=unprivileged_headers
     )
     assert response.status_code == 403

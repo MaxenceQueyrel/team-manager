@@ -53,7 +53,6 @@ def _user_me_out(user: User) -> UserMeOut:
         id=user.id,
         email=user.email,
         is_active=user.is_active,
-        person_id=user.person_id,
         roles=[role.name for role in user.roles],
         permissions=sorted(
             {permission.code for role in user.roles for permission in role.permissions}
@@ -69,17 +68,16 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    employee_role = db.execute(
-        select(Role).where(Role.name == "employee")
+    manager_role = db.execute(
+        select(Role).where(Role.name == "manager")
     ).scalar_one_or_none()
-    if employee_role is None:
+    if manager_role is None:
         raise HTTPException(status_code=500, detail="Default role not seeded")
 
     user = User(
         email=data.email,
         hashed_password=security.hash_password(data.password),
-        person_id=data.person_id,
-        roles=[employee_role],
+        roles=[manager_role],
     )
     db.add(user)
     db.commit()
