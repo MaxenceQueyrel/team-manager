@@ -40,8 +40,8 @@ def test_create_and_get_assignment(client, manager_headers):
     assert get_response.json() == body
 
 
-def test_create_assignment_without_permission_returns_403(client, employee_headers):
-    response = _create_assignment(client, employee_headers)
+def test_create_assignment_without_permission_returns_403(client, unprivileged_headers):
+    response = _create_assignment(client, unprivileged_headers)
     assert response.status_code == 403
 
 
@@ -135,12 +135,12 @@ def test_delete_missing_assignment_returns_404(client, manager_headers):
 
 
 def test_delete_assignment_without_permission_returns_403(
-    client, manager_headers, employee_headers
+    client, manager_headers, unprivileged_headers
 ):
     created = _create_assignment(client, manager_headers).json()
 
     response = client.delete(
-        f"/api/v1/assignments/{created['id']}", headers=employee_headers
+        f"/api/v1/assignments/{created['id']}", headers=unprivileged_headers
     )
     assert response.status_code == 403
 

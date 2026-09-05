@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 class UserRegister(BaseModel):
     email: str
     password: str = Field(min_length=8)
-    person_id: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -18,7 +17,6 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     is_active: bool
-    person_id: str | None
 
     model_config = {"from_attributes": True}
 

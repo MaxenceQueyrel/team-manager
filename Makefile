@@ -1,4 +1,4 @@
-.PHONY: dev prod down down-prod logs build \
+.PHONY: dev prod down down-prod logs build infra down-infra \
         sync install-backend install-frontend hooks-install \
         run-backend run-frontend \
         test test-optimizer test-api test-e2e test-e2e-headed test-e2e-ui \
@@ -28,6 +28,12 @@ down-prod:        ## Stop and remove production containers
 
 logs:             ## Tail logs from all dev containers
 	$(COMPOSE) $(DEV_FILE) logs -f
+
+infra:            ## Start only infrastructure (postgres) for local backend/frontend dev
+	$(COMPOSE) $(DEV_FILE) up postgres
+
+down-infra:       ## Stop and remove infrastructure containers
+	$(COMPOSE) $(DEV_FILE) down postgres
 
 # ── Local development (without Docker) ───────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from api.db.models import RefreshToken, Role, User, UserRole
+from api.db.models import RefreshToken, User, UserRole
 from api.db.session import SessionLocal
 from api.main import app
 
@@ -23,33 +23,33 @@ def _cleanup_users():
     db.close()
 
 
-def register_and_login(
-    client, email, password="hunter2pass", *, manager=False, person_id=None
-) -> dict[str, str]:
-    """Registers a user (optionally promoted to manager), logs in, and returns auth headers."""
-    payload = {"email": email, "password": password}
-    if person_id is not None:
-        payload["person_id"] = person_id
-    client.post("/api/v1/auth/register", json=payload)
-
-    if manager:
-        with SessionLocal() as db:
-            user = db.query(User).filter(User.email == email).first()
-            manager_role = db.query(Role).filter(Role.name == "manager").first()
-            user.roles.append(manager_role)
-            db.commit()
-
+def register_and_login(client, email, password="hunter2pass") -> dict[str, str]:
+    """Registers a user (accounts are managers by default) and returns auth headers."""
+    client.post(
+        "/api/v1/auth/register", json={"email": email, "password": password}
+    )
     response = client.post(
         "/api/v1/auth/login", json={"email": email, "password": password}
     )
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
+def _strip_roles(email):
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email).first()
+        user.roles.clear()
+        db.commit()
+
+
 @pytest.fixture
 def manager_headers(client):
-    return register_and_login(client, "manager@example.com", manager=True)
+    return register_and_login(client, "manager@example.com")
 
 
 @pytest.fixture
-def employee_headers(client):
-    return register_and_login(client, "employee@example.com")
+def unprivileged_headers(client):
+    """Headers for a logged-in account holding no roles, to exercise permission-denied paths."""
+    email = "unprivileged@example.com"
+    headers = register_and_login(client, email)
+    _strip_roles(email)
+    return headers

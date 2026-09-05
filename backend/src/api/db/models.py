@@ -59,9 +59,6 @@ class User(Base):
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[str]
     is_active: Mapped[bool] = mapped_column(default=True)
-    # References Person.id in the JSON file; validated at the API layer only,
-    # not a real FK since People live outside Postgres.
-    person_id: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from api.core.deps import require_permission, require_self_or_manager
+from api.core.deps import require_permission
 from api.models.person import Person, PersonCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
@@ -93,10 +93,7 @@ def create_person(data: PersonCreate):
 @router.put(
     "/{person_id}",
     response_model=Person,
-    dependencies=[
-        Depends(require_permission("people:write")),
-        Depends(require_self_or_manager),
-    ],
+    dependencies=[Depends(require_permission("people:write"))],
 )
 def update_person(person_id: str, data: PersonCreate):
     person = repo.update(person_id, data.model_dump())
