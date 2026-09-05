@@ -54,7 +54,7 @@ Examples:
    - Link to the created commit(s)
    - Any blockers or deviations from the original plan
 
-8. **Do not Create a commit but wait for it and then create one** with a clear message:
+8. **Do not Create a commit, except if it is asked create one** with a clear message:
    - Reference the issue number in the commit message (e.g., "Fixes #10")
    - Write a clear summary of the changes
    - Use conventional commit format if applicable
