@@ -123,7 +123,6 @@ export interface User {
   id: string;
   email: string;
   is_active: boolean;
-  person_id: string | null;
   roles: string[];
   permissions: string[];
 }
