@@ -3,6 +3,7 @@ from api.v1 import (
     assignments,
     auth,
     optimization,
+    organizations,
     people,
     projects,
     roles,
@@ -12,6 +13,9 @@ from api.v1 import (
 
 router = APIRouter()
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(
+    organizations.router, prefix="/organizations", tags=["organizations"]
+)
 router.include_router(people.router, prefix="/people", tags=["people"])
 router.include_router(projects.router, prefix="/projects", tags=["projects"])
 router.include_router(teams.router, prefix="/teams", tags=["teams"])
