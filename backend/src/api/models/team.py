@@ -4,6 +4,7 @@ from optimizer.models import AssignedMember, AssignmentWeights
 
 class Team(BaseModel):
     id: str
+    organization_id: str
     project_id: str
     members: list[AssignedMember] = []
     is_optimized: bool = False

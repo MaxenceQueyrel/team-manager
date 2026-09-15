@@ -17,6 +17,7 @@ class ProjectBase(BaseModel):
 
 class Project(ProjectBase):
     id: str
+    organization_id: str
 
 
 class ProjectCreate(ProjectBase):

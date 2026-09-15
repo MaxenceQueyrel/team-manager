@@ -30,33 +30,55 @@ class FileRepository(Generic[T]):
             json.dumps(data, indent=2, ensure_ascii=False, default=str)
         )
 
-    def list(self) -> list[T]:
-        return [self._model.model_validate(item) for item in self._load()]
+    def list(self, organization_id: str) -> list[T]:
+        return [
+            self._model.model_validate(item)
+            for item in self._load()
+            if item.get("organization_id") == organization_id
+        ]
 
-    def get(self, id: str) -> T | None:
-        raw = next((item for item in self._load() if item.get("id") == id), None)
+    def get(self, id: str, organization_id: str) -> T | None:
+        raw = next(
+            (
+                item
+                for item in self._load()
+                if item.get("id") == id
+                and item.get("organization_id") == organization_id
+            ),
+            None,
+        )
         return self._model.model_validate(raw) if raw else None
 
-    def create(self, data: dict) -> T:
+    def create(self, data: dict, organization_id: str) -> T:
         items = self._load()
-        data = {**data, "id": data.get("id") or str(uuid.uuid4())}
+        data = {
+            **data,
+            "id": data.get("id") or str(uuid.uuid4()),
+            "organization_id": organization_id,
+        }
         items.append(data)
         self._save(items)
         return self._model.model_validate(data)
 
-    def update(self, id: str, data: dict) -> T | None:
+    def update(self, id: str, data: dict, organization_id: str) -> T | None:
         items = self._load()
         for i, item in enumerate(items):
-            if item.get("id") == id:
-                updated = {**data, "id": id}
+            if item.get("id") == id and item.get("organization_id") == organization_id:
+                updated = {**data, "id": id, "organization_id": organization_id}
                 items[i] = updated
                 self._save(items)
                 return self._model.model_validate(updated)
         return None
 
-    def delete(self, id: str) -> bool:
+    def delete(self, id: str, organization_id: str) -> bool:
         items = self._load()
-        filtered = [item for item in items if item.get("id") != id]
+        filtered = [
+            item
+            for item in items
+            if not (
+                item.get("id") == id and item.get("organization_id") == organization_id
+            )
+        ]
         if len(filtered) == len(items):
             return False
         self._save(filtered)

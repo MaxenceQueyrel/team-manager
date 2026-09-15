@@ -80,6 +80,9 @@ test-e2e-ui:      ## Run e2e tests in Playwright's interactive UI mode
 lint-backend:     ## Lint optimizer + backend with ruff
 	uv run ruff check optimizer/src backend/src
 
+format-backend:  ## Format optimizer + backend with ruff
+	uv run ruff format optimizer/src backend/src
+
 typecheck-optimizer: ## Type-check the optimizer with ty
 	cd optimizer && uv run ty check
 

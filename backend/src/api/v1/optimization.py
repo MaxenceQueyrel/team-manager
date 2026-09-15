@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.core.deps import require_permission
+from api.core.deps import require_org_member, require_permission
 from api.models.person import Person
 from api.models.project import Project
 from api.models.team import Team, OptimizationRequest
@@ -20,16 +20,18 @@ solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
     response_model=Team,
     dependencies=[Depends(require_permission("optimization:run"))],
 )
-def solve_assignment(request: OptimizationRequest):
+def solve_assignment(
+    request: OptimizationRequest, organization_id: str = Depends(require_org_member)
+):
     projects_repo: FileRepository[Project] = FileRepository("projects", Project)
     people_repo: FileRepository[Person] = FileRepository("people", Person)
     teams_repo: FileRepository[Team] = FileRepository("teams", Team)
 
-    project = projects_repo.get(request.project_id)
+    project = projects_repo.get(request.project_id, organization_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    people = people_repo.list()
+    people = people_repo.list(organization_id)
 
     project_input = ProjectInput(
         id=project.id,
@@ -68,6 +70,7 @@ def solve_assignment(request: OptimizationRequest):
             "is_optimized": True,
             "optimization_score": result.score,
             "optimization_max_score": result.max_score,
-        }
+        },
+        organization_id,
     )
     return saved

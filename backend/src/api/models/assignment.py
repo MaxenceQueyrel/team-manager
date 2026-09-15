@@ -16,6 +16,7 @@ class AssignmentBase(BaseModel):
 
 class Assignment(AssignmentBase):
     id: str
+    organization_id: str
 
 
 class AssignmentCreate(AssignmentBase):

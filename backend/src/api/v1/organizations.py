@@ -90,9 +90,7 @@ def list_organizations(
 ):
     rows = db.execute(
         select(Organization, OrganizationMember.role)
-        .join(
-            OrganizationMember, OrganizationMember.organization_id == Organization.id
-        )
+        .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
         .where(OrganizationMember.user_id == current_user.id)
     ).all()
     return [
@@ -155,9 +153,7 @@ def add_member(
     organization: Organization = Depends(require_org_owner),
     db: Session = Depends(get_db),
 ):
-    user = db.execute(
-        select(User).where(User.email == data.email)
-    ).scalar_one_or_none()
+    user = db.execute(select(User).where(User.email == data.email)).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     if _get_membership(organization.id, user.id, db) is not None:
