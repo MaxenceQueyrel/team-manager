@@ -28,21 +28,24 @@ def _create_assignment(client, headers, **overrides):
     return client.post("/api/v1/assignments/", json=payload, headers=headers)
 
 
-def test_create_and_get_assignment(client, manager_headers):
-    response = _create_assignment(client, manager_headers)
+def test_create_and_get_assignment(client, org_headers):
+    response = _create_assignment(client, org_headers)
     assert response.status_code == 201
     body = response.json()
     assert body["person_id"] == "person-1"
     assert body["phase_id"] is None
+    assert body["organization_id"] == org_headers["X-Organization-Id"]
 
-    get_response = client.get(f"/api/v1/assignments/{body['id']}")
+    get_response = client.get(f"/api/v1/assignments/{body['id']}", headers=org_headers)
     assert get_response.status_code == 200
     assert get_response.json() == body
 
 
-def test_create_assignment_without_permission_returns_403(client, unprivileged_headers):
+def test_create_assignment_without_organization_header_returns_422(
+    client, unprivileged_headers
+):
     response = _create_assignment(client, unprivileged_headers)
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 def test_create_assignment_without_auth_returns_401(client):
@@ -50,37 +53,42 @@ def test_create_assignment_without_auth_returns_401(client):
     assert response.status_code == 401
 
 
-def test_get_missing_assignment_returns_404(client):
-    response = client.get("/api/v1/assignments/does-not-exist")
+def test_get_missing_assignment_returns_404(client, org_headers):
+    response = client.get("/api/v1/assignments/does-not-exist", headers=org_headers)
     assert response.status_code == 404
 
 
-def test_list_filters_by_person_and_project(client, manager_headers):
+def test_list_filters_by_person_and_project(client, org_headers):
     _create_assignment(
-        client, manager_headers, person_id="person-1", project_id="project-1", ratio=0.5
+        client, org_headers, person_id="person-1", project_id="project-1", ratio=0.5
     )
     _create_assignment(
-        client, manager_headers, person_id="person-1", project_id="project-2", ratio=0.5
+        client, org_headers, person_id="person-1", project_id="project-2", ratio=0.5
     )
     _create_assignment(
-        client, manager_headers, person_id="person-2", project_id="project-1", ratio=1.0
+        client, org_headers, person_id="person-2", project_id="project-1", ratio=1.0
     )
 
-    by_person = client.get("/api/v1/assignments/", params={"person_id": "person-1"})
+    by_person = client.get(
+        "/api/v1/assignments/", params={"person_id": "person-1"}, headers=org_headers
+    )
     assert len(by_person.json()) == 2
 
-    by_project = client.get("/api/v1/assignments/", params={"project_id": "project-1"})
+    by_project = client.get(
+        "/api/v1/assignments/", params={"project_id": "project-1"}, headers=org_headers
+    )
     assert len(by_project.json()) == 2
 
     by_both = client.get(
         "/api/v1/assignments/",
         params={"person_id": "person-1", "project_id": "project-2"},
+        headers=org_headers,
     )
     assert len(by_both.json()) == 1
 
 
-def test_update_assignment(client, manager_headers):
-    created = _create_assignment(client, manager_headers, ratio=0.5).json()
+def test_update_assignment(client, org_headers):
+    created = _create_assignment(client, org_headers, ratio=0.5).json()
 
     response = client.put(
         f"/api/v1/assignments/{created['id']}",
@@ -92,7 +100,7 @@ def test_update_assignment(client, manager_headers):
             "end": "2026-01-31",
             "phase_id": "phase-1",
         },
-        headers=manager_headers,
+        headers=org_headers,
     )
 
     assert response.status_code == 200
@@ -102,7 +110,7 @@ def test_update_assignment(client, manager_headers):
     assert body["id"] == created["id"]
 
 
-def test_update_missing_assignment_returns_404(client, manager_headers):
+def test_update_missing_assignment_returns_404(client, org_headers):
     response = client.put(
         "/api/v1/assignments/does-not-exist",
         json={
@@ -112,43 +120,43 @@ def test_update_missing_assignment_returns_404(client, manager_headers):
             "start": "2026-01-01",
             "end": "2026-01-31",
         },
-        headers=manager_headers,
+        headers=org_headers,
     )
     assert response.status_code == 404
 
 
-def test_delete_assignment(client, manager_headers):
-    created = _create_assignment(client, manager_headers).json()
+def test_delete_assignment(client, org_headers):
+    created = _create_assignment(client, org_headers).json()
 
     response = client.delete(
-        f"/api/v1/assignments/{created['id']}", headers=manager_headers
+        f"/api/v1/assignments/{created['id']}", headers=org_headers
     )
     assert response.status_code == 204
-    assert client.get(f"/api/v1/assignments/{created['id']}").status_code == 404
-
-
-def test_delete_missing_assignment_returns_404(client, manager_headers):
-    response = client.delete(
-        "/api/v1/assignments/does-not-exist", headers=manager_headers
+    assert (
+        client.get(
+            f"/api/v1/assignments/{created['id']}", headers=org_headers
+        ).status_code
+        == 404
     )
+
+
+def test_delete_missing_assignment_returns_404(client, org_headers):
+    response = client.delete("/api/v1/assignments/does-not-exist", headers=org_headers)
     assert response.status_code == 404
 
 
-def test_delete_assignment_without_permission_returns_403(
-    client, manager_headers, unprivileged_headers
-):
-    created = _create_assignment(client, manager_headers).json()
+def test_delete_assignment_without_organization_header_returns_422(client, org_headers):
+    created = _create_assignment(client, org_headers).json()
 
-    response = client.delete(
-        f"/api/v1/assignments/{created['id']}", headers=unprivileged_headers
-    )
-    assert response.status_code == 403
+    headers = {"Authorization": org_headers["Authorization"]}
+    response = client.delete(f"/api/v1/assignments/{created['id']}", headers=headers)
+    assert response.status_code == 422
 
 
-def test_overlapping_assignments_exceeding_fte_are_rejected(client, manager_headers):
+def test_overlapping_assignments_exceeding_fte_are_rejected(client, org_headers):
     _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-1",
         ratio=0.6,
         start="2026-01-01",
@@ -157,7 +165,7 @@ def test_overlapping_assignments_exceeding_fte_are_rejected(client, manager_head
 
     response = _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-1",
         ratio=0.5,
         start="2026-01-15",
@@ -167,10 +175,10 @@ def test_overlapping_assignments_exceeding_fte_are_rejected(client, manager_head
     assert response.status_code == 400
 
 
-def test_non_overlapping_assignments_are_allowed(client, manager_headers):
+def test_non_overlapping_assignments_are_allowed(client, org_headers):
     _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-1",
         ratio=1.0,
         start="2026-01-01",
@@ -179,7 +187,7 @@ def test_non_overlapping_assignments_are_allowed(client, manager_headers):
 
     response = _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-1",
         ratio=1.0,
         start="2026-02-01",
@@ -189,12 +197,10 @@ def test_non_overlapping_assignments_are_allowed(client, manager_headers):
     assert response.status_code == 201
 
 
-def test_overlapping_assignments_for_different_people_are_allowed(
-    client, manager_headers
-):
+def test_overlapping_assignments_for_different_people_are_allowed(client, org_headers):
     _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-1",
         ratio=1.0,
         start="2026-01-01",
@@ -203,7 +209,7 @@ def test_overlapping_assignments_for_different_people_are_allowed(
 
     response = _create_assignment(
         client,
-        manager_headers,
+        org_headers,
         person_id="person-2",
         ratio=1.0,
         start="2026-01-01",
@@ -213,8 +219,8 @@ def test_overlapping_assignments_for_different_people_are_allowed(
     assert response.status_code == 201
 
 
-def test_update_excludes_its_own_assignment_from_fte_check(client, manager_headers):
-    created = _create_assignment(client, manager_headers, ratio=0.6).json()
+def test_update_excludes_its_own_assignment_from_fte_check(client, org_headers):
+    created = _create_assignment(client, org_headers, ratio=0.6).json()
 
     response = client.put(
         f"/api/v1/assignments/{created['id']}",
@@ -225,7 +231,7 @@ def test_update_excludes_its_own_assignment_from_fte_check(client, manager_heade
             "start": "2026-01-01",
             "end": "2026-01-31",
         },
-        headers=manager_headers,
+        headers=org_headers,
     )
 
     assert response.status_code == 200

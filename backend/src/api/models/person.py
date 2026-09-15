@@ -20,6 +20,7 @@ class PersonBase(BaseModel):
 
 class Person(PersonBase):
     id: str
+    organization_id: str
 
 
 class PersonCreate(PersonBase):

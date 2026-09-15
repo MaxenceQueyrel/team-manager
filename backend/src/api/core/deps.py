@@ -1,11 +1,13 @@
+import uuid
+
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from api.core.security import decode_access_token
-from api.db.models import Role, User
+from api.db.models import OrganizationMember, Role, User
 from api.db.session import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
@@ -58,10 +60,58 @@ def require_manager(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+def require_org_member(
+    x_organization_id: str = Header(
+        description="Id of the organization to scope this request's data to."
+    ),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> str:
+    """Validates that the caller belongs to the organization named by X-Organization-Id.
+
+    Used on people/roles/skills/projects/assignments/teams endpoints, where
+    membership (owner or contributor) implies full read/write access to that
+    organization's data.
+
+    Returns:
+        The organization id, for scoping FileRepository reads and writes.
+
+    Raises:
+        HTTPException: 400 if the header isn't a valid UUID, 403 if the caller has
+            no OrganizationMember row for it.
+    """
+    try:
+        organization_id = uuid.UUID(x_organization_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Organization-Id header must be a valid UUID",
+        ) from None
+
+    membership = db.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == user.id,
+        )
+    ).scalar_one_or_none()
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this organization",
+        )
+    return str(organization_id)
+
+
 def require_permission(code: str):
     """Builds a dependency that requires the current user to hold permission `code`.
 
     Usable as `Depends(require_permission("people:write"))`.
+
+    Only "optimization:run" is still wired to a route — require_org_member now
+    covers people/roles/skills/projects/assignments/teams, so their `*:write`,
+    `*:delete` codes (and the seeded rows granting them) are unreferenced.
+    Left in place rather than migrated away, matching the pre-existing `*:read`
+    codes that were never wired to a route either.
     """
 
     def dependency(user: User = Depends(get_current_user)) -> User:

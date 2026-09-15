@@ -33,9 +33,7 @@ def _cleanup_users():
 
 def register_and_login(client, email, password="hunter2pass") -> dict[str, str]:
     """Registers a user (accounts are managers by default) and returns auth headers."""
-    client.post(
-        "/api/v1/auth/register", json={"email": email, "password": password}
-    )
+    client.post("/api/v1/auth/register", json={"email": email, "password": password})
     response = client.post(
         "/api/v1/auth/login", json={"email": email, "password": password}
     )
@@ -61,3 +59,23 @@ def unprivileged_headers(client):
     headers = register_and_login(client, email)
     _strip_roles(email)
     return headers
+
+
+def create_org(client, headers, name="Acme Corp") -> str:
+    """Creates an organization owned by `headers`'s user and returns its id."""
+    response = client.post(
+        "/api/v1/organizations/", json={"name": name}, headers=headers
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+@pytest.fixture
+def org_headers(client, manager_headers):
+    """Auth + X-Organization-Id headers for a manager who owns an organization.
+
+    The org-scoped routers (people/roles/skills/projects/assignments/teams)
+    require this header on every request.
+    """
+    organization_id = create_org(client, manager_headers)
+    return {**manager_headers, "X-Organization-Id": organization_id}
