@@ -14,6 +14,12 @@ pre-commit:
         - "backend/src/**/*.py"
       run: uv run ruff check {staged_files}
 
+    - name: ruff-format
+      glob:
+        - "optimizer/src/**/*.py"
+        - "backend/src/**/*.py"
+      run: uv run ruff format --check {staged_files}
+
     - name: ty-check-optimizer
       root: "optimizer/"
       glob: "optimizer/src/**/*.py"
