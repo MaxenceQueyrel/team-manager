@@ -2,11 +2,13 @@ import { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import Layout from "@/components/common/Layout";
 import RequireAuth from "@/components/common/RequireAuth";
+import RequireOrganization from "@/components/common/RequireOrganization";
 import RequirePermission from "@/components/common/RequirePermission";
 import AvailabilityPage from "@/pages/AvailabilityPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import OptimizationPage from "@/pages/OptimizationPage";
+import OrganizationPage from "@/pages/OrganizationPage";
 import PeoplePage from "@/pages/PeoplePage";
 import ProfilePage from "@/pages/ProfilePage";
 import ProjectsPage from "@/pages/ProjectsPage";
@@ -27,15 +29,18 @@ export default function App() {
       <Route path="register" element={<RegisterPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="people" element={<PeoplePage />} />
-          <Route path="projects" element={<ProjectsPage />} />
-          <Route path="teams" element={<TeamsPage />} />
-          <Route element={<RequirePermission permission="optimization:run" />}>
-            <Route path="optimization" element={<OptimizationPage />} />
-          </Route>
-          <Route path="availability" element={<AvailabilityPage />} />
+          <Route path="organization" element={<OrganizationPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route element={<RequireOrganization />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="people" element={<PeoplePage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="teams" element={<TeamsPage />} />
+            <Route element={<RequirePermission permission="optimization:run" />}>
+              <Route path="optimization" element={<OptimizationPage />} />
+            </Route>
+            <Route path="availability" element={<AvailabilityPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

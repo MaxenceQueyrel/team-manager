@@ -20,7 +20,7 @@ case "${1:-}" in
     ;;
 esac
 
-if curl -sf http://localhost:8000/api/v1/roles/ >/dev/null 2>&1; then
+if curl -sf http://localhost:8000/health >/dev/null 2>&1; then
   echo "error: something is already listening on port 8000 (e.g. 'make run-backend')." >&2
   echo "Stop it first — otherwise e2e tests would run against its real backend/data/*.json." >&2
   exit 1
@@ -42,7 +42,7 @@ cleanup() {
 trap cleanup EXIT
 
 for _ in $(seq 1 30); do
-  curl -sf http://localhost:8000/api/v1/roles/ >/dev/null 2>&1 && break
+  curl -sf http://localhost:8000/health >/dev/null 2>&1 && break
   sleep 1
 done
 

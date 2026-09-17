@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { inputStyle } from "@/components/common/ui";
 import { useAuthStore } from "@/store/authStore";
 
 const navItems = [
@@ -8,11 +9,15 @@ const navItems = [
   { to: "/availability", label: "Availability" },
   { to: "/teams", label: "Teams" },
   { to: "/optimization", label: "Optimization", permission: "optimization:run" },
+  { to: "/organization", label: "Organization" },
 ];
 
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
   const permissions = useAuthStore((s) => s.permissions);
+  const organizations = useAuthStore((s) => s.organizations);
+  const activeOrganizationId = useAuthStore((s) => s.activeOrganizationId);
+  const setActiveOrganization = useAuthStore((s) => s.setActiveOrganization);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const visibleNavItems = navItems.filter(
@@ -33,6 +38,24 @@ export default function Layout() {
         }}
       >
         <h2 style={{ margin: "0 0 1.5rem", fontSize: "1.1rem" }}>Team Manager</h2>
+        {organizations.length > 0 && (
+          <label style={{ display: "block", marginBottom: "1.25rem" }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: 600, marginBottom: 4 }}>
+              Organization
+            </div>
+            <select
+              value={activeOrganizationId ?? ""}
+              onChange={(e) => setActiveOrganization(e.target.value)}
+              style={{ ...inputStyle, fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+            >
+              {organizations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {visibleNavItems.map(({ to, label }) => (
             <li key={to} style={{ marginBottom: "0.25rem" }}>

@@ -2,6 +2,10 @@ import axios from "axios";
 import type {
   Assignment,
   OptimizationRequest,
+  Organization,
+  OrganizationDetail,
+  OrganizationMember,
+  OrganizationMembership,
   Person,
   PersonAvailability,
   Project,
@@ -35,9 +39,24 @@ export function setOnAuthFailure(handler: (() => void) | null): void {
   onAuthFailure = handler;
 }
 
+// Scopes people/roles/skills/projects/assignments/teams/optimization requests to the
+// active organization; auth and organizations endpoints ignore this header.
+let activeOrganizationId: string | null = null;
+
+export function setActiveOrganizationId(id: string | null): void {
+  activeOrganizationId = id;
+}
+
+export function getActiveOrganizationId(): string | null {
+  return activeOrganizationId;
+}
+
 client.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (activeOrganizationId) {
+    config.headers["X-Organization-Id"] = activeOrganizationId;
   }
   return config;
 });
@@ -159,4 +178,18 @@ export const skillsApi = {
 export const optimizationApi = {
   solve: (request: OptimizationRequest) =>
     client.post<Team>("/api/v1/optimization/solve", request).then((r) => r.data),
+};
+
+export const organizationsApi = {
+  list: () => client.get<OrganizationMembership[]>("/api/v1/organizations/").then((r) => r.data),
+  create: (data: { name: string }) =>
+    client.post<Organization>("/api/v1/organizations/", data).then((r) => r.data),
+  get: (id: string) =>
+    client.get<OrganizationDetail>(`/api/v1/organizations/${id}`).then((r) => r.data),
+  addMember: (id: string, email: string) =>
+    client
+      .post<OrganizationMember>(`/api/v1/organizations/${id}/members`, { email })
+      .then((r) => r.data),
+  removeMember: (id: string, userId: string) =>
+    client.delete(`/api/v1/organizations/${id}/members/${userId}`),
 };
