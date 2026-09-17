@@ -17,6 +17,10 @@ frontend/blob-report/
 # ── Docker ────────────────────────────────────────────────────────────────────
 # (keep docker-compose files but ignore generated runtime artifacts)
 
+# ── Backend runtime data ───────────────────────────────────────────────────────
+# FileRepository-backed JSON store, mutated by app usage — not source.
+backend/data/
+
 # ── Byte-compiled / optimized / DLL files ─────────────────────────────────────
 # Byte-compiled / optimized / DLL files
 __pycache__/

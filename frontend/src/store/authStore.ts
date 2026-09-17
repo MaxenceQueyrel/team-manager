@@ -1,11 +1,22 @@
 import { create } from "zustand";
-import { authApi, getAccessToken, setAccessToken, setOnAuthFailure } from "@/services/api";
-import type { User } from "@/types";
+import {
+  authApi,
+  getAccessToken,
+  organizationsApi,
+  setAccessToken,
+  setActiveOrganizationId,
+  setOnAuthFailure,
+} from "@/services/api";
+import type { OrganizationMembership, User } from "@/types";
+
+const ACTIVE_ORG_STORAGE_KEY = "activeOrganizationId";
 
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   permissions: Set<string>;
+  organizations: OrganizationMembership[];
+  activeOrganizationId: string | null;
   isLoading: boolean;
   isHydrated: boolean;
   error: string | null;
@@ -17,6 +28,10 @@ interface AuthState {
   updatePassword: (password: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   clearError: () => void;
+
+  setActiveOrganization: (id: string) => void;
+  createOrganization: (name: string) => Promise<void>;
+  refreshOrganizations: () => Promise<void>;
 }
 
 function message(e: unknown): string {
@@ -25,15 +40,56 @@ function message(e: unknown): string {
   return String(e);
 }
 
+/** Keeps the persisted choice in sync with the axios header used to scope org-scoped requests. */
+function applyActiveOrganization(id: string | null) {
+  setActiveOrganizationId(id);
+  if (id) {
+    localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, id);
+  } else {
+    localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+  }
+}
+
+/** Prefers the persisted/previous choice if it's still a membership, else the first available. */
+function pickActiveOrganizationId(
+  organizations: OrganizationMembership[],
+  preferredId: string | null,
+): string | null {
+  if (preferredId && organizations.some((o) => o.id === preferredId)) return preferredId;
+  return organizations[0]?.id ?? null;
+}
+
+async function loadOrganizations(): Promise<{
+  organizations: OrganizationMembership[];
+  activeOrganizationId: string | null;
+}> {
+  const organizations = await organizationsApi.list();
+  const activeOrganizationId = pickActiveOrganizationId(
+    organizations,
+    localStorage.getItem(ACTIVE_ORG_STORAGE_KEY),
+  );
+  applyActiveOrganization(activeOrganizationId);
+  return { organizations, activeOrganizationId };
+}
+
 function loggedOutState() {
   setAccessToken(null);
-  return { user: null, accessToken: null, permissions: new Set<string>() };
+  applyActiveOrganization(null);
+  return {
+    user: null,
+    accessToken: null,
+    permissions: new Set<string>(),
+    organizations: [] as OrganizationMembership[],
+    activeOrganizationId: null,
+  };
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   accessToken: null,
   permissions: new Set(),
+  organizations: [],
+  activeOrganizationId: null,
   isLoading: false,
   isHydrated: false,
   error: null,
@@ -44,7 +100,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { access_token } = await authApi.login({ email, password });
       setAccessToken(access_token);
       const user = await authApi.me();
-      set({ user, accessToken: access_token, permissions: new Set(user.permissions) });
+      const { organizations, activeOrganizationId } = await loadOrganizations();
+      set({
+        user,
+        accessToken: access_token,
+        permissions: new Set(user.permissions),
+        organizations,
+        activeOrganizationId,
+      });
     } catch (e) {
       set(loggedOutState());
       set({ error: message(e) });
@@ -81,7 +144,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // No access token exists yet on a fresh page load: this 401s and the response
       // interceptor transparently refreshes from the httpOnly cookie and retries.
       const user = await authApi.me();
-      set({ user, accessToken: getAccessToken(), permissions: new Set(user.permissions) });
+      const { organizations, activeOrganizationId } = await loadOrganizations();
+      set({
+        user,
+        accessToken: getAccessToken(),
+        permissions: new Set(user.permissions),
+        organizations,
+        activeOrganizationId,
+      });
     } catch {
       set(loggedOutState());
     } finally {
@@ -115,6 +185,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  setActiveOrganization: (id) => {
+    applyActiveOrganization(id);
+    set({ activeOrganizationId: id });
+  },
+
+  createOrganization: async (name) => {
+    set({ isLoading: true, error: null });
+    try {
+      const organization = await organizationsApi.create({ name });
+      const organizations = await organizationsApi.list();
+      applyActiveOrganization(organization.id);
+      set({ organizations, activeOrganizationId: organization.id });
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  refreshOrganizations: async () => {
+    const organizations = await organizationsApi.list();
+    const activeOrganizationId = pickActiveOrganizationId(
+      organizations,
+      get().activeOrganizationId,
+    );
+    applyActiveOrganization(activeOrganizationId);
+    set({ organizations, activeOrganizationId });
+  },
 }));
 
 setOnAuthFailure(() => useAuthStore.setState(loggedOutState()));

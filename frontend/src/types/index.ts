@@ -126,3 +126,26 @@ export interface User {
   roles: string[];
   permissions: string[];
 }
+
+export type OrganizationRole = "owner" | "contributor";
+
+export interface Organization {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+// Membership is many-to-many, so a user's role lives per-organization rather than on User.
+export interface OrganizationMembership extends Organization {
+  role: OrganizationRole;
+}
+
+export interface OrganizationMember {
+  user_id: string;
+  email: string;
+  role: OrganizationRole;
+}
+
+export interface OrganizationDetail extends Organization {
+  members: OrganizationMember[];
+}

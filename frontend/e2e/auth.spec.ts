@@ -15,8 +15,10 @@ test("logging in lands on a protected route", async ({ page, request }) => {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await page.waitForURL("/");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  // A freshly registered user has no organization yet, so the index route redirects to
+  // the organization empty state rather than the (org-scoped) dashboard.
+  await page.waitForURL("/organization");
+  await expect(page.getByRole("heading", { name: "Organization", exact: true })).toBeVisible();
   await expect(page.getByText(email)).toBeVisible();
 });
 

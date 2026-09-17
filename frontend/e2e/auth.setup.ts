@@ -17,4 +17,21 @@ setup("ensure a manager account exists", async ({ request }) => {
   execFileSync("uv", ["run", "python", "scripts/bootstrap_manager.py", MANAGER_EMAIL], {
     cwd: BACKEND_DIR,
   });
+
+  // People/projects/etc. are scoped by organization, so every spec that drives the manager
+  // through those pages needs it to already belong to (and thus default to) one.
+  const loginResponse = await request.post("/api/v1/auth/login", {
+    data: { email: MANAGER_EMAIL, password: MANAGER_PASSWORD },
+  });
+  const { access_token: accessToken } = await loginResponse.json();
+  const headers = { Authorization: `Bearer ${accessToken}` };
+
+  const organizationsResponse = await request.get("/api/v1/organizations/", { headers });
+  const organizations = await organizationsResponse.json();
+  if (organizations.length === 0) {
+    await request.post("/api/v1/organizations/", {
+      data: { name: "E2E Manager Org" },
+      headers,
+    });
+  }
 });
