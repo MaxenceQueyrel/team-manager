@@ -51,10 +51,15 @@ def two_orgs(client):
     b_headers = register_and_login(client, "b-owner@example.com")
     a_org_id = create_org(client, a_headers, name="Org A")
     b_org_id = create_org(client, b_headers, name="Org B")
-    return {
+    orgs = {
         "a": {**a_headers, "X-Organization-Id": a_org_id},
         "b": {**b_headers, "X-Organization-Id": b_org_id},
     }
+    # Person.role must reference an existing Role catalog entry, and
+    # _person_payload()'s default role is used in both organizations below.
+    for headers in orgs.values():
+        client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=headers)
+    return orgs
 
 
 # ── Non-member rejection ──────────────────────────────────────────────────────

@@ -1,12 +1,15 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from api.core.deps import require_org_member
+from api.core.people_csv import PersonCsvRowError, decode_people_csv, encode_people_csv
 from api.models.person import Person, PersonCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
+from api.v1 import roles as roles_module
 from optimizer.availability import daily_availability
 from optimizer.models import AvailabilityWindow, DateRange, PersonInput
 
@@ -78,6 +81,54 @@ def list_people(organization_id: str = Depends(require_org_member)):
     return repo.list(organization_id)
 
 
+def _require_known_role(role: str, organization_id: str) -> None:
+    if not roles_module.repo.get(role, organization_id):
+        raise HTTPException(status_code=400, detail=f"Unknown role: {role}")
+
+
+class ImportSummary(BaseModel):
+    created: list[str]
+    skipped: list[str]
+
+
+@router.post("/import", response_model=ImportSummary)
+def import_people(file: UploadFile, organization_id: str = Depends(require_org_member)):
+    content = file.file.read().decode("utf-8")
+    try:
+        rows = decode_people_csv(content)
+    except PersonCsvRowError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Validate every row before creating anything, so a bad row fails the whole
+    # import instead of leaving a partial set of people behind.
+    for row_number, (_, data) in enumerate(rows, start=2):
+        if not roles_module.repo.get(data.role, organization_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Row {row_number}: Unknown role: {data.role}",
+            )
+
+    created: list[str] = []
+    skipped: list[str] = []
+    for person_id, data in rows:
+        if repo.get(person_id, organization_id):
+            skipped.append(person_id)
+            continue
+        repo.create({**data.model_dump(), "id": person_id}, organization_id)
+        created.append(person_id)
+    return ImportSummary(created=created, skipped=skipped)
+
+
+@router.get("/export")
+def export_people(organization_id: str = Depends(require_org_member)):
+    csv_text = encode_people_csv(repo.list(organization_id))
+    return StreamingResponse(
+        iter([csv_text]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=people.csv"},
+    )
+
+
 @router.get("/{person_id}", response_model=Person)
 def get_person(person_id: str, organization_id: str = Depends(require_org_member)):
     person = repo.get(person_id, organization_id)
@@ -90,6 +141,7 @@ def get_person(person_id: str, organization_id: str = Depends(require_org_member
 def create_person(
     data: PersonCreate, organization_id: str = Depends(require_org_member)
 ):
+    _require_known_role(data.role, organization_id)
     return repo.create(data.model_dump(), organization_id)
 
 
@@ -99,6 +151,7 @@ def update_person(
     data: PersonCreate,
     organization_id: str = Depends(require_org_member),
 ):
+    _require_known_role(data.role, organization_id)
     person = repo.update(person_id, data.model_dump(), organization_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")

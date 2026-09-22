@@ -43,6 +43,13 @@ def _person_payload(**overrides):
     }
 
 
+@pytest.fixture
+def org_headers(client, org_headers):
+    """Person.role must reference an existing Role catalog entry."""
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    return org_headers
+
+
 # ── require_org_member (membership, not RBAC, gates people/roles/skills/…) ──
 
 
@@ -64,6 +71,33 @@ def test_delete_person_by_org_member_succeeds(client, org_headers):
 
     response = client.delete(f"/api/v1/people/{created['id']}", headers=org_headers)
     assert response.status_code == 204
+
+
+# ── Person.role must reference an existing Role catalog entry ─────────────────
+
+
+def test_create_person_with_unknown_role_returns_400(client, org_headers):
+    response = client.post(
+        "/api/v1/people/",
+        json=_person_payload(role="Ghost Role"),
+        headers=org_headers,
+    )
+    assert response.status_code == 400
+    assert "Ghost Role" in response.json()["detail"]
+
+
+def test_update_person_with_unknown_role_returns_400(client, org_headers):
+    created = client.post(
+        "/api/v1/people/", json=_person_payload(), headers=org_headers
+    ).json()
+
+    response = client.put(
+        f"/api/v1/people/{created['id']}",
+        json=_person_payload(role="Ghost Role"),
+        headers=org_headers,
+    )
+    assert response.status_code == 400
+    assert "Ghost Role" in response.json()["detail"]
 
 
 # ── Person.manager_id ─────────────────────────────────────────────────────────

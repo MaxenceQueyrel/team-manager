@@ -1,0 +1,4 @@
+id,name,role,seniority,years_of_experience,fte_capacity,manager_id,skills,availability_windows,preferences,growth_targets,affinities
+p-alice,Alice Martin,Backend Developer,senior,8.0,1.0,,"[{""id"": ""python"", ""description"": ""Python"", ""level"": 4.5}, {""id"": ""sql"", ""description"": ""SQL"", ""level"": 3.5}]",[],"[""python""]",[],{}
+p-bob,Bob Nguyen,Frontend Developer,mid,4.0,0.8,p-alice,"[{""id"": ""react"", ""description"": ""React"", ""level"": 3.0}]","[{""start"": ""2026-07-01"", ""end"": ""2026-07-15"", ""ratio"": 0.0}]",[],"[""react""]","{""p-alice"": 2.0}"
+p-carol,Carol Diaz,Designer,junior,1.5,1.0,p-alice,[],[],[],"[""figma""]",{}

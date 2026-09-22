@@ -6,9 +6,11 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.models.assignment import Assignment
 from api.models.person import Person
+from api.models.role import Role as RoleCatalogEntry
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
 from api.v1 import people as people_module
+from api.v1 import roles as roles_module
 from optimizer.models import AvailabilityWindow, Seniority
 
 
@@ -16,6 +18,7 @@ from optimizer.models import AvailabilityWindow, Seniority
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setattr(people_module, "repo", FileRepository("people", Person))
+    monkeypatch.setattr(roles_module, "repo", FileRepository("roles", RoleCatalogEntry))
     monkeypatch.setattr(
         assignments_module, "repo", FileRepository("assignments", Assignment)
     )
@@ -32,6 +35,7 @@ def _create_person(client, headers, **overrides):
         "availability_windows": [],
         **overrides,
     }
+    client.post("/api/v1/roles/", json={"id": payload["role"]}, headers=headers)
     response = client.post("/api/v1/people/", json=payload, headers=headers)
     assert response.status_code == 201
     return response.json()
