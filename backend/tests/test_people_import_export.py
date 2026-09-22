@@ -4,9 +4,11 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.models.person import Person
 from api.models.role import Role as RoleCatalogEntry
+from api.models.skill import Skill as SkillCatalogEntry
 from api.repositories.file_repository import FileRepository
 from api.v1 import people as people_module
 from api.v1 import roles as roles_module
+from api.v1 import skills as skills_module
 from optimizer.models import Seniority
 from tests.conftest import create_org
 
@@ -16,11 +18,14 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setattr(people_module, "repo", FileRepository("people", Person))
     monkeypatch.setattr(roles_module, "repo", FileRepository("roles", RoleCatalogEntry))
+    monkeypatch.setattr(
+        skills_module, "repo", FileRepository("skills", SkillCatalogEntry)
+    )
     return TestClient(app)
 
 
 def _ensure_role(client, headers, role_id):
-    """Person.role (and CSV import rows) must reference an existing Role."""
+    """Direct person create/update requires an existing Role (CSV import auto-creates it)."""
     client.post("/api/v1/roles/", json={"id": role_id}, headers=headers)
 
 
@@ -79,10 +84,13 @@ def _row_values(**overrides):
         "affinities": "{}",
         **overrides,
     }
-    return ",".join(
-        f'"{row[field]}"' if "," in row[field] or '"' in row[field] else row[field]
-        for field in _CSV_FIELDNAMES
-    )
+
+    def _cell(value: str) -> str:
+        if "," in value or '"' in value:
+            return '"{}"'.format(value.replace('"', '""'))
+        return value
+
+    return ",".join(_cell(row[field]) for field in _CSV_FIELDNAMES)
 
 
 def _csv_row(**overrides):
@@ -100,7 +108,12 @@ def test_import_creates_new_people(client, org_headers):
     response = _upload_csv(client, org_headers, _csv_row())
 
     assert response.status_code == 200
-    assert response.json() == {"created": ["p1"], "skipped": []}
+    assert response.json() == {
+        "created": ["p1"],
+        "skipped": [],
+        "created_roles": [],
+        "created_skills": [],
+    }
 
     person = client.get("/api/v1/people/p1", headers=org_headers).json()
     assert person["name"] == "Bob Nguyen"
@@ -159,23 +172,76 @@ def test_import_fails_closed_on_partial_bad_row(client, org_headers):
     assert client.get("/api/v1/people/good", headers=org_headers).status_code == 404
 
 
-def test_import_rejects_unknown_role(client, org_headers):
+def test_import_creates_missing_role(client, org_headers):
     response = _upload_csv(client, org_headers, _csv_row(role="Ghost Role"))
 
-    assert response.status_code == 400
-    assert "Row 2" in response.json()["detail"]
-    assert "Ghost Role" in response.json()["detail"]
-    assert client.get("/api/v1/people/p1", headers=org_headers).status_code == 404
+    assert response.status_code == 200
+    body = response.json()
+    assert body["created"] == ["p1"]
+    assert body["created_roles"] == ["Ghost Role"]
+    assert client.get("/api/v1/people/p1", headers=org_headers).status_code == 200
+
+    roles = {r["id"] for r in client.get("/api/v1/roles/", headers=org_headers).json()}
+    assert "Ghost Role" in roles
 
 
-def test_import_fails_closed_when_one_row_has_an_unknown_role(client, org_headers):
+def test_import_does_not_recreate_an_existing_role(client, org_headers):
     _ensure_role(client, org_headers, "Frontend Developer")
-    csv_text = _csv_rows({"id": "good"}, {"id": "bad", "role": "Ghost Role"})
+
+    response = _upload_csv(client, org_headers, _csv_row())
+
+    assert response.status_code == 200
+    assert response.json()["created_roles"] == []
+
+
+def test_import_with_a_blank_role_does_not_create_a_junk_catalog_entry(
+    client, org_headers
+):
+    response = _upload_csv(client, org_headers, _csv_row(role=""))
+
+    assert response.status_code == 200
+    assert response.json()["created_roles"] == []
+    assert client.get("/api/v1/roles/", headers=org_headers).json() == []
+
+
+def test_import_creates_missing_skills_from_skills_preferences_and_growth_targets(
+    client, org_headers
+):
+    csv_text = _csv_row(
+        skills='[{"id": "python", "description": "Python", "level": 3}]',
+        preferences='["rust"]',
+        growth_targets='["go"]',
+    )
 
     response = _upload_csv(client, org_headers, csv_text)
 
-    assert response.status_code == 400
-    assert client.get("/api/v1/people/good", headers=org_headers).status_code == 404
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body["created_skills"]) == {"python", "rust", "go"}
+
+    skills = {
+        s["id"]: s["description"]
+        for s in client.get("/api/v1/skills/", headers=org_headers).json()
+    }
+    assert skills["python"] == "Python"
+    assert skills["rust"] == ""
+    assert skills["go"] == ""
+
+
+def test_import_does_not_recreate_an_existing_skill(client, org_headers):
+    client.post(
+        "/api/v1/skills/",
+        json={"id": "react", "description": "React"},
+        headers=org_headers,
+    )
+    csv_text = _csv_row(skills='[{"id": "react", "level": 3}]')
+
+    response = _upload_csv(client, org_headers, csv_text)
+
+    assert response.status_code == 200
+    assert response.json()["created_skills"] == []
+    skill = client.get("/api/v1/skills/react", headers=org_headers).json()
+    assert skill["description"] == "React"
 
 
 def test_export_round_trips_through_import(client, org_headers):

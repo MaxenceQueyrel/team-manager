@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   Badge,
@@ -16,9 +16,25 @@ import {
   SkillsEditor,
   TagSkillInput,
 } from "@/components/editors/listEditors";
+import { peopleApi } from "@/services/api";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type { Person, Role, Seniority, Skill } from "@/types";
+import type { PeopleImportSummary, Person, Role, Seniority, Skill } from "@/types";
+
+function message(e: unknown): string {
+  if (typeof e === "object" && e && "message" in e)
+    return String((e as { message: unknown }).message);
+  return String(e);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];
 
@@ -52,6 +68,7 @@ export default function PeoplePage() {
     fetchSkills,
     savePerson,
     deletePerson,
+    importPeople,
     createRole,
     createSkill,
   } = useAppStore();
@@ -63,12 +80,41 @@ export default function PeoplePage() {
   const canWriteSkills = useAuthStore((s) => s.permissions.has("skills:write"));
   const [editing, setEditing] = useState<Person | "new" | null>(null);
   const [catalogKind, setCatalogKind] = useState<CatalogKind | null>(null);
+  const [importSummary, setImportSummary] = useState<PeopleImportSummary | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchPeople();
     fetchRoles();
     fetchSkills();
   }, [fetchPeople, fetchRoles, fetchSkills]);
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    setImportError(null);
+    setImportSummary(null);
+    try {
+      setImportSummary(await importPeople(file));
+    } catch (e) {
+      setImportError(message(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(await peopleApi.exportCsv(), "people.csv");
+    } catch (e) {
+      setImportError(message(e));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div>
@@ -86,12 +132,53 @@ export default function PeoplePage() {
           {canWriteRoles && <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>}
           {canWriteSkills && <Button onClick={() => setCatalogKind("skill")}>+ Add skill</Button>}
           {canWritePeople && (
-            <Button variant="primary" onClick={() => setEditing("new")}>
-              + Add person
-            </Button>
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) handleImportFile(file);
+                }}
+              />
+              <Button disabled={importing} onClick={() => fileInputRef.current?.click()}>
+                {importing ? "Importing…" : "Import CSV"}
+              </Button>
+              <Button disabled={exporting} onClick={handleExport}>
+                {exporting ? "Exporting…" : "Export CSV"}
+              </Button>
+              <Button variant="primary" onClick={() => setEditing("new")}>
+                + Add person
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {importSummary && (
+        <p style={{ color: colors.success, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          Import complete — created {importSummary.created.length}, skipped{" "}
+          {importSummary.skipped.length} (already existing:{" "}
+          {importSummary.skipped.join(", ") || "none"}).
+          {(importSummary.created_roles.length > 0 || importSummary.created_skills.length > 0) && (
+            <>
+              {" "}
+              Also added {importSummary.created_roles.length} new role
+              {importSummary.created_roles.length === 1 ? "" : "s"} and{" "}
+              {importSummary.created_skills.length} new skill
+              {importSummary.created_skills.length === 1 ? "" : "s"} to the catalog.
+            </>
+          )}
+        </p>
+      )}
+      {importError && (
+        <p style={{ color: colors.danger, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          {importError}
+        </p>
+      )}
 
       <div
         style={{
