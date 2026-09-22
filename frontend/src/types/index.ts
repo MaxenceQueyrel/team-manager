@@ -50,6 +50,13 @@ export interface Person {
   affinities: Record<string, number>; // person_id → score (-5..+5)
 }
 
+export interface PeopleImportSummary {
+  created: string[]; // ids of people created by the import
+  skipped: string[]; // ids that already existed and were left untouched
+  created_roles: string[]; // role ids auto-created because the CSV referenced them
+  created_skills: string[]; // skill ids auto-created because the CSV referenced them
+}
+
 export interface Squad {
   member_ids: string[];
 }

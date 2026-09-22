@@ -6,6 +6,7 @@ import type {
   OrganizationDetail,
   OrganizationMember,
   OrganizationMembership,
+  PeopleImportSummary,
   Person,
   PersonAvailability,
   Project,
@@ -126,6 +127,17 @@ export const peopleApi = {
     client
       .get<PersonAvailability[]>("/api/v1/people/availability", { params: { start, end } })
       .then((r) => r.data),
+  importCsv: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return client
+      .post<PeopleImportSummary>("/api/v1/people/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+  exportCsv: () =>
+    client.get<Blob>("/api/v1/people/export", { responseType: "blob" }).then((r) => r.data),
 };
 
 export const projectsApi = {

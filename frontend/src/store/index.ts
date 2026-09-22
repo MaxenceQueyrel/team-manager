@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { peopleApi, projectsApi, rolesApi, skillsApi, teamsApi } from "@/services/api";
-import type { OptimizationWeights, Person, Project, Role, Skill, Team } from "@/types";
+import type {
+  OptimizationWeights,
+  PeopleImportSummary,
+  Person,
+  Project,
+  Role,
+  Skill,
+  Team,
+} from "@/types";
 
 interface AppState {
   people: Person[];
@@ -20,6 +28,7 @@ interface AppState {
 
   savePerson: (data: Omit<Person, "id">, id?: string) => Promise<void>;
   deletePerson: (id: string) => Promise<void>;
+  importPeople: (file: File) => Promise<PeopleImportSummary>;
   saveProject: (data: Omit<Project, "id">, id?: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
@@ -120,6 +129,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().fetchPeople();
     } catch (e) {
       set({ error: message(e) });
+    }
+  },
+
+  importPeople: async (file) => {
+    set({ error: null });
+    try {
+      const summary = await peopleApi.importCsv(file);
+      await Promise.all([get().fetchPeople(), get().fetchRoles(), get().fetchSkills()]);
+      return summary;
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
     }
   },
 

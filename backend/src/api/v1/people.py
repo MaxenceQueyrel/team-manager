@@ -10,6 +10,7 @@ from api.models.person import Person, PersonCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
 from api.v1 import roles as roles_module
+from api.v1 import skills as skills_module
 from optimizer.availability import daily_availability
 from optimizer.models import AvailabilityWindow, DateRange, PersonInput
 
@@ -89,6 +90,8 @@ def _require_known_role(role: str, organization_id: str) -> None:
 class ImportSummary(BaseModel):
     created: list[str]
     skipped: list[str]
+    created_roles: list[str] = []
+    created_skills: list[str] = []
 
 
 @router.post("/import", response_model=ImportSummary)
@@ -99,24 +102,54 @@ def import_people(file: UploadFile, organization_id: str = Depends(require_org_m
     except PersonCsvRowError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Validate every row before creating anything, so a bad row fails the whole
-    # import instead of leaving a partial set of people behind.
-    for row_number, (_, data) in enumerate(rows, start=2):
-        if not roles_module.repo.get(data.role, organization_id):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Row {row_number}: Unknown role: {data.role}",
-            )
+    # Roles and skills referenced by the CSV that aren't in the catalog yet are
+    # created on the fly, rather than failing the import — a CSV is often the
+    # first time a roster (and its roles/skills) is entered into the system.
+    existing_role_ids = {role.id for role in roles_module.repo.list(organization_id)}
+    existing_skill_ids = {
+        skill.id for skill in skills_module.repo.list(organization_id)
+    }
+    created_roles: list[str] = []
+    created_skills: list[str] = []
+
+    def _ensure_skill(skill_id: str, description: str = "") -> None:
+        # A blank id would make FileRepository.create() mint a random uuid instead,
+        # spawning a junk catalog entry that doesn't match the (still-blank) cell.
+        if not skill_id or skill_id in existing_skill_ids:
+            return
+        skills_module.repo.create(
+            {"id": skill_id, "description": description}, organization_id
+        )
+        existing_skill_ids.add(skill_id)
+        created_skills.append(skill_id)
 
     created: list[str] = []
     skipped: list[str] = []
     for person_id, data in rows:
+        if data.role and data.role not in existing_role_ids:
+            roles_module.repo.create(
+                {"id": data.role, "description": ""}, organization_id
+            )
+            existing_role_ids.add(data.role)
+            created_roles.append(data.role)
+
+        for skill in data.skills:
+            _ensure_skill(skill.id, skill.description)
+        for skill_id in (*data.preferences, *data.growth_targets):
+            _ensure_skill(skill_id)
+
         if repo.get(person_id, organization_id):
             skipped.append(person_id)
             continue
         repo.create({**data.model_dump(), "id": person_id}, organization_id)
         created.append(person_id)
-    return ImportSummary(created=created, skipped=skipped)
+
+    return ImportSummary(
+        created=created,
+        skipped=skipped,
+        created_roles=created_roles,
+        created_skills=created_skills,
+    )
 
 
 @router.get("/export")
