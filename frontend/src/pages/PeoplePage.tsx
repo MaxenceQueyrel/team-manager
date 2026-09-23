@@ -8,6 +8,7 @@ import {
   Field,
   inputStyle,
   Modal,
+  selectStyle,
   seniorityColors,
 } from "@/components/common/ui";
 import {
@@ -489,7 +490,7 @@ function PersonForm({
           <select
             value={draft.role}
             onChange={(e) => set("role", e.target.value)}
-            style={inputStyle}
+            style={selectStyle}
           >
             <option value="">Select a role</option>
             {roleOptions.map((roleId) => (
@@ -508,7 +509,7 @@ function PersonForm({
           <select
             value={draft.seniority}
             onChange={(e) => set("seniority", e.target.value as Seniority)}
-            style={inputStyle}
+            style={selectStyle}
           >
             {SENIORITIES.map((s) => (
               <option key={s} value={s}>

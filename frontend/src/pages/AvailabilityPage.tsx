@@ -6,7 +6,7 @@ import {
   type TimelineOverlay,
   type TimelineRow,
 } from "@/components/common/AvailabilityCalendar";
-import { Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { Card, colors, Field, inputStyle, selectStyle } from "@/components/common/ui";
 import { TagSkillInput } from "@/components/editors/listEditors";
 import { peopleApi } from "@/services/api";
 import { knownSkillIds, useAppStore } from "@/store";
@@ -151,7 +151,7 @@ export default function AvailabilityPage() {
                 setSelectedProjectId(e.target.value);
                 setSquadOnly(false);
               }}
-              style={inputStyle}
+              style={selectStyle}
             >
               <option value="">— none —</option>
               {projects.map((p) => (

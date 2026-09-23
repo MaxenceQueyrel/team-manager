@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Card, colors, Field, inputStyle, Modal } from "@/components/common/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  colors,
+  Field,
+  inputStyle,
+  Modal,
+  selectStyle,
+} from "@/components/common/ui";
 import { assignmentsApi } from "@/services/api";
 import type { Assignment, Person, Project } from "@/types";
 
@@ -169,7 +178,7 @@ export function ProjectAssignmentsModal({
             <select
               value={selectedPersonId}
               onChange={(e) => setSelectedPersonId(e.target.value)}
-              style={inputStyle}
+              style={selectStyle}
             >
               <option value="">Select a person</option>
               {people.map((person) => (
@@ -189,7 +198,7 @@ export function ProjectAssignmentsModal({
                 const selected = COMMITMENTS.find((item) => item.value === next);
                 if (selected && next !== "custom") setRatio(selected.ratio);
               }}
-              style={inputStyle}
+              style={selectStyle}
             >
               {COMMITMENTS.map((item) => (
                 <option key={item.value} value={item.value}>

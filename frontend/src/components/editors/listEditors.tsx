@@ -1,5 +1,6 @@
-import { useId, useState } from "react";
-import { Button, colors, inputStyle } from "@/components/common/ui";
+import { useState } from "react";
+import { Combobox } from "@/components/common/Combobox";
+import { Button, colors, inputStyle, selectStyle } from "@/components/common/ui";
 import type {
   AvailabilityWindow,
   DateRange,
@@ -44,16 +45,6 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function SkillDatalist({ id, options }: { id: string; options: string[] }) {
-  return (
-    <datalist id={id}>
-      {options.map((o) => (
-        <option key={o} value={o} />
-      ))}
-    </datalist>
-  );
-}
-
 export function SkillsEditor({
   value,
   onChange,
@@ -63,21 +54,19 @@ export function SkillsEditor({
   onChange: (v: SkillLevel[]) => void;
   skillOptions: string[];
 }) {
-  const listId = useId();
   const update = (i: number, patch: Partial<SkillLevel>) =>
     onChange(value.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
 
   return (
     <div>
-      <SkillDatalist id={listId} options={skillOptions} />
       {value.map((s, i) => (
         <div key={i} style={rowStyle}>
-          <input
-            list={listId}
+          <Combobox
             placeholder="skill id"
             value={s.id}
-            onChange={(e) => update(i, { id: e.target.value })}
-            style={{ ...inputStyle, flex: 1 }}
+            onChange={(id) => update(i, { id })}
+            options={skillOptions}
+            style={{ flex: 1 }}
           />
           <input
             type="number"
@@ -106,21 +95,19 @@ export function SkillReqsEditor({
   onChange: (v: SkillRequirement[]) => void;
   skillOptions: string[];
 }) {
-  const listId = useId();
   const update = (i: number, patch: Partial<SkillRequirement>) =>
     onChange(value.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
 
   return (
     <div>
-      <SkillDatalist id={listId} options={skillOptions} />
       {value.map((s, i) => (
         <div key={i} style={rowStyle}>
-          <input
-            list={listId}
+          <Combobox
             placeholder="skill id"
             value={s.id}
-            onChange={(e) => update(i, { id: e.target.value })}
-            style={{ ...inputStyle, flex: 1 }}
+            onChange={(id) => update(i, { id })}
+            options={skillOptions}
+            style={{ flex: 1 }}
           />
           <input
             type="number"
@@ -267,7 +254,7 @@ export function AffinitiesEditor({
         <select
           value=""
           onChange={(e) => e.target.value && setScore(e.target.value, 0)}
-          style={{ ...inputStyle, maxWidth: 260 }}
+          style={{ ...selectStyle, maxWidth: 260 }}
         >
           <option value="">+ Add affinity with…</option>
           {available.map((p) => (
@@ -285,18 +272,16 @@ export function TagSkillInput({
   value,
   onChange,
   skillOptions,
-  placeholder = "type a skill id and press Enter",
+  placeholder = "type a skill id, or pick one below",
 }: {
   value: string[];
   onChange: (v: string[]) => void;
   skillOptions: string[];
   placeholder?: string;
 }) {
-  const listId = useId();
   const [draft, setDraft] = useState("");
-
-  const add = () => {
-    const v = draft.trim();
+  const add = (tag: string) => {
+    const v = tag.trim();
     if (v && !value.includes(v)) onChange([...value, v]);
     setDraft("");
   };
@@ -329,6 +314,7 @@ export function TagSkillInput({
             <button
               type="button"
               onClick={() => onChange(value.filter((t) => t !== tag))}
+              aria-label={`Remove ${tag}`}
               style={{
                 border: "none",
                 background: "none",
@@ -343,20 +329,15 @@ export function TagSkillInput({
           </span>
         ))}
       </div>
-      <SkillDatalist id={listId} options={skillOptions} />
-      <input
-        list={listId}
+      <Combobox
         value={draft}
+        onChange={setDraft}
+        options={skillOptions.filter((o) => !value.includes(o))}
         placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            add();
-          }
-        }}
-        onBlur={add}
-        style={inputStyle}
+        onSelect={add}
+        onEnter={() => add(draft)}
+        onBlur={() => add(draft)}
+        emptyLabel="No matching skill — press Enter to add it as typed"
       />
     </div>
   );

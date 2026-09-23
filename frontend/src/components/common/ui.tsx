@@ -24,6 +24,20 @@ export const inputStyle: CSSProperties = {
   color: colors.text,
 };
 
+/** Styling for native `<select>`: the browser chevron is replaced by an inline SVG
+ * so the control matches `inputStyle` across browsers. */
+export const selectStyle: CSSProperties = {
+  ...inputStyle,
+  appearance: "none",
+  paddingRight: "2rem",
+  cursor: "pointer",
+  backgroundImage:
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%236c757d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E\")",
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 0.65rem center",
+  backgroundSize: "0.7rem",
+};
+
 type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 const buttonVariants: Record<ButtonVariant, CSSProperties> = {

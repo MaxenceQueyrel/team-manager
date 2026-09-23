@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { inputStyle } from "@/components/common/ui";
+import { selectStyle } from "@/components/common/ui";
 import { useAuthStore } from "@/store/authStore";
 
 const navItems = [
@@ -46,7 +46,7 @@ export default function Layout() {
             <select
               value={activeOrganizationId ?? ""}
               onChange={(e) => setActiveOrganization(e.target.value)}
-              style={{ ...inputStyle, fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
+              style={{ ...selectStyle, fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
             >
               {organizations.map((o) => (
                 <option key={o.id} value={o.id}>

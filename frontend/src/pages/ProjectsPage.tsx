@@ -9,6 +9,7 @@ import {
   inputStyle,
   Modal,
   priorityColors,
+  selectStyle,
 } from "@/components/common/ui";
 import {
   DateRangesEditor,
@@ -246,7 +247,7 @@ function ProjectForm({
           <select
             value={draft.priority}
             onChange={(e) => set("priority", e.target.value as Priority)}
-            style={inputStyle}
+            style={selectStyle}
           >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>

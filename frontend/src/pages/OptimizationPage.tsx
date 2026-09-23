@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { TeamMembers } from "@/components/common/TeamMembers";
-import { Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { Button, Card, colors, Field, selectStyle } from "@/components/common/ui";
 import { optimizationApi } from "@/services/api";
 import { useAppStore } from "@/store";
 import type { OptimizationWeights, Team } from "@/types";
@@ -96,7 +96,7 @@ export default function OptimizationPage() {
           <select
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            style={inputStyle}
+            style={selectStyle}
           >
             <option value="">— choose a project —</option>
             {projects.map((p) => (
