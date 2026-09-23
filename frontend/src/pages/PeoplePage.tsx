@@ -160,9 +160,14 @@ export default function PeoplePage() {
 
       {importSummary && (
         <p style={{ color: colors.success, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
-          Import complete — created {importSummary.created.length}, skipped{" "}
-          {importSummary.skipped.length} (already existing:{" "}
-          {importSummary.skipped.join(", ") || "none"}).
+          Import complete — created {importSummary.created.length}
+          {importSummary.skipped.length > 0 && (
+            <>
+              , skipped {importSummary.skipped.length} (already existing:{" "}
+              {importSummary.skipped.join(", ")})
+            </>
+          )}
+          .
           {(importSummary.created_roles.length > 0 || importSummary.created_skills.length > 0) && (
             <>
               {" "}
