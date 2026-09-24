@@ -1,0 +1,3 @@
+id,name,description,n_slots,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases
+proj-atlas,Atlas Migration,Migrate legacy billing to Atlas,3,high,"[{""id"": ""python"", ""description"": ""Python"", ""min_level"": 3.0}, {""id"": ""sql"", ""description"": ""SQL"", ""min_level"": 2.5}]","[""p-carol""]","[""p-alice""]","[{""member_ids"": [""p-alice"", ""p-bob""]}]","[{""start"": ""2026-07-01"", ""end"": ""2026-09-30""}]",[]
+proj-nova,Nova Redesign,,1,medium,[],[],[],[],[],"[{""id"": ""design"", ""n_slots"": 1, ""skill_requirements"": [{""id"": ""figma"", ""description"": ""Figma"", ""min_level"": 2.0}], ""date_range"": {""start"": ""2026-08-01"", ""end"": ""2026-08-31""}}]"
