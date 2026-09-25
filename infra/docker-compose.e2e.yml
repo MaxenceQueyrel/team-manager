@@ -1,0 +1,21 @@
+# Throwaway Postgres for the Playwright e2e suite (scripts/test-e2e.sh).
+# Runs under its own compose project on :5433 with data on tmpfs, so it can
+# run alongside the dev stack and every e2e run starts from an empty database.
+name: team-manager-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=team_manager
+      - POSTGRES_PASSWORD=team_manager
+      - POSTGRES_DB=team_manager
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U team_manager"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

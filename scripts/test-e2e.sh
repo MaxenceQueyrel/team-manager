@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Runs the frontend Playwright suite against a real backend, backed by a
-# scratch copy of backend/data so e2e runs never mutate the checked-in
-# sample data. The frontend dev server itself is started by Playwright's
-# webServer (see frontend/playwright.config.ts).
+# Runs the frontend Playwright suite against its own isolated stack, so it can
+# run alongside the dev app (make run-backend / make run-frontend) without
+# sharing any state with it:
+#   - a throwaway tmpfs Postgres on :5433 (infra/docker-compose.e2e.yml)
+#   - a backend on :8001, backed by a scratch copy of backend/data
+#   - a frontend dev server on :3001, started by Playwright's webServer
+#     (see frontend/playwright.config.ts)
 #
 # Usage: scripts/test-e2e.sh [headed|ui]
 #   (no arg)  run headless, no UI (default)
@@ -20,29 +23,40 @@ case "${1:-}" in
     ;;
 esac
 
-if curl -sf http://localhost:8000/health >/dev/null 2>&1; then
-  echo "error: something is already listening on port 8000 (e.g. 'make run-backend')." >&2
-  echo "Stop it first — otherwise e2e tests would run against its real backend/data/*.json." >&2
+if curl -sf http://localhost:8001/health >/dev/null 2>&1; then
+  echo "error: port 8001 is already in use (a leftover e2e backend?). Stop it first." >&2
   exit 1
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COMPOSE=(docker compose -f "$ROOT_DIR/infra/docker-compose.e2e.yml")
 E2E_DATA_DIR="$(mktemp -d)"
-cp "$ROOT_DIR"/backend/data/*.json "$E2E_DATA_DIR"/
-
-cd "$ROOT_DIR/backend"
-DATA_DIR="$E2E_DATA_DIR" CORS_ORIGINS="http://localhost:3000" \
-  uv run uvicorn api.main:app --port 8000 &
-BACKEND_PID=$!
+BACKEND_PID=""
 
 cleanup() {
-  kill "$BACKEND_PID" 2>/dev/null || true
+  if [ -n "$BACKEND_PID" ]; then
+    kill "$BACKEND_PID" 2>/dev/null || true
+  fi
+  "${COMPOSE[@]}" down -v >/dev/null 2>&1 || true
   rm -rf "$E2E_DATA_DIR"
 }
 trap cleanup EXIT
 
+cp "$ROOT_DIR"/backend/data/*.json "$E2E_DATA_DIR"/
+
+"${COMPOSE[@]}" up -d --wait
+
+export DATABASE_URL="postgresql+psycopg://team_manager:team_manager@localhost:5433/team_manager"
+export DATA_DIR="$E2E_DATA_DIR"
+export CORS_ORIGINS="http://localhost:3001"
+
+cd "$ROOT_DIR/backend"
+uv run alembic upgrade head
+uv run uvicorn api.main:app --port 8001 &
+BACKEND_PID=$!
+
 for _ in $(seq 1 30); do
-  curl -sf http://localhost:8000/health >/dev/null 2>&1 && break
+  curl -sf http://localhost:8001/health >/dev/null 2>&1 && break
   sleep 1
 done
 

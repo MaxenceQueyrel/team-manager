@@ -66,7 +66,7 @@ test-optimizer:   ## Run optimizer unit tests
 test-api:         ## Run backend API tests
 	cd backend && uv run pytest tests/ -v
 
-test-e2e:         ## Run frontend Playwright end-to-end tests (spins up an isolated backend)
+test-e2e:         ## Run Playwright e2e tests on an isolated stack (:3001/:8001, tmpfs Postgres :5433)
 	./scripts/test-e2e.sh
 
 test-e2e-headed:  ## Run e2e tests with the browser window visible

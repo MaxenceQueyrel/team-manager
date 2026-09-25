@@ -54,7 +54,7 @@ One-time setup:
 cd frontend && bunx playwright install chromium
 ```
 
-Run the whole suite, including an isolated backend so tests never touch `backend/data/*.json`:
+Run the whole suite against its own isolated stack (tmpfs Postgres on `:5433`, backend on `:8001`, Vite on `:3001`), so it can run while your dev app is up on `:3000`/`:8000` and never touches its database or `backend/data/*.json`. Docker must be running:
 
 ```bash
 make test-e2e            # from repo root; runs scripts/test-e2e.sh headlessly
@@ -62,7 +62,7 @@ make test-e2e-headed     # same, with the browser window visible
 make test-e2e-ui         # same, in Playwright's interactive UI mode
 ```
 
-Alternatively, run `bun run e2e` (or `e2e:headed` / `e2e:ui`) directly from `frontend/` against a backend you're already running (e.g. via `make run-backend`) — Playwright starts the frontend dev server itself.
+Alternatively, run `bun run e2e` (or `e2e:headed` / `e2e:ui`) directly from `frontend/` against a backend you're already running on `:8001` — Playwright starts its own frontend dev server on `:3001`, proxying `/api` there via `API_PROXY_TARGET`.
 
 ---
 

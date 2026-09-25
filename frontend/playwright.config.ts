@@ -9,7 +9,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    // Ports 3001/8001 keep the e2e stack apart from the dev app on 3000/8000
+    // (see scripts/test-e2e.sh).
+    baseURL: "http://localhost:3001",
     trace: "on-first-retry",
     launchOptions: {
       // Headless Chromium needs this in sandboxed dev containers / CI that
@@ -26,9 +28,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "bun run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    command: "bun run dev --port 3001 --strictPort",
+    url: "http://localhost:3001",
+    env: { API_PROXY_TARGET: "http://localhost:8001" },
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });
