@@ -147,32 +147,18 @@ jobs:
   # Spins up the full stack (Postgres + backend + frontend dev server), so it
   # only runs on pushes to main rather than on every PR/push — trigger a run
   # manually (workflow_dispatch) to validate e2e behaviour before merging.
+  # scripts/test-e2e.sh provisions and migrates its own Postgres
+  # (infra/docker-compose.e2e.yml), so this job needs no service container.
   e2e:
     name: E2E (Playwright)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: team_manager
-          POSTGRES_PASSWORD: team_manager
-          POSTGRES_DB: team_manager
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U team_manager"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - uses: oven-sh/setup-bun@v2
-      - name: Apply auth-schema migrations
-        working-directory: backend
-        run: uv run alembic upgrade head
       - working-directory: frontend
         run: bun install --frozen-lockfile
       - name: Install Playwright browsers

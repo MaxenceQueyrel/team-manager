@@ -127,6 +127,19 @@ make typecheck-backend   Type-check the backend with ty
 make lint-frontend       Lint TypeScript with biome
 ```
 
+### End-to-end tests run in their own stack
+
+`make test-e2e` (and its `-headed` / `-ui` variants) never touches the app you run by hand, so you can keep `make run-backend` + `make run-frontend` up while it runs:
+
+| | Manual app | E2E run |
+|---|---|---|
+| Frontend (Vite) | `:3000` | `:3001` |
+| Backend (uvicorn) | `:8000` | `:8001` |
+| Postgres | `:5432`, persistent volume | `:5433`, `tmpfs` ([infra/docker-compose.e2e.yml](infra/docker-compose.e2e.yml)), removed after the run |
+| JSON data | `backend/data/` | temporary copy, removed after the run |
+
+[scripts/test-e2e.sh](scripts/test-e2e.sh) starts the e2e Postgres, applies the Alembic migrations, runs the backend on `:8001` and lets Playwright start its own Vite on `:3001`. Docker must be running.
+
 ---
 
 ## Continuous integration
@@ -144,7 +157,7 @@ Every pull request (and every push to `main`/`dev`) runs [.github/workflows/ci.y
 | `lint-frontend` | `make lint-frontend` (biome) |
 | `format-frontend` | `biome format` check (no `--write`) over the frontend source |
 | `build-frontend` | `bun run build` (`tsc -b && vite build`) |
-| `e2e` | `make test-e2e` (Playwright) — only on pushes to `main` or a manual [workflow dispatch](https://github.com/MaxenceQueyrel/team-manager/actions/workflows/ci.yml), since it spins up the full stack |
+| `e2e` | `make test-e2e` (Playwright), which provisions its own Postgres — only on pushes to `main` or a manual [workflow dispatch](https://github.com/MaxenceQueyrel/team-manager/actions/workflows/ci.yml), since it spins up the full stack |
 
 A job failing blocks the PR from merging once branch protection on `main`/`dev` requires these checks (Settings → Branches → Branch protection rules → "Require status checks to pass").
 

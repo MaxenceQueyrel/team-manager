@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
+import path from "node:path";
 import react from "@vitejs/plugin-react";
-import path from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
@@ -14,8 +14,9 @@ export default defineConfig({
     port: 3000,
     // Mirror the production nginx setup: forward /api to the backend so the
     // browser stays same-origin and import.meta.env.VITE_API_URL can be empty.
+    // The e2e suite overrides the target to reach its isolated backend.
     proxy: {
-      "/api": "http://localhost:8000",
+      "/api": process.env.API_PROXY_TARGET ?? "http://localhost:8000",
     },
   },
 });
