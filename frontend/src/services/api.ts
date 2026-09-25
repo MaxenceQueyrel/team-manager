@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   Assignment,
   OptimizationRequest,
+  OptimizationResponse,
   Organization,
   OrganizationDetail,
   OrganizationMember,
@@ -14,6 +15,7 @@ import type {
   Role,
   Skill,
   Team,
+  TeamProposal,
   User,
 } from "@/types";
 
@@ -178,6 +180,8 @@ export const assignmentsApi = {
 export const teamsApi = {
   list: () => client.get<Team[]>("/api/v1/teams/").then((r) => r.data),
   get: (id: string) => client.get<Team>(`/api/v1/teams/${id}`).then((r) => r.data),
+  create: (data: TeamProposal & { project_id: string }) =>
+    client.post<Team>("/api/v1/teams/", data).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/teams/${id}`),
 };
 
@@ -201,7 +205,7 @@ export const skillsApi = {
 
 export const optimizationApi = {
   solve: (request: OptimizationRequest) =>
-    client.post<Team>("/api/v1/optimization/solve", request).then((r) => r.data),
+    client.post<OptimizationResponse>("/api/v1/optimization/solve", request).then((r) => r.data),
 };
 
 export const organizationsApi = {

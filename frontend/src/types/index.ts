@@ -129,6 +129,19 @@ export interface OptimizationRequest {
   project_id: string;
   weights: OptimizationWeights;
   respect_exclusions: boolean;
+  n_alternatives: number; // 0–5 runner-up teams to return after the best one
+}
+
+// A ranked runner-up team; not persisted until promoted via teamsApi.create.
+export interface TeamProposal {
+  members: AssignedMember[];
+  optimization_score: number;
+  optimization_max_score: number;
+}
+
+export interface OptimizationResponse {
+  best: Team;
+  alternatives: TeamProposal[];
 }
 
 export interface User {
