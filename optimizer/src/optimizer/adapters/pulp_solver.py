@@ -27,108 +27,58 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         weights: AssignmentWeights,
         respect_exclusions: bool = True,
     ) -> AssignmentResult:
-        if not project.phases:
-            members, score, max_score = self._solve_phase(project, people, weights, respect_exclusions)
-            return AssignmentResult(project_id=project.id, members=members, score=score, max_score=max_score)
+        return self.solve_pool(project, people, weights, respect_exclusions, n_alternatives=0)[0]
 
-        if weights.handover > 0:
-            return self._solve_phases_jointly(project, people, weights, respect_exclusions)
-
-        all_members = []
-        total_score = 0.0
-        total_max_score = 0.0
-        for phase in project.phases:
-            shadow = self._phase_shadow(project, phase)
-            members, score, max_score = self._solve_phase(shadow, people, weights, respect_exclusions)
-            all_members += [
-                AssignedMember(person_id=m.person_id, fte_allocation=m.fte_allocation, phase_id=phase.id)
-                for m in members
-            ]
-            total_score += score
-            total_max_score += max_score
-
-        return AssignmentResult(
-            project_id=project.id,
-            members=all_members,
-            score=round(total_score, 6),
-            max_score=round(total_max_score, 6),
-        )
-
-    def _solve_phase(
+    def solve_pool(
         self,
         project: ProjectInput,
         people: list[PersonInput],
         weights: AssignmentWeights,
-        respect_exclusions: bool,
-    ) -> tuple[list[AssignedMember], float, float]:
-        candidates = feasible_people(project, people, respect_exclusions)
-        if not candidates:
-            return [], 0.0, 0.0
+        respect_exclusions: bool = True,
+        n_alternatives: int = 2,
+        min_difference: int = 2,
+    ) -> list[AssignmentResult]:
+        # A project without phases is solved as a single untagged scope. Phases are
+        # always modelled jointly: with handover == 0 the objective is separable, so
+        # the optimum matches solving each phase alone, and the no-good cut can then
+        # span every phase so alternatives are ranked by total project score.
+        if project.phases:
+            scopes = [(phase.id, self._phase_shadow(project, phase)) for phase in project.phases]
+        else:
+            scopes = [(None, project)]
 
-        model = pulp.LpProblem("team_assignment", pulp.LpMaximize)
-        x, objective_terms, n_selected = self._build_phase(model, "0", project, candidates, weights)
-        model += pulp.lpSum(objective_terms)
-        model.solve(pulp.PULP_CBC_CMD(msg=False))
-        self._check_optimal(model, project)
-
-        members = [
-            AssignedMember(person_id=p.id, fte_allocation=min(effective_availability(p, project), 1.0))
-            for p in candidates
-            if x[p.id].value() == 1
-        ]
-
-        max_score = self._max_phase_score(n_selected, weights)
-        return members, round(pulp.value(model.objective), 6), max_score
-
-    def _solve_phases_jointly(
-        self,
-        project: ProjectInput,
-        people: list[PersonInput],
-        weights: AssignmentWeights,
-        respect_exclusions: bool,
-    ) -> AssignmentResult:
         model = pulp.LpProblem("team_assignment", pulp.LpMaximize)
         objective_terms = []
-        phases = []  # (phase, shadow, candidates, x) per phase, in order
+        phases = []  # (phase_id, scoped project, candidates, x) per scope, in order
         n_selected_per_phase = []
-        for k, phase in enumerate(project.phases):
-            shadow = self._phase_shadow(project, phase)
-            candidates = feasible_people(shadow, people, respect_exclusions)
+        for k, (phase_id, scoped) in enumerate(scopes):
+            candidates = feasible_people(scoped, people, respect_exclusions)
             if not candidates:
-                phases.append((phase, shadow, [], {}))
+                phases.append((phase_id, scoped, [], {}))
                 n_selected_per_phase.append(0)
                 continue
-            x, terms, n_selected = self._build_phase(model, str(k), shadow, candidates, weights)
+            x, terms, n_selected = self._build_phase(model, str(k), scoped, candidates, weights)
             objective_terms += terms
-            phases.append((phase, shadow, candidates, x))
+            phases.append((phase_id, scoped, candidates, x))
             n_selected_per_phase.append(n_selected)
+
+        if not objective_terms:
+            return [AssignmentResult(project_id=project.id, members=[], score=0.0, max_score=0.0)]
 
         # Reward people retained between consecutive phases: y is 1 only when the
         # person is selected in both, linearized like the chemistry pairs.
-        for k in range(len(phases) - 1):
-            x_curr = phases[k][3]
-            x_next = phases[k + 1][3]
-            for person_id in x_curr.keys() & x_next.keys():
-                y = pulp.LpVariable(f"h_{k}_{person_id}", cat="Binary")
-                model += y <= x_curr[person_id]
-                model += y <= x_next[person_id]
-                model += y >= x_curr[person_id] + x_next[person_id] - 1
-                objective_terms.append(weights.handover * y)
+        if weights.handover > 0:
+            for k in range(len(phases) - 1):
+                x_curr = phases[k][3]
+                x_next = phases[k + 1][3]
+                for person_id in x_curr.keys() & x_next.keys():
+                    y = pulp.LpVariable(f"h_{k}_{person_id}", cat="Binary")
+                    model += y <= x_curr[person_id]
+                    model += y <= x_next[person_id]
+                    model += y >= x_curr[person_id] + x_next[person_id] - 1
+                    objective_terms.append(weights.handover * y)
 
         model += pulp.lpSum(objective_terms)
-        model.solve(pulp.PULP_CBC_CMD(msg=False))
-        self._check_optimal(model, project)
-
-        all_members = [
-            AssignedMember(
-                person_id=p.id,
-                fte_allocation=min(effective_availability(p, shadow), 1.0),
-                phase_id=phase.id,
-            )
-            for phase, shadow, candidates, x in phases
-            for p in candidates
-            if x[p.id].value() == 1
-        ]
 
         max_score = round(
             sum(self._max_phase_score(n, weights) for n in n_selected_per_phase)
@@ -136,12 +86,45 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             6,
         )
 
-        return AssignmentResult(
-            project_id=project.id,
-            members=all_members,
-            score=round(pulp.value(model.objective), 6),
-            max_score=max_score,
-        )
+        pool = []
+        while True:
+            model.solve(pulp.PULP_CBC_CMD(msg=False))
+            if not pool:
+                self._check_optimal(model, project)
+            elif pulp.LpStatus[model.status] != "Optimal":
+                break  # the cuts exclude every remaining team
+
+            selected = [
+                (phase_id, scoped, p, x[p.id])
+                for phase_id, scoped, candidates, x in phases
+                for p in candidates
+                if x[p.id].value() == 1
+            ]
+            members = [
+                AssignedMember(
+                    person_id=p.id,
+                    fte_allocation=min(effective_availability(p, scoped), 1.0),
+                    phase_id=phase_id,
+                )
+                for phase_id, scoped, p, _ in selected
+            ]
+            pool.append(
+                AssignmentResult(
+                    project_id=project.id,
+                    members=members,
+                    score=round(pulp.value(model.objective), 6),
+                    max_score=max_score,
+                )
+            )
+            if len(pool) > n_alternatives:
+                break
+
+            # No-good cut: at least min_difference of this team's (phase, person)
+            # picks must be dropped. Clamped so tiny teams don't make it trivially infeasible.
+            selected_vars = [var for _, _, _, var in selected]
+            model += pulp.lpSum(selected_vars) <= len(selected_vars) - min(min_difference, len(selected_vars))
+
+        return pool
 
     def _check_optimal(self, model: pulp.LpProblem, project: ProjectInput) -> None:
         status = pulp.LpStatus[model.status]
