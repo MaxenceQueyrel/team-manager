@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   Badge,
@@ -19,9 +19,17 @@ import {
   SquadsEditor,
 } from "@/components/editors/listEditors";
 import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
+import { projectsApi } from "@/services/api";
+import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type { Priority, Project } from "@/types";
+import type { Priority, Project, ProjectsImportSummary } from "@/types";
+
+function message(e: unknown): string {
+  if (typeof e === "object" && e && "message" in e)
+    return String((e as { message: unknown }).message);
+  return String(e);
+}
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
 
@@ -52,12 +60,18 @@ export default function ProjectsPage() {
     fetchSkills,
     saveProject,
     deleteProject,
+    importProjects,
   } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
   const canWriteProjects = useAuthStore((s) => s.permissions.has("projects:write"));
   const canDeleteProjects = useAuthStore((s) => s.permissions.has("projects:delete"));
   const [editing, setEditing] = useState<Project | "new" | null>(null);
   const [assigning, setAssigning] = useState<Project | null>(null);
+  const [importSummary, setImportSummary] = useState<ProjectsImportSummary | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -65,16 +79,85 @@ export default function ProjectsPage() {
     fetchSkills();
   }, [fetchProjects, fetchPeople, fetchSkills]);
 
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    setImportError(null);
+    setImportSummary(null);
+    try {
+      setImportSummary(await importProjects(file));
+    } catch (e) {
+      setImportError(message(e));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      downloadBlob(await projectsApi.exportCsv(), "projects.csv");
+    } catch (e) {
+      setImportError(message(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+        }}
+      >
         <h1>Projects</h1>
         {canWriteProjects && (
-          <Button variant="primary" onClick={() => setEditing("new")}>
-            + Add project
-          </Button>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) handleImportFile(file);
+              }}
+            />
+            <Button disabled={importing} onClick={() => fileInputRef.current?.click()}>
+              {importing ? "Importing…" : "Import CSV"}
+            </Button>
+            <Button disabled={exporting} onClick={handleExport}>
+              {exporting ? "Exporting…" : "Export CSV"}
+            </Button>
+            <Button variant="primary" onClick={() => setEditing("new")}>
+              + Add project
+            </Button>
+          </div>
         )}
       </div>
+
+      {importSummary && (
+        <p style={{ color: colors.success, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          Import complete — created {importSummary.created.length}
+          {importSummary.skipped.length > 0 && (
+            <>
+              , skipped {importSummary.skipped.length} (already existing:{" "}
+              {importSummary.skipped.join(", ")})
+            </>
+          )}
+          .
+        </p>
+      )}
+      {importError && (
+        <p style={{ color: colors.danger, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
+          {importError}
+        </p>
+      )}
 
       {isLoading && projects.length === 0 ? (
         <p>Loading…</p>

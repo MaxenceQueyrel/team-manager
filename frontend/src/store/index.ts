@@ -5,6 +5,7 @@ import type {
   PeopleImportSummary,
   Person,
   Project,
+  ProjectsImportSummary,
   Role,
   Skill,
   Team,
@@ -31,6 +32,7 @@ interface AppState {
   importPeople: (file: File) => Promise<PeopleImportSummary>;
   saveProject: (data: Omit<Project, "id">, id?: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  importProjects: (file: File) => Promise<ProjectsImportSummary>;
   deleteTeam: (id: string) => Promise<void>;
   createRole: (data: Role) => Promise<void>;
   createSkill: (data: Skill) => Promise<void>;
@@ -163,6 +165,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().fetchProjects();
     } catch (e) {
       set({ error: message(e) });
+    }
+  },
+
+  importProjects: async (file) => {
+    set({ error: null });
+    try {
+      const summary = await projectsApi.importCsv(file);
+      await get().fetchProjects();
+      return summary;
+    } catch (e) {
+      set({ error: message(e) });
+      throw e;
     }
   },
 

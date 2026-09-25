@@ -35,3 +35,41 @@ test("assigning a person to a project shows the roster entry", async ({ page }) 
   await expect(rosterEntry).toBeVisible();
   await expect(rosterEntry).toContainText("Half-time");
 });
+
+test("exporting projects downloads a CSV file", async ({ page }) => {
+  const name = `Data Warehouse ${uniqueSuffix()}`;
+
+  await page.goto("/projects");
+  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe("projects.csv");
+});
+
+test("importing a CSV adds new projects and reports the result", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const projectId = `imported-${suffix}`;
+  const name = `Imported Project ${suffix}`;
+
+  await page.goto("/projects");
+
+  const csv = [
+    "id,name,description,n_slots,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases",
+    `${projectId},${name},Imported from CSV,2,high,[],[],[],[],[],[]`,
+  ].join("\n");
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+
+  await expect(page.getByText(/Import complete — created 1\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+});

@@ -18,6 +18,7 @@ import {
   TagSkillInput,
 } from "@/components/editors/listEditors";
 import { peopleApi } from "@/services/api";
+import { downloadBlob } from "@/services/download";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { PeopleImportSummary, Person, Role, Seniority, Skill } from "@/types";
@@ -26,15 +27,6 @@ function message(e: unknown): string {
   if (typeof e === "object" && e && "message" in e)
     return String((e as { message: unknown }).message);
   return String(e);
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];

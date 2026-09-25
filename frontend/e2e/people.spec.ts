@@ -44,7 +44,7 @@ test("importing a CSV adds new people and reports the result", async ({ page }) 
     buffer: Buffer.from(csv),
   });
 
-  await expect(page.getByText(/Import complete — created 1, skipped 0/)).toBeVisible();
+  await expect(page.getByText(/Import complete — created 1\./)).toBeVisible();
   await expect(page.getByRole("cell", { name })).toBeVisible();
 });
 
