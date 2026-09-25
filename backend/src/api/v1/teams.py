@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.core.deps import require_org_member
-from api.models.team import Team
+from api.models.team import Team, TeamCreate
 from api.repositories.file_repository import FileRepository
 
 router = APIRouter()
@@ -19,6 +19,11 @@ def get_team(team_id: str, organization_id: str = Depends(require_org_member)):
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     return team
+
+
+@router.post("/", response_model=Team, status_code=201)
+def create_team(data: TeamCreate, organization_id: str = Depends(require_org_member)):
+    return repo.create({**data.model_dump(), "is_optimized": True}, organization_id)
 
 
 @router.delete("/{team_id}", status_code=204)
