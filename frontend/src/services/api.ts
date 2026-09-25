@@ -10,6 +10,7 @@ import type {
   Person,
   PersonAvailability,
   Project,
+  ProjectsImportSummary,
   Role,
   Skill,
   Team,
@@ -148,6 +149,17 @@ export const projectsApi = {
   update: (id: string, data: Omit<Project, "id">) =>
     client.put<Project>(`/api/v1/projects/${id}`, data).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/projects/${id}`),
+  importCsv: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return client
+      .post<ProjectsImportSummary>("/api/v1/projects/import", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+  exportCsv: () =>
+    client.get<Blob>("/api/v1/projects/export", { responseType: "blob" }).then((r) => r.data),
 };
 
 type AssignmentPayload = Omit<Assignment, "id">;

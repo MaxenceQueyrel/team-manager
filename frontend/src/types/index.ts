@@ -57,6 +57,11 @@ export interface PeopleImportSummary {
   created_skills: string[]; // skill ids auto-created because the CSV referenced them
 }
 
+export interface ProjectsImportSummary {
+  created: string[]; // ids of projects created by the import
+  skipped: string[]; // ids that already existed and were left untouched
+}
+
 export interface Squad {
   member_ids: string[];
 }
