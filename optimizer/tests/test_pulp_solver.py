@@ -286,3 +286,106 @@ def test_phase_date_range_filters_unavailable_person(solver, people):
     assert all(m.person_id != "p1" for m in stage1_members)
     # p1 is available again by stage-2's span, so the forced inclusion does apply.
     assert any(m.person_id == "p1" for m in stage2_members)
+
+
+@pytest.fixture
+def pythonistas():
+    return [
+        PersonInput(id=f"py{level}", seniority=Seniority.SENIOR, years_of_experience=5,
+                    skills=[SkillLevel(id="python", level=level)])
+        for level in (5.0, 4.5, 4.0, 3.5, 3.0, 2.5)
+    ]
+
+
+@pytest.fixture
+def python_project():
+    return ProjectInput(id="proj-test", n_slots=2, skill_requirements=[SkillRequirement(id="python", min_level=1)])
+
+
+def _team(result):
+    return {(m.phase_id, m.person_id) for m in result.members}
+
+
+def test_pool_is_ordered_by_descending_score(solver, python_project, pythonistas):
+    pool = solver.solve_pool(python_project, pythonistas, AssignmentWeights(), n_alternatives=3, min_difference=1)
+    assert len(pool) == 4
+    scores = [r.score for r in pool]
+    assert scores == sorted(scores, reverse=True)
+    assert {r.max_score for r in pool} == {pool[0].max_score}
+
+
+def test_pool_teams_differ_by_at_least_min_difference(solver, python_project, pythonistas):
+    pool = solver.solve_pool(python_project, pythonistas, AssignmentWeights(), n_alternatives=2, min_difference=2)
+    teams = [_team(r) for r in pool]
+    assert len(teams) == 3
+    for i, a in enumerate(teams):
+        for b in teams[i + 1 :]:
+            assert len(a - b) >= 2  # fully disjoint for a team of two
+
+
+def test_pool_alternatives_respect_squads_inclusions_and_exclusions(solver, python_project, pythonistas):
+    project = python_project.model_copy(
+        update={
+            "n_slots": 3,
+            "included_person_ids": ["py3.0"],
+            "excluded_person_ids": ["py5.0"],
+            "squads": [Squad(member_ids=["py4.5", "py4.0"])],
+        }
+    )
+    pool = solver.solve_pool(project, pythonistas, AssignmentWeights(), n_alternatives=5, min_difference=1)
+    assert len(pool) > 1
+    for result in pool:
+        selected = {m.person_id for m in result.members}
+        assert len(selected) == 3
+        assert "py3.0" in selected
+        assert "py5.0" not in selected
+        assert ("py4.5" in selected) == ("py4.0" in selected)
+
+
+def test_pool_truncates_when_candidates_run_out(solver, python_project, pythonistas):
+    # 3 candidates for 2 slots admit exactly 3 teams differing by one member.
+    pool = solver.solve_pool(python_project, pythonistas[:3], AssignmentWeights(), n_alternatives=10, min_difference=1)
+    assert len(pool) == 3
+    assert len({frozenset(_team(r)) for r in pool}) == 3
+
+
+def test_pool_min_difference_is_clamped_to_team_size(solver, python_project, pythonistas):
+    project = python_project.model_copy(update={"n_slots": 1})
+    pool = solver.solve_pool(project, pythonistas[:3], AssignmentWeights(), n_alternatives=5, min_difference=4)
+    assert len(pool) == 3
+
+
+def test_pool_without_alternatives_matches_solve(solver, python_project, pythonistas):
+    weights = AssignmentWeights()
+    pool = solver.solve_pool(python_project, pythonistas, weights, n_alternatives=0)
+    assert pool == [solver.solve(python_project, pythonistas, weights)]
+
+
+def test_pool_first_solve_still_raises_when_infeasible(solver):
+    candidates = [
+        PersonInput(id="a", seniority=Seniority.SENIOR, years_of_experience=5),
+        PersonInput(id="b", seniority=Seniority.SENIOR, years_of_experience=5),
+    ]
+    project = ProjectInput(id="proj-test", n_slots=1, squads=[Squad(member_ids=["a", "b"])])
+    with pytest.raises(ValueError):
+        solver.solve_pool(project, candidates, AssignmentWeights())
+
+
+@pytest.mark.parametrize("handover", [0.0, 0.5])
+def test_pool_cut_spans_all_phases(solver, pythonistas, handover):
+    # Two single-seat phases: a cut of 2 must be met across the whole project, so
+    # an alternative may keep one phase's pick and change only the other.
+    phases = [
+        ProjectPhase(id=f"stage-{k}", n_slots=1, skill_requirements=[SkillRequirement(id="python", min_level=1)])
+        for k in (1, 2)
+    ]
+    project = ProjectInput(id="proj-test", phases=phases)
+    weights = AssignmentWeights(handover=handover)
+
+    pool = solver.solve_pool(project, pythonistas[:2], weights, n_alternatives=5, min_difference=2)
+
+    # 2 people x 2 phases = 4 teams; after the optimum, a 2-swap cut leaves only its mirror.
+    assert len(pool) == 2
+    assert _team(pool[0]).isdisjoint(_team(pool[1]))
+    assert pool[0].score >= pool[1].score
+    assert pool[0] == solver.solve(project, pythonistas[:2], weights)
