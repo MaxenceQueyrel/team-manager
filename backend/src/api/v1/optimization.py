@@ -3,7 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.core.deps import require_org_member, require_permission
 from api.models.person import Person
 from api.models.project import Project
-from api.models.team import Team, OptimizationRequest
+from api.models.team import (
+    OptimizationRequest,
+    OptimizationResponse,
+    Team,
+    TeamProposal,
+)
 
 from api.repositories.file_repository import FileRepository
 
@@ -17,7 +22,7 @@ solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
 
 @router.post(
     "/solve",
-    response_model=Team,
+    response_model=OptimizationResponse,
     dependencies=[Depends(require_permission("optimization:run"))],
 )
 def solve_assignment(
@@ -59,18 +64,33 @@ def solve_assignment(
         for p in people
     ]
 
-    result = solver.solve(
-        project_input, people_inputs, request.weights, request.respect_exclusions
+    pool = solver.solve_pool(
+        project_input,
+        people_inputs,
+        request.weights,
+        request.respect_exclusions,
+        n_alternatives=request.n_alternatives,
     )
+    best, alternatives = pool[0], pool[1:]
 
     saved = teams_repo.create(
         {
-            "project_id": result.project_id,
-            "members": [m.model_dump() for m in result.members],
+            "project_id": best.project_id,
+            "members": [m.model_dump() for m in best.members],
             "is_optimized": True,
-            "optimization_score": result.score,
-            "optimization_max_score": result.max_score,
+            "optimization_score": best.score,
+            "optimization_max_score": best.max_score,
         },
         organization_id,
     )
-    return saved
+    return OptimizationResponse(
+        best=saved,
+        alternatives=[
+            TeamProposal(
+                members=alternative.members,
+                optimization_score=alternative.score,
+                optimization_max_score=alternative.max_score,
+            )
+            for alternative in alternatives
+        ],
+    )

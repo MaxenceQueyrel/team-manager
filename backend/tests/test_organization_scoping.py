@@ -224,4 +224,4 @@ def test_optimization_solve_only_draws_people_from_the_active_organization(
     )
 
     assert response.status_code == 200
-    assert response.json()["members"] == []
+    assert response.json()["best"]["members"] == []
