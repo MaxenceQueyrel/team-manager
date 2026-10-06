@@ -92,8 +92,7 @@ frontend/
 │   │   ├── DashboardPage.tsx
 │   │   ├── PeoplePage.tsx
 │   │   ├── ProjectsPage.tsx
-│   │   ├── TeamsPage.tsx
-│   │   └── OptimizationPage.tsx
+│   │   └── ProjectWorkspacePage.tsx  Phase timeline, staffing, optimization & proposals
 │   ├── services/
 │   │   └── api.ts          Axios client pointed at VITE_API_URL
 │   ├── store/

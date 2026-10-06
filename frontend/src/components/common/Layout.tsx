@@ -6,22 +6,16 @@ const navItems = [
   { to: "/", label: "Dashboard" },
   { to: "/people", label: "People" },
   { to: "/projects", label: "Projects" },
-  { to: "/teams", label: "Teams" },
-  { to: "/optimization", label: "Optimization", permission: "optimization:run" },
   { to: "/organization", label: "Organization" },
 ];
 
 export default function Layout() {
   const user = useAuthStore((s) => s.user);
-  const permissions = useAuthStore((s) => s.permissions);
   const organizations = useAuthStore((s) => s.organizations);
   const activeOrganizationId = useAuthStore((s) => s.activeOrganizationId);
   const setActiveOrganization = useAuthStore((s) => s.setActiveOrganization);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
-  const visibleNavItems = navItems.filter(
-    (item) => !item.permission || permissions.has(item.permission),
-  );
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -56,7 +50,7 @@ export default function Layout() {
           </label>
         )}
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {visibleNavItems.map(({ to, label }) => (
+          {navItems.map(({ to, label }) => (
             <li key={to} style={{ marginBottom: "0.25rem" }}>
               <NavLink
                 to={to}

@@ -1,4 +1,3 @@
-import { isAxiosError } from "axios";
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -17,6 +16,7 @@ import {
   missingSkills,
   type StaffingLane,
 } from "@/components/projects/staffing";
+import { errorMessage } from "@/services/api";
 import type { Assignment, Person } from "@/types";
 
 const COMMITMENTS = [
@@ -27,15 +27,6 @@ const COMMITMENTS = [
 ] as const;
 
 type CommitmentValue = (typeof COMMITMENTS)[number]["value"];
-
-// The API reports business-rule failures (e.g. the FTE check) in `detail`; axios'
-// own message would only say "Request failed with status code 400".
-function errorMessage(e: unknown): string {
-  if (isAxiosError(e) && typeof e.response?.data?.detail === "string") {
-    return e.response.data.detail;
-  }
-  return e instanceof Error ? e.message : String(e);
-}
 
 function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);

@@ -120,6 +120,7 @@ backend/
 | GET/POST/PUT/DELETE | `/api/v1/skills` | Manage skills |
 | GET/POST/PUT/DELETE | `/api/v1/roles` | Manage roles |
 | GET/POST | `/api/v1/teams` | List / create teams |
+| POST | `/api/v1/teams/{id}/apply` | Replace the project's staffing with a team's assignments |
 | POST | `/api/v1/optimization/solve` | Run the assignment solver |
 
 Full schema available at <http://localhost:8000/docs> when the server is running.

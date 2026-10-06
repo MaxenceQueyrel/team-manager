@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 import type {
   Assignment,
   OptimizationRequest,
@@ -64,6 +64,15 @@ client.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// The API reports business-rule failures (e.g. the FTE check) in `detail`; axios'
+// own message would only say "Request failed with status code 400".
+export function errorMessage(e: unknown): string {
+  if (isAxiosError(e) && typeof e.response?.data?.detail === "string") {
+    return e.response.data.detail;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
 
 let refreshPromise: Promise<string> | null = null;
 
@@ -182,6 +191,7 @@ export const teamsApi = {
   get: (id: string) => client.get<Team>(`/api/v1/teams/${id}`).then((r) => r.data),
   create: (data: TeamProposal & { project_id: string }) =>
     client.post<Team>("/api/v1/teams/", data).then((r) => r.data),
+  apply: (id: string) => client.post<Assignment[]>(`/api/v1/teams/${id}/apply`).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/teams/${id}`),
 };
 
