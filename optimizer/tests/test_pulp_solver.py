@@ -151,6 +151,23 @@ def test_fte_allocation_reflects_windowed_availability(solver, project, people):
     assert p1_member.fte_allocation == pytest.approx(0.4)
 
 
+def test_fully_assigned_person_is_not_selected(solver, project, people):
+    project.date_ranges = [DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))]
+    project.included_person_ids = ["p1"]
+    people[0].assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=1.0)]
+    result = solver.solve(project, people, AssignmentWeights())
+    assert all(m.person_id != "p1" for m in result.members)
+
+
+def test_fte_allocation_is_reduced_by_assignments(solver, project, people):
+    project.date_ranges = [DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))]
+    project.included_person_ids = ["p1"]
+    people[0].assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=0.5)]
+    result = solver.solve(project, people, AssignmentWeights())
+    p1_member = next(m for m in result.members if m.person_id == "p1")
+    assert p1_member.fte_allocation == pytest.approx(0.5)
+
+
 def test_phases_produce_tagged_members_and_summed_score(solver, people):
     phase1 = ProjectPhase(id="stage-1", n_slots=1, skill_requirements=[SkillRequirement(id="python", min_level=3)])
     phase2 = ProjectPhase(id="stage-2", n_slots=1, skill_requirements=[SkillRequirement(id="react", min_level=3)])
@@ -389,3 +406,26 @@ def test_pool_cut_spans_all_phases(solver, pythonistas, handover):
     assert _team(pool[0]).isdisjoint(_team(pool[1]))
     assert pool[0].score >= pool[1].score
     assert pool[0] == solver.solve(project, pythonistas[:2], weights)
+
+
+def test_phase_date_range_evaluates_assignments_per_phase(solver, people):
+    people[0].assignments = [AvailabilityWindow(start=date(2026, 1, 1), end=date(2026, 1, 31), ratio=1.0)]
+    phase1 = ProjectPhase(
+        id="stage-1",
+        n_slots=1,
+        date_range=DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25)),
+    )
+    phase2 = ProjectPhase(
+        id="stage-2",
+        n_slots=1,
+        date_range=DateRange(start=date(2026, 3, 2), end=date(2026, 3, 19)),
+    )
+    project = ProjectInput(id="proj-test", phases=[phase1, phase2], included_person_ids=["p1"])
+
+    result = solver.solve(project, people, AssignmentWeights())
+
+    stage1_ids = [m.person_id for m in result.members if m.phase_id == "stage-1"]
+    stage2_members = [m for m in result.members if m.phase_id == "stage-2"]
+    assert "p1" not in stage1_ids
+    p1_stage2 = next(m for m in stage2_members if m.person_id == "p1")
+    assert p1_stage2.fte_allocation == pytest.approx(1.0)

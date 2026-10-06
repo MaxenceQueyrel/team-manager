@@ -103,7 +103,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             members = [
                 AssignedMember(
                     person_id=p.id,
-                    fte_allocation=min(effective_availability(p, scoped), 1.0),
+                    fte_allocation=min(effective_availability(p, scoped, p.assignments), 1.0),
                     phase_id=phase_id,
                 )
                 for phase_id, scoped, p, _ in selected

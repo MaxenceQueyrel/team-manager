@@ -9,4 +9,4 @@ def feasible_people(
 ) -> list[PersonInput]:
     """Returns the subset of people eligible for assignment to the project."""
     excluded = set(project.excluded_person_ids) if respect_exclusions else set()
-    return [p for p in people if p.id not in excluded and effective_availability(p, project) > 0]
+    return [p for p in people if p.id not in excluded and effective_availability(p, project, p.assignments) > 0]
