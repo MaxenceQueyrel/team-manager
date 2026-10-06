@@ -121,44 +121,33 @@ export default function PeoplePage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "1rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <h1 style={{ margin: 0 }}>People</h1>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          {canWriteRoles && <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>}
-          {canWriteSkills && <Button onClick={() => setCatalogKind("skill")}>+ Add skill</Button>}
-          {canWritePeople && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) handleImportFile(file);
-                }}
-              />
-              <Button disabled={importing} onClick={() => fileInputRef.current?.click()}>
-                {importing ? "Importing…" : "Import CSV"}
-              </Button>
-              <Button disabled={exporting} onClick={handleExport}>
-                {exporting ? "Exporting…" : "Export CSV"}
-              </Button>
-              <Button variant="primary" onClick={() => setEditing("new")}>
-                + Add person
-              </Button>
-            </>
-          )}
-        </div>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {canWriteRoles && <Button onClick={() => setCatalogKind("role")}>+ Add role</Button>}
+        {canWriteSkills && <Button onClick={() => setCatalogKind("skill")}>+ Add skill</Button>}
+        {canWritePeople && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) handleImportFile(file);
+              }}
+            />
+            <Button disabled={importing} onClick={() => fileInputRef.current?.click()}>
+              {importing ? "Importing…" : "Import CSV"}
+            </Button>
+            <Button disabled={exporting} onClick={handleExport}>
+              {exporting ? "Exporting…" : "Export CSV"}
+            </Button>
+            <Button variant="primary" onClick={() => setEditing("new")}>
+              + Add person
+            </Button>
+          </>
+        )}
       </div>
 
       {importSummary && (

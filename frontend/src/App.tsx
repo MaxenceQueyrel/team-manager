@@ -1,14 +1,15 @@
 import { useEffect } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "@/components/common/Layout";
 import RequireAuth from "@/components/common/RequireAuth";
 import RequireOrganization from "@/components/common/RequireOrganization";
 import RequirePermission from "@/components/common/RequirePermission";
-import AvailabilityPage from "@/pages/AvailabilityPage";
+import PeopleWorkspace from "@/components/people/PeopleWorkspace";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import OptimizationPage from "@/pages/OptimizationPage";
 import OrganizationPage from "@/pages/OrganizationPage";
+import PeopleCapacityView from "@/pages/PeopleCapacityView";
 import PeoplePage from "@/pages/PeoplePage";
 import PersonDetailPage from "@/pages/PersonDetailPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -34,14 +35,17 @@ export default function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route element={<RequireOrganization />}>
             <Route index element={<DashboardPage />} />
-            <Route path="people" element={<PeoplePage />} />
+            <Route path="people" element={<PeopleWorkspace />}>
+              <Route index element={<PeoplePage />} />
+              <Route path="capacity" element={<PeopleCapacityView />} />
+            </Route>
             <Route path="people/:id" element={<PersonDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route element={<RequirePermission permission="optimization:run" />}>
               <Route path="optimization" element={<OptimizationPage />} />
             </Route>
-            <Route path="availability" element={<AvailabilityPage />} />
+            <Route path="availability" element={<Navigate to="/people/capacity" replace />} />
           </Route>
         </Route>
       </Route>

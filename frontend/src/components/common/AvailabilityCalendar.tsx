@@ -1,10 +1,12 @@
 import { Fragment, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { colors } from "@/components/common/ui";
 import type { AvailabilitySegment } from "@/types";
 
 export interface TimelineRow {
   id: string;
   label: string;
+  href?: string;
   segments: AvailabilitySegment[];
 }
 
@@ -206,7 +208,13 @@ export function AvailabilityCalendar({
                   paddingRight: "0.5rem",
                 }}
               >
-                {row.label}
+                {row.href ? (
+                  <Link to={row.href} style={{ color: colors.primary }}>
+                    {row.label}
+                  </Link>
+                ) : (
+                  row.label
+                )}
               </div>
               {days.map((day, i) => {
                 const ratio = ratios[i];

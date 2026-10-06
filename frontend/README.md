@@ -46,7 +46,7 @@ Opens at <http://localhost:3000> with HMR. The dev server proxies `/api` to the 
 
 ## End-to-end tests
 
-[Playwright](https://playwright.dev/) drives the real app through a handful of core user flows: creating a person, creating a project, running an optimization, and viewing the availability calendar. Specs live in `e2e/`.
+[Playwright](https://playwright.dev/) drives the real app through a handful of core user flows: creating a person, creating a project, running an optimization, and viewing the capacity timeline. Specs live in `e2e/`.
 
 One-time setup:
 
