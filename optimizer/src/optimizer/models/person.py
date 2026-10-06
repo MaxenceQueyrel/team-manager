@@ -20,6 +20,10 @@ class PersonInput(BaseModel):
         default=[],
         description="Exceptions to fte_capacity during specific date ranges (e.g. leave, part-time stints).",
     )
+    assignments: list[AvailabilityWindow] = Field(
+        default=[],
+        description="Committed workload on other projects, subtracted from availability.",
+    )
     preferences: list[str] = Field(default=[], description="Skill IDs the person prefers to work on.")
     growth_targets: list[str] = Field(default=[], description="Skill IDs the person wants to grow in.")
     affinities: dict[str, float] = Field(default={}, description="Mapping of person_id to affinity score, in [-5, +5].")

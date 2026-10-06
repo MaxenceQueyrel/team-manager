@@ -2,11 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.models.assignment import Assignment
 from api.models.person import Person
 from api.models.project import Project
 from api.models.role import Role as RoleCatalogEntry
 from api.models.team import Team
 from api.repositories.file_repository import FileRepository
+from api.v1 import assignments as assignments_module
 from api.v1 import people as people_module
 from api.v1 import projects as projects_module
 from api.v1 import roles as roles_module
@@ -21,6 +23,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(projects_module, "repo", FileRepository("projects", Project))
     monkeypatch.setattr(teams_module, "repo", FileRepository("teams", Team))
     monkeypatch.setattr(roles_module, "repo", FileRepository("roles", RoleCatalogEntry))
+    monkeypatch.setattr(
+        assignments_module, "repo", FileRepository("assignments", Assignment)
+    )
     return TestClient(app)
 
 
@@ -143,3 +148,74 @@ def test_create_team_requires_organization_membership(client, org_headers, proje
     )
 
     assert response.status_code == 422
+
+
+NOVEMBER = [{"start": "2026-11-01", "end": "2026-11-30"}]
+
+
+def _busy_person_setup(client, headers):
+    """Creates a person fully assigned to project A, and project B overlapping it.
+
+    Both projects force-include the person, so they are proposed whenever they are
+    a feasible candidate and left out only when the solver sees them as booked.
+    """
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=headers)
+    person_ids = [
+        client.post(
+            "/api/v1/people/",
+            json={
+                "name": name,
+                "role": "Backend Developer",
+                "seniority": Seniority.SENIOR,
+                "years_of_experience": 5.0,
+            },
+            headers=headers,
+        ).json()["id"]
+        for name in ("Bob", "Alice")
+    ]
+    bob_id = person_ids[0]
+    project_ids = [
+        client.post(
+            "/api/v1/projects/",
+            json={
+                "name": name,
+                "date_ranges": NOVEMBER,
+                "included_person_ids": [bob_id],
+            },
+            headers=headers,
+        ).json()["id"]
+        for name in ("Project A", "Project B")
+    ]
+    client.post(
+        "/api/v1/assignments/",
+        json={
+            "person_id": bob_id,
+            "project_id": project_ids[0],
+            "ratio": 1.0,
+            **NOVEMBER[0],
+        },
+        headers=headers,
+    )
+    return bob_id, project_ids[0], project_ids[1]
+
+
+def _best_member_ids(response):
+    return [m["person_id"] for m in response.json()["best"]["members"]]
+
+
+def test_solve_skips_person_fully_assigned_to_another_project(client, org_headers):
+    bob_id, _, project_b = _busy_person_setup(client, org_headers)
+
+    response = _solve(client, org_headers, project_b, n_alternatives=0)
+
+    assert response.status_code == 200
+    assert bob_id not in _best_member_ids(response)
+
+
+def test_solve_ignores_assignments_on_the_project_being_solved(client, org_headers):
+    bob_id, project_a, _ = _busy_person_setup(client, org_headers)
+
+    response = _solve(client, org_headers, project_a, n_alternatives=0)
+
+    assert response.status_code == 200
+    assert _best_member_ids(response) == [bob_id]

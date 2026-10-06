@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.core.deps import require_org_member, require_permission
+from api.models.assignment import Assignment
 from api.models.person import Person
 from api.models.project import Project
 from api.models.team import (
@@ -14,7 +15,7 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort
-from optimizer.models import PersonInput, ProjectInput
+from optimizer.models import AvailabilityWindow, PersonInput, ProjectInput
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
@@ -31,12 +32,25 @@ def solve_assignment(
     projects_repo: FileRepository[Project] = FileRepository("projects", Project)
     people_repo: FileRepository[Person] = FileRepository("people", Person)
     teams_repo: FileRepository[Team] = FileRepository("teams", Team)
+    assignments_repo: FileRepository[Assignment] = FileRepository(
+        "assignments", Assignment
+    )
 
     project = projects_repo.get(request.project_id, organization_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     people = people_repo.list(organization_id)
+
+    # The solved project's own assignments are left out so re-optimizing a staffed
+    # project doesn't treat its current members as busy and never re-propose them.
+    committed: dict[str, list[AvailabilityWindow]] = {}
+    for a in assignments_repo.list(organization_id):
+        if a.project_id == project.id:
+            continue
+        committed.setdefault(a.person_id, []).append(
+            AvailabilityWindow(start=a.start, end=a.end, ratio=a.ratio)
+        )
 
     project_input = ProjectInput(
         id=project.id,
@@ -57,6 +71,7 @@ def solve_assignment(
             fte_capacity=p.fte_capacity,
             skills=p.skills,
             availability_windows=p.availability_windows,
+            assignments=committed.get(p.id, []),
             preferences=p.preferences,
             growth_targets=p.growth_targets,
             affinities=p.affinities,
