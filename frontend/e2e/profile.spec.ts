@@ -26,8 +26,8 @@ test("viewing the profile page shows account info and lets a user change their p
   await page.getByText(email).click();
   await page.waitForURL("/profile");
   await expect(page.getByRole("heading", { name: "Profile" })).toBeVisible();
-  await expect(page.getByText("employee")).toBeVisible();
-  await expect(page.getByText("Not a manager")).toBeVisible();
+  await expect(page.getByText("manager", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not a manager")).toHaveCount(0);
 
   await page.getByLabel(/^New password/).fill(newPassword);
   await page.getByLabel("Confirm new password").fill(newPassword);
