@@ -12,12 +12,14 @@ test("assignment-driven reductions show up on the capacity timeline", async ({ p
   await page.getByRole("button", { name: "+ Add project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
-  await page.getByRole("button", { name: `View / assign ${projectName}`, exact: true }).click();
+  await page.getByRole("link", { name: projectName }).click();
+  await page.getByRole("button", { name: "Assign person to Whole project" }).click();
   await page.getByLabel("Person").selectOption({ label: name });
   await page.getByLabel("Commitment").selectOption("half-time");
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
-  await page.getByRole("button", { name: "Assign to project" }).click();
+  await page.getByRole("button", { name: "Assign", exact: true }).click();
+  await expect(page.getByText("1 / 1 · complete")).toBeVisible();
 
   await page.goto("/people");
   await page.getByRole("link", { name: "Capacity" }).click();
