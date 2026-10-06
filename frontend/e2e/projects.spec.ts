@@ -10,6 +10,7 @@ test("creating a project adds it to the list", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByRole("link", { name })).toContainText("0 / 1 slots staffedincomplete");
 });
 
 test("assigning a person from the project workspace shows the roster entry", async ({ page }) => {
@@ -40,7 +41,9 @@ test("assigning a person from the project workspace shows the roster entry", asy
   await expect(lane.getByText("1 / 1 · complete")).toBeVisible();
 
   await page.getByRole("link", { name: "← Projects" }).click();
-  await expect(page.getByRole("link", { name: projectName })).toContainText("1 / 1 slots");
+  await expect(page.getByRole("link", { name: projectName })).toContainText(
+    "1 / 1 slots staffedcomplete",
+  );
 });
 
 test("assigning to a phase uses the phase dates and updates its fill", async ({ page }) => {

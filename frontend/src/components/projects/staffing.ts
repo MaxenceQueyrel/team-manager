@@ -1,5 +1,12 @@
 import { colors } from "@/components/common/ui";
-import type { Assignment, DateRange, Person, Project, SkillRequirement } from "@/types";
+import type {
+  AssignedMember,
+  Assignment,
+  DateRange,
+  Person,
+  Project,
+  SkillRequirement,
+} from "@/types";
 
 export type FillStatus = "complete" | "partial" | "empty";
 
@@ -100,4 +107,33 @@ export function staffedSlots(lanes: StaffingLane[]): { staffed: number; total: n
     total += lane.nSlots;
   }
   return { staffed, total };
+}
+
+/** Current staffing as team members, limited to the phases `proposed` covers: applying a
+ * proposal only replaces those, so other phases are not part of its diff. */
+export function staffingBaseline(
+  assignments: Assignment[],
+  proposed: AssignedMember[],
+): AssignedMember[] {
+  const covered = new Set(proposed.map((m) => m.phase_id));
+  const byKey = new Map<string, AssignedMember>();
+  for (const a of assignments) {
+    if (!covered.has(a.phase_id)) continue;
+    // A project with several date ranges holds one assignment per range for the same member.
+    byKey.set(`${a.person_id}|${a.phase_id}`, {
+      person_id: a.person_id,
+      fte_allocation: a.ratio,
+      phase_id: a.phase_id,
+    });
+  }
+  return [...byKey.values()];
+}
+
+/** Whether every lane with requirements has all its slots filled and all its skills covered. */
+export function isFullyStaffed(lanes: StaffingLane[], people: Person[]): boolean {
+  return lanes.every(
+    (lane) =>
+      lane.nSlots === null ||
+      (fillStatus(lane) === "complete" && missingSkills(lane, people).length === 0),
+  );
 }

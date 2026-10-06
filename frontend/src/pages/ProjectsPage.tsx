@@ -3,7 +3,12 @@ import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
 import { ProjectForm } from "@/components/projects/ProjectForm";
-import { buildLanes, staffedSlots } from "@/components/projects/staffing";
+import {
+  buildLanes,
+  fillColors,
+  isFullyStaffed,
+  staffedSlots,
+} from "@/components/projects/staffing";
 import { assignmentsApi, projectsApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
@@ -134,7 +139,9 @@ export default function ProjectsPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
           {projects.map((p) => {
-            const { staffed, total } = staffedSlots(buildLanes(p, assignments));
+            const lanes = buildLanes(p, assignments);
+            const { staffed, total } = staffedSlots(lanes);
+            const complete = isFullyStaffed(lanes, people);
             return (
               <Card key={p.id}>
                 <div
@@ -160,36 +167,16 @@ export default function ProjectsPage() {
                       style={{
                         marginTop: "0.6rem",
                         display: "flex",
-                        flexWrap: "wrap",
-                        gap: "0.4rem",
+                        alignItems: "center",
+                        gap: "0.5rem",
                         fontSize: "0.8rem",
+                        color: colors.muted,
                       }}
                     >
-                      <Stat label="Staffed" value={`${staffed} / ${total} slots`} />
-                      <Stat
-                        label="Slots"
-                        value={p.phases.length ? `${p.phases.length} phases` : String(p.n_slots)}
-                      />
-                      {p.skill_requirements.length > 0 && (
-                        <Stat
-                          label="Skills"
-                          value={p.skill_requirements
-                            .map((s) => `${s.id}≥${s.min_level}`)
-                            .join(", ")}
-                        />
-                      )}
-                      {p.included_person_ids.length > 0 && (
-                        <Stat label="Must include" value={String(p.included_person_ids.length)} />
-                      )}
-                      {p.excluded_person_ids.length > 0 && (
-                        <Stat label="Excluded" value={String(p.excluded_person_ids.length)} />
-                      )}
-                      {p.squads.length > 0 && (
-                        <Stat label="Squads" value={String(p.squads.length)} />
-                      )}
-                      {p.date_ranges.length > 0 && (
-                        <Stat label="Date ranges" value={String(p.date_ranges.length)} />
-                      )}
+                      {staffed} / {total} slots staffed
+                      <Badge color={complete ? fillColors.complete : fillColors.partial}>
+                        {complete ? "complete" : "incomplete"}
+                      </Badge>
                     </div>
                   </Link>
                   <div style={{ whiteSpace: "nowrap" }}>
@@ -227,13 +214,5 @@ export default function ProjectsPage() {
         />
       )}
     </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <span style={{ color: colors.muted }}>
-      <strong style={{ color: colors.text }}>{label}:</strong> {value}
-    </span>
   );
 }

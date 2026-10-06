@@ -16,7 +16,6 @@ export default function DashboardPage() {
   }, [fetchPeople, fetchProjects, fetchTeams, fetchSkills]);
 
   const totalCapacity = people.reduce((sum, p) => sum + p.fte_capacity, 0);
-  const optimizedTeams = teams.filter((t) => t.is_optimized).length;
 
   return (
     <div>
@@ -28,7 +27,7 @@ export default function DashboardPage() {
           sub={`${totalCapacity.toFixed(1)} FTE total`}
         />
         <StatCard label="Projects" value={projects.length} />
-        <StatCard label="Teams" value={teams.length} sub={`${optimizedTeams} optimized`} />
+        <StatCard label="Proposals" value={teams.length} sub="saved optimizer results" />
         <StatCard label="Skills tracked" value={skills.length} />
       </div>
     </div>
