@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   AvailabilityCalendar,
-  ratioColor,
+  AvailabilityLegend,
   type TimelineOverlay,
   type TimelineRow,
 } from "@/components/common/AvailabilityCalendar";
@@ -257,7 +257,7 @@ export default function AvailabilityPage() {
           <span style={{ fontSize: "0.85rem", color: colors.muted }}>
             {start} → {end}
           </span>
-          <Legend />
+          <AvailabilityLegend />
         </div>
 
         {loading && rows.length === 0 ? (
@@ -270,29 +270,6 @@ export default function AvailabilityPage() {
           <AvailabilityCalendar start={start} end={end} rows={rows} overlays={overlays} />
         )}
       </Card>
-    </div>
-  );
-}
-
-function Legend() {
-  const stops = [0, 0.25, 0.5, 0.75, 1];
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.35rem",
-        fontSize: "0.75rem",
-        color: colors.muted,
-      }}
-    >
-      <span>0%</span>
-      <div style={{ display: "flex", width: 100, height: 10, borderRadius: 5, overflow: "hidden" }}>
-        {stops.map((ratio) => (
-          <div key={ratio} style={{ flex: 1, background: ratioColor(ratio) }} />
-        ))}
-      </div>
-      <span>100% available</span>
     </div>
   );
 }

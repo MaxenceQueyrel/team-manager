@@ -10,6 +10,7 @@ import LoginPage from "@/pages/LoginPage";
 import OptimizationPage from "@/pages/OptimizationPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import PeoplePage from "@/pages/PeoplePage";
+import PersonDetailPage from "@/pages/PersonDetailPage";
 import ProfilePage from "@/pages/ProfilePage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -34,6 +35,7 @@ export default function App() {
           <Route element={<RequireOrganization />}>
             <Route index element={<DashboardPage />} />
             <Route path="people" element={<PeoplePage />} />
+            <Route path="people/:id" element={<PersonDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route element={<RequirePermission permission="optimization:run" />}>

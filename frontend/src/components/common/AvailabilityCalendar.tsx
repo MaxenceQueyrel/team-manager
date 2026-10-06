@@ -37,7 +37,7 @@ function parseISODate(iso: string): Date {
   return new Date(`${iso}T00:00:00Z`);
 }
 
-function daysBetween(startIso: string, endIso: string): number {
+export function daysBetween(startIso: string, endIso: string): number {
   return Math.round(
     (parseISODate(endIso).getTime() - parseISODate(startIso).getTime()) / MS_PER_DAY,
   );
@@ -71,6 +71,29 @@ function dailyRatios(days: string[], segments: AvailabilitySegment[]): (number |
 export function ratioColor(ratio: number): string {
   const hue = Math.max(0, Math.min(1, ratio)) * 120;
   return `hsl(${hue}, 70%, 45%)`;
+}
+
+export function AvailabilityLegend() {
+  const stops = [0, 0.25, 0.5, 0.75, 1];
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.35rem",
+        fontSize: "0.75rem",
+        color: colors.muted,
+      }}
+    >
+      <span>0%</span>
+      <div style={{ display: "flex", width: 100, height: 10, borderRadius: 5, overflow: "hidden" }}>
+        {stops.map((ratio) => (
+          <div key={ratio} style={{ flex: 1, background: ratioColor(ratio) }} />
+        ))}
+      </div>
+      <span>100% available</span>
+    </div>
+  );
 }
 
 export function AvailabilityCalendar({

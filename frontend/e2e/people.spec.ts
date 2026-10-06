@@ -77,3 +77,66 @@ test("importing a CSV with unknown roles/skills adds them to the catalog", async
   await expect(row.getByRole("cell", { name: roleId })).toBeVisible();
   await expect(row.getByText(`${skillId} (3)`)).toBeVisible();
 });
+
+test("editing an availability window on the detail page updates the timeline", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const name = `Katherine Johnson ${suffix}`;
+  await createPerson(page, name, `qa-engineer-${suffix}`);
+
+  await page.getByRole("link", { name }).click();
+  await expect(page).toHaveURL(/\/people\/[^/]+$/);
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+
+  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
+  await expect(page.getByTitle("2026-01-04: 100%")).toBeVisible();
+
+  await page.getByRole("button", { name: "+ Add window" }).click();
+  await page.getByLabel("Window start").fill("2026-01-03");
+  await page.getByLabel("Window end").fill("2026-01-05");
+  await page.getByLabel("Window ratio").fill("0.25");
+  await page.getByRole("button", { name: "Save windows" }).click();
+
+  await expect(page.getByTitle("2026-01-04: 25%")).toBeVisible();
+  await expect(page.getByTitle("2026-01-06: 100%")).toBeVisible();
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/people$/);
+});
+
+test("an assigned person shows reduced availability on their detail page", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const name = `Dorothy Vaughan ${suffix}`;
+  const projectName = `Fortran ${suffix}`;
+  await createPerson(page, name, `qa-engineer-${suffix}`);
+
+  await page.goto("/projects");
+  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(projectName);
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: `View / assign ${projectName}`, exact: true }).click();
+  await page.getByLabel("Person").selectOption({ label: name });
+  await page.getByLabel("Commitment").selectOption("half-time");
+  await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
+  await page.getByRole("button", { name: "Assign to project" }).click();
+
+  await page.goto("/people");
+  await page.getByRole("link", { name }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
+  await expect(page.getByTitle("2026-01-01: 50%")).toBeVisible();
+
+  await page.getByText("Past assignments (1)").click();
+  await page.getByRole("link", { name: projectName }).click();
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole("heading", { level: 2, name: projectName })).toBeVisible();
+});
+
+test("an unknown person id shows a not-found state", async ({ page }) => {
+  await page.goto(`/people/does-not-exist-${uniqueSuffix()}`);
+
+  await expect(page.getByRole("heading", { name: "Person not found" })).toBeVisible();
+  await page.getByRole("link", { name: "← Back to People" }).click();
+  await expect(page).toHaveURL(/\/people$/);
+});

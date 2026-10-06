@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import {
   Badge,
@@ -72,12 +73,22 @@ export default function ProjectsPage() {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openProjectId = searchParams.get("open");
 
   useEffect(() => {
     fetchProjects();
     fetchPeople();
     fetchSkills();
   }, [fetchProjects, fetchPeople, fetchSkills]);
+
+  // Other pages deep-link to a project via ?open=<id>; consume the param once the project is loaded.
+  useEffect(() => {
+    const project = projects.find((p) => p.id === openProjectId);
+    if (!project) return;
+    setAssigning(project);
+    setSearchParams({}, { replace: true });
+  }, [openProjectId, projects, setSearchParams]);
 
   const handleImportFile = async (file: File) => {
     setImporting(true);
