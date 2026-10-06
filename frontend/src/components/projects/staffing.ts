@@ -128,3 +128,12 @@ export function staffingBaseline(
   }
   return [...byKey.values()];
 }
+
+/** Whether every lane with requirements has all its slots filled and all its skills covered. */
+export function isFullyStaffed(lanes: StaffingLane[], people: Person[]): boolean {
+  return lanes.every(
+    (lane) =>
+      lane.nSlots === null ||
+      (fillStatus(lane) === "complete" && missingSkills(lane, people).length === 0),
+  );
+}
