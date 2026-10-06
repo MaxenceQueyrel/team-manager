@@ -322,7 +322,7 @@ function AssignmentsTable({
           <tr key={a.id} style={{ borderBottom: `1px solid ${colors.light}` }}>
             <td style={{ padding: "0.4rem" }}>
               <Link
-                to={`/projects?open=${encodeURIComponent(a.project_id)}`}
+                to={`/projects/${encodeURIComponent(a.project_id)}`}
                 style={{ color: colors.primary }}
               >
                 {projects.find((p) => p.id === a.project_id)?.name ?? a.project_id}

@@ -14,6 +14,7 @@ import PeoplePage from "@/pages/PeoplePage";
 import PersonDetailPage from "@/pages/PersonDetailPage";
 import ProfilePage from "@/pages/ProfilePage";
 import ProjectsPage from "@/pages/ProjectsPage";
+import ProjectWorkspacePage from "@/pages/ProjectWorkspacePage";
 import RegisterPage from "@/pages/RegisterPage";
 import TeamsPage from "@/pages/TeamsPage";
 import { useAuthStore } from "@/store/authStore";
@@ -41,6 +42,7 @@ export default function App() {
             </Route>
             <Route path="people/:id" element={<PersonDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/:id" element={<ProjectWorkspacePage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route element={<RequirePermission permission="optimization:run" />}>
               <Route path="optimization" element={<OptimizationPage />} />

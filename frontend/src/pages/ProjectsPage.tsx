@@ -1,54 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import {
-  Badge,
-  Button,
-  Card,
-  colors,
-  Field,
-  inputStyle,
-  Modal,
-  priorityColors,
-  selectStyle,
-} from "@/components/common/ui";
-import {
-  DateRangesEditor,
-  PersonMultiSelect,
-  PhasesEditor,
-  SkillReqsEditor,
-  SquadsEditor,
-} from "@/components/editors/listEditors";
-import { ProjectAssignmentsModal } from "@/components/projects/ProjectAssignmentsModal";
-import { projectsApi } from "@/services/api";
+import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
+import { ProjectForm } from "@/components/projects/ProjectForm";
+import { buildLanes, staffedSlots } from "@/components/projects/staffing";
+import { assignmentsApi, projectsApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type { Priority, Project, ProjectsImportSummary } from "@/types";
+import type { Assignment, Project, ProjectsImportSummary } from "@/types";
 
 function message(e: unknown): string {
   if (typeof e === "object" && e && "message" in e)
     return String((e as { message: unknown }).message);
   return String(e);
-}
-
-const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
-
-type Draft = Omit<Project, "id">;
-
-function emptyDraft(): Draft {
-  return {
-    name: "",
-    description: "",
-    n_slots: 1,
-    skill_requirements: [],
-    excluded_person_ids: [],
-    included_person_ids: [],
-    squads: [],
-    date_ranges: [],
-    phases: [],
-    priority: "medium",
-  };
 }
 
 export default function ProjectsPage() {
@@ -67,37 +32,31 @@ export default function ProjectsPage() {
   const canWriteProjects = useAuthStore((s) => s.permissions.has("projects:write"));
   const canDeleteProjects = useAuthStore((s) => s.permissions.has("projects:delete"));
   const [editing, setEditing] = useState<Project | "new" | null>(null);
-  const [assigning, setAssigning] = useState<Project | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [importSummary, setImportSummary] = useState<ProjectsImportSummary | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const openProjectId = searchParams.get("open");
 
   useEffect(() => {
     fetchProjects();
     fetchPeople();
     fetchSkills();
+    assignmentsApi
+      .list()
+      .then(setAssignments)
+      .catch((e) => setError(message(e)));
   }, [fetchProjects, fetchPeople, fetchSkills]);
-
-  // Other pages deep-link to a project via ?open=<id>; consume the param once the project is loaded.
-  useEffect(() => {
-    const project = projects.find((p) => p.id === openProjectId);
-    if (!project) return;
-    setAssigning(project);
-    setSearchParams({}, { replace: true });
-  }, [openProjectId, projects, setSearchParams]);
 
   const handleImportFile = async (file: File) => {
     setImporting(true);
-    setImportError(null);
+    setError(null);
     setImportSummary(null);
     try {
       setImportSummary(await importProjects(file));
     } catch (e) {
-      setImportError(message(e));
+      setError(message(e));
     } finally {
       setImporting(false);
     }
@@ -108,7 +67,7 @@ export default function ProjectsPage() {
     try {
       downloadBlob(await projectsApi.exportCsv(), "projects.csv");
     } catch (e) {
-      setImportError(message(e));
+      setError(message(e));
     } finally {
       setExporting(false);
     }
@@ -164,10 +123,8 @@ export default function ProjectsPage() {
           .
         </p>
       )}
-      {importError && (
-        <p style={{ color: colors.danger, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>
-          {importError}
-        </p>
+      {error && (
+        <p style={{ color: colors.danger, margin: "0.5rem 0 0", fontSize: "0.85rem" }}>{error}</p>
       )}
 
       {isLoading && projects.length === 0 ? (
@@ -176,80 +133,84 @@ export default function ProjectsPage() {
         <p>No projects found. Create your first project.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
-          {projects.map((p) => (
-            <Card key={p.id}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: "1rem",
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    <h3 style={{ margin: 0 }}>{p.name}</h3>
-                    <Badge color={priorityColors[p.priority]}>{p.priority}</Badge>
-                  </div>
-                  {p.description && (
-                    <p style={{ margin: "0.5rem 0 0", color: colors.muted }}>{p.description}</p>
-                  )}
-                  <div
-                    style={{
-                      marginTop: "0.6rem",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "0.4rem",
-                      fontSize: "0.8rem",
-                    }}
+          {projects.map((p) => {
+            const { staffed, total } = staffedSlots(buildLanes(p, assignments));
+            return (
+              <Card key={p.id}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "1rem",
+                  }}
+                >
+                  <Link
+                    to={`/projects/${encodeURIComponent(p.id)}`}
+                    style={{ flex: 1, color: "inherit", textDecoration: "none" }}
                   >
-                    <Stat
-                      label="Slots"
-                      value={p.phases.length ? `${p.phases.length} phases` : String(p.n_slots)}
-                    />
-                    {p.skill_requirements.length > 0 && (
-                      <Stat
-                        label="Skills"
-                        value={p.skill_requirements.map((s) => `${s.id}≥${s.min_level}`).join(", ")}
-                      />
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                      <h3 style={{ margin: 0 }}>{p.name}</h3>
+                      <Badge color={priorityColors[p.priority]}>{p.priority}</Badge>
+                    </div>
+                    {p.description && (
+                      <p style={{ margin: "0.5rem 0 0", color: colors.muted }}>{p.description}</p>
                     )}
-                    {p.included_person_ids.length > 0 && (
-                      <Stat label="Must include" value={String(p.included_person_ids.length)} />
-                    )}
-                    {p.excluded_person_ids.length > 0 && (
-                      <Stat label="Excluded" value={String(p.excluded_person_ids.length)} />
-                    )}
-                    {p.squads.length > 0 && <Stat label="Squads" value={String(p.squads.length)} />}
-                    {p.date_ranges.length > 0 && (
-                      <Stat label="Date ranges" value={String(p.date_ranges.length)} />
-                    )}
-                  </div>
-                </div>
-                <div style={{ whiteSpace: "nowrap" }}>
-                  {canWriteProjects && (
-                    <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
-                      Edit
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => setAssigning(p)}
-                    ariaLabel={`View / assign ${p.name}`}
-                    style={{ marginRight: "0.4rem" }}
-                  >
-                    View / assign
-                  </Button>
-                  {canDeleteProjects && (
-                    <Button
-                      variant="danger"
-                      onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
+                    <div
+                      style={{
+                        marginTop: "0.6rem",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "0.4rem",
+                        fontSize: "0.8rem",
+                      }}
                     >
-                      Delete
-                    </Button>
-                  )}
+                      <Stat label="Staffed" value={`${staffed} / ${total} slots`} />
+                      <Stat
+                        label="Slots"
+                        value={p.phases.length ? `${p.phases.length} phases` : String(p.n_slots)}
+                      />
+                      {p.skill_requirements.length > 0 && (
+                        <Stat
+                          label="Skills"
+                          value={p.skill_requirements
+                            .map((s) => `${s.id}≥${s.min_level}`)
+                            .join(", ")}
+                        />
+                      )}
+                      {p.included_person_ids.length > 0 && (
+                        <Stat label="Must include" value={String(p.included_person_ids.length)} />
+                      )}
+                      {p.excluded_person_ids.length > 0 && (
+                        <Stat label="Excluded" value={String(p.excluded_person_ids.length)} />
+                      )}
+                      {p.squads.length > 0 && (
+                        <Stat label="Squads" value={String(p.squads.length)} />
+                      )}
+                      {p.date_ranges.length > 0 && (
+                        <Stat label="Date ranges" value={String(p.date_ranges.length)} />
+                      )}
+                    </div>
+                  </Link>
+                  <div style={{ whiteSpace: "nowrap" }}>
+                    {canWriteProjects && (
+                      <Button onClick={() => setEditing(p)} style={{ marginRight: "0.4rem" }}>
+                        Edit
+                      </Button>
+                    )}
+                    {canDeleteProjects && (
+                      <Button
+                        variant="danger"
+                        onClick={() => confirm(`Delete ${p.name}?`) && deleteProject(p.id)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -265,15 +226,6 @@ export default function ProjectsPage() {
           }}
         />
       )}
-
-      {assigning && (
-        <ProjectAssignmentsModal
-          key={assigning.id}
-          project={assigning}
-          people={people}
-          onClose={() => setAssigning(null)}
-        />
-      )}
     </div>
   );
 }
@@ -283,149 +235,5 @@ function Stat({ label, value }: { label: string; value: string }) {
     <span style={{ color: colors.muted }}>
       <strong style={{ color: colors.text }}>{label}:</strong> {value}
     </span>
-  );
-}
-
-function ProjectForm({
-  project,
-  people,
-  skillOptions,
-  onClose,
-  onSave,
-}: {
-  project: Project | null;
-  people: import("@/types").Person[];
-  skillOptions: string[];
-  onClose: () => void;
-  onSave: (draft: Draft, id?: string) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState<Draft>(() =>
-    project ? { ...emptyDraft(), ...project } : emptyDraft(),
-  );
-  const [saving, setSaving] = useState(false);
-  const usesPhases = draft.phases.length > 0;
-  const set = <K extends keyof Draft>(key: K, val: Draft[K]) =>
-    setDraft((d) => ({ ...d, [key]: val }));
-
-  const submit = async () => {
-    setSaving(true);
-    try {
-      await onSave(draft, project?.id);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal
-      title={project ? `Edit ${project.name}` : "New project"}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" disabled={saving || !draft.name.trim()} onClick={submit}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </>
-      }
-    >
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0 1rem" }}>
-        <Field label="Name">
-          <input
-            value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
-            style={inputStyle}
-          />
-        </Field>
-        <Field label="Priority">
-          <select
-            value={draft.priority}
-            onChange={(e) => set("priority", e.target.value as Priority)}
-            style={selectStyle}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <Field label="Description">
-        <textarea
-          value={draft.description}
-          onChange={(e) => set("description", e.target.value)}
-          rows={2}
-          style={{ ...inputStyle, resize: "vertical" }}
-        />
-      </Field>
-
-      {!usesPhases && (
-        <>
-          <Field label="Number of slots" hint="People to assign to the project">
-            <input
-              type="number"
-              min={1}
-              value={draft.n_slots}
-              onChange={(e) =>
-                set("n_slots", Math.max(1, Math.round(parseFloat(e.target.value) || 1)))
-              }
-              style={{ ...inputStyle, maxWidth: 120 }}
-            />
-          </Field>
-
-          <Field label="Skill requirements" hint="Minimum proficiency required, 0 to 5">
-            <SkillReqsEditor
-              value={draft.skill_requirements}
-              onChange={(v) => set("skill_requirements", v)}
-              skillOptions={skillOptions}
-            />
-          </Field>
-
-          <Field label="Date ranges" hint="Calendar spans during which the project runs">
-            <DateRangesEditor value={draft.date_ranges} onChange={(v) => set("date_ranges", v)} />
-          </Field>
-        </>
-      )}
-
-      <Field
-        label="Phases"
-        hint={
-          usesPhases
-            ? "Per-stage staffing overrides the project-level slots, skills and date ranges above."
-            : "Add phases for multi-stage staffing (e.g. design → build → handover). Leave empty for a single team."
-        }
-      >
-        <PhasesEditor
-          value={draft.phases}
-          onChange={(v) => set("phases", v)}
-          skillOptions={skillOptions}
-        />
-      </Field>
-
-      <Field label="Must include" hint="People that must be on the team">
-        <PersonMultiSelect
-          value={draft.included_person_ids}
-          onChange={(v) => set("included_person_ids", v)}
-          people={people}
-        />
-      </Field>
-
-      <Field
-        label="Excluded"
-        hint="People that must not be assigned (when exclusions are respected)"
-      >
-        <PersonMultiSelect
-          value={draft.excluded_person_ids}
-          onChange={(v) => set("excluded_person_ids", v)}
-          people={people}
-        />
-      </Field>
-
-      <Field label="Squads" hint="Groups co-selected all-or-nothing">
-        <SquadsEditor value={draft.squads} onChange={(v) => set("squads", v)} people={people} />
-      </Field>
-    </Modal>
   );
 }
