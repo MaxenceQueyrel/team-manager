@@ -180,6 +180,7 @@ export function AvailabilityEditor({
         <div key={i} style={rowStyle}>
           <input
             type="date"
+            aria-label="Window start"
             value={w.start}
             onChange={(e) => update(i, { start: e.target.value })}
             style={{ ...inputStyle, flex: 1 }}
@@ -187,6 +188,7 @@ export function AvailabilityEditor({
           <span style={{ color: colors.muted }}>→</span>
           <input
             type="date"
+            aria-label="Window end"
             value={w.end}
             onChange={(e) => update(i, { end: e.target.value })}
             style={{ ...inputStyle, flex: 1 }}
@@ -197,6 +199,7 @@ export function AvailabilityEditor({
             max={1}
             step={0.1}
             title="FTE ratio during window (0–1)"
+            aria-label="Window ratio"
             value={w.ratio}
             onChange={(e) => update(i, { ratio: num(e.target.value) })}
             style={{ ...inputStyle, width: 80 }}
