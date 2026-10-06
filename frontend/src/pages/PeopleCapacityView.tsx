@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import {
   AvailabilityCalendar,
@@ -25,18 +26,65 @@ function defaultRange(): { start: string; end: string } {
   return { start: toISODate(today), end: toISODate(later) };
 }
 
-export default function AvailabilityPage() {
+interface CapacityFilters {
+  start: string;
+  end: string;
+  projectId: string;
+  seniorities: Seniority[];
+  skills: string[];
+  minSkillLevel: number;
+  squadOnly: boolean;
+}
+
+function filtersFromParams(params: URLSearchParams): CapacityFilters {
+  const range = defaultRange();
+  return {
+    start: params.get("from") || range.start,
+    end: params.get("to") || range.end,
+    projectId: params.get("project") ?? "",
+    seniorities: SENIORITIES.filter((s) => params.getAll("seniority").includes(s)),
+    skills: params.getAll("skill"),
+    minSkillLevel: parseFloat(params.get("min_level") ?? "") || 0,
+    squadOnly: params.get("squad_only") === "1",
+  };
+}
+
+function filtersToParams(filters: CapacityFilters): URLSearchParams {
+  const params = new URLSearchParams({ from: filters.start, to: filters.end });
+  if (filters.projectId) params.set("project", filters.projectId);
+  for (const s of filters.seniorities) params.append("seniority", s);
+  for (const s of filters.skills) params.append("skill", s);
+  if (filters.minSkillLevel > 0) params.set("min_level", String(filters.minSkillLevel));
+  if (filters.squadOnly) params.set("squad_only", "1");
+  return params;
+}
+
+export default function PeopleCapacityView() {
   const { people, projects, fetchPeople, fetchProjects, fetchSkills } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
-  const [{ start, end }, setRange] = useState(defaultRange);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The URL is only a mirror of this state: react-router applies location changes in a
+  // transition, so binding the inputs to the URL directly drops rapid successive edits.
+  const [filters, setFilters] = useState(() => filtersFromParams(searchParams));
   const [availability, setAvailability] = useState<PersonAvailability[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seniorityFilter, setSeniorityFilter] = useState<Seniority[]>([]);
-  const [skillFilter, setSkillFilter] = useState<string[]>([]);
-  const [minSkillLevel, setMinSkillLevel] = useState(0);
-  const [squadOnly, setSquadOnly] = useState(false);
+
+  const {
+    start,
+    end,
+    projectId: selectedProjectId,
+    seniorities: seniorityFilter,
+    skills: skillFilter,
+    minSkillLevel,
+    squadOnly,
+  } = filters;
+  const update = (changes: Partial<CapacityFilters>) => setFilters((f) => ({ ...f, ...changes }));
+
+  useEffect(() => {
+    // Replace rather than push so typing a date doesn't flood the history stack.
+    setSearchParams(filtersToParams(filters), { replace: true });
+  }, [filters, setSearchParams]);
 
   useEffect(() => {
     fetchPeople();
@@ -98,6 +146,7 @@ export default function AvailabilityPage() {
       .map((person) => ({
         id: person.id,
         label: person.name,
+        href: `/people/${person.id}`,
         segments: byPersonId.get(person.id) ?? [],
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -124,15 +173,13 @@ export default function AvailabilityPage() {
 
   return (
     <div>
-      <h1 style={{ margin: "0 0 1rem" }}>Availability</h1>
-
       <Card style={{ marginBottom: "1.5rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 1rem" }}>
           <Field label="From">
             <input
               type="date"
               value={start}
-              onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
+              onChange={(e) => update({ start: e.target.value })}
               style={inputStyle}
             />
           </Field>
@@ -140,17 +187,14 @@ export default function AvailabilityPage() {
             <input
               type="date"
               value={end}
-              onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
+              onChange={(e) => update({ end: e.target.value })}
               style={inputStyle}
             />
           </Field>
           <Field label="Overlay project" hint="Highlights the project's period on the timeline">
             <select
               value={selectedProjectId}
-              onChange={(e) => {
-                setSelectedProjectId(e.target.value);
-                setSquadOnly(false);
-              }}
+              onChange={(e) => update({ projectId: e.target.value, squadOnly: false })}
               style={selectStyle}
             >
               <option value="">— none —</option>
@@ -184,9 +228,11 @@ export default function AvailabilityPage() {
                     type="checkbox"
                     checked={seniorityFilter.includes(s)}
                     onChange={() =>
-                      setSeniorityFilter((prev) =>
-                        prev.includes(s) ? prev.filter((v) => v !== s) : [...prev, s],
-                      )
+                      update({
+                        seniorities: seniorityFilter.includes(s)
+                          ? seniorityFilter.filter((v) => v !== s)
+                          : [...seniorityFilter, s],
+                      })
                     }
                   />
                   {s}
@@ -197,7 +243,7 @@ export default function AvailabilityPage() {
           <Field label="Skills" hint="Only show people with at least one of these skills">
             <TagSkillInput
               value={skillFilter}
-              onChange={setSkillFilter}
+              onChange={(skills) => update({ skills })}
               skillOptions={skillOptions}
             />
             {skillFilter.length > 0 && (
@@ -209,7 +255,7 @@ export default function AvailabilityPage() {
                   max={5}
                   step={0.5}
                   value={minSkillLevel}
-                  onChange={(e) => setMinSkillLevel(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => update({ minSkillLevel: parseFloat(e.target.value) || 0 })}
                   style={{ ...inputStyle, width: 80 }}
                 />
               </div>
@@ -237,7 +283,7 @@ export default function AvailabilityPage() {
                 type="checkbox"
                 checked={squadOnly}
                 disabled={!squadFilterAvailable}
-                onChange={(e) => setSquadOnly(e.target.checked)}
+                onChange={(e) => update({ squadOnly: e.target.checked })}
               />
               Squad members only
             </label>
