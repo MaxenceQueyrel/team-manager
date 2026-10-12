@@ -11,8 +11,10 @@ import {
 } from "@/components/common/ui";
 import {
   assignedCount,
+  assignedFte,
   fillColors,
   fillStatus,
+  formatHeadcount,
   missingSkills,
   type StaffingLane,
 } from "@/components/projects/staffing";
@@ -91,9 +93,14 @@ export function StaffingLaneCard({
             {lane.label}
           </h3>
           {lane.nSlots !== null && (
-            <Badge color={fillColors[status]}>
-              {assignedCount(lane)} / {lane.nSlots} · {status}
-            </Badge>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "0.8rem", color: colors.muted }}>
+                {formatHeadcount(assignedCount(lane))}
+              </span>
+              <Badge color={fillColors[status]}>
+                {assignedFte(lane)} / {lane.nSlots} FTE · {status}
+              </Badge>
+            </div>
           )}
         </div>
 
@@ -104,7 +111,7 @@ export function StaffingLaneCard({
         ) : (
           <div style={{ marginTop: "0.4rem", fontSize: "0.8rem", color: colors.muted }}>
             <div>
-              <strong style={{ color: colors.text }}>Slots:</strong> {lane.nSlots}
+              <strong style={{ color: colors.text }}>FTE needed:</strong> {lane.nSlots}
               {lane.skillRequirements.length > 0 && (
                 <>
                   {" · "}

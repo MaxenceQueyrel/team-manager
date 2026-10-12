@@ -11,7 +11,12 @@ import { PhaseTimeline } from "@/components/projects/PhaseTimeline";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { ProposalCard } from "@/components/projects/ProposalCard";
 import { StaffingLaneCard } from "@/components/projects/StaffingLaneCard";
-import { buildLanes, staffedSlots, staffingBaseline } from "@/components/projects/staffing";
+import {
+  buildLanes,
+  formatHeadcount,
+  staffedFte,
+  staffingBaseline,
+} from "@/components/projects/staffing";
 import { assignmentsApi, projectsApi, teamsApi } from "@/services/api";
 import { knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
@@ -118,7 +123,8 @@ export default function ProjectWorkspacePage() {
   }
 
   const lanes = buildLanes(project, assignments);
-  const { staffed, total } = staffedSlots(lanes);
+  const { staffed, total } = staffedFte(lanes);
+  const headcount = new Set(lanes.flatMap((lane) => lane.assignments.map((a) => a.person_id))).size;
   const span = dateSpan(project);
   // The store keeps teams in creation order.
   const proposals = teams.filter((t) => t.project_id === project.id).reverse();
@@ -162,7 +168,8 @@ export default function ProjectWorkspacePage() {
             <p style={{ margin: "0.4rem 0 0", color: colors.muted }}>{project.description}</p>
           )}
           <div style={{ marginTop: "0.4rem", fontSize: "0.85rem", color: colors.muted }}>
-            {span ?? "No dates set"} · {staffed} / {total} slots staffed
+            {span ?? "No dates set"} · {staffed} / {total} FTE staffed ·{" "}
+            {formatHeadcount(headcount)}
           </div>
         </div>
         <div style={{ display: "flex", gap: "0.4rem" }}>

@@ -3,12 +3,7 @@ import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
 import { ProjectForm } from "@/components/projects/ProjectForm";
-import {
-  buildLanes,
-  fillColors,
-  isFullyStaffed,
-  staffedSlots,
-} from "@/components/projects/staffing";
+import { buildLanes, fillColors, isFullyStaffed, staffedFte } from "@/components/projects/staffing";
 import { assignmentsApi, projectsApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
@@ -140,7 +135,7 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1rem" }}>
           {projects.map((p) => {
             const lanes = buildLanes(p, assignments);
-            const { staffed, total } = staffedSlots(lanes);
+            const { staffed, total } = staffedFte(lanes);
             const complete = isFullyStaffed(lanes, people);
             return (
               <Card key={p.id}>
@@ -173,7 +168,7 @@ export default function ProjectsPage() {
                         color: colors.muted,
                       }}
                     >
-                      {staffed} / {total} slots staffed
+                      {staffed} / {total} FTE staffed
                       <Badge color={complete ? fillColors.complete : fillColors.partial}>
                         {complete ? "complete" : "incomplete"}
                       </Badge>

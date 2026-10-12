@@ -106,7 +106,7 @@ export function ProjectForm({
 
       {!usesPhases && (
         <>
-          <Field label="Number of slots" hint="People to assign to the project">
+          <Field label="FTE needed" hint="1 = one full-time person">
             <input
               type="number"
               min={1}
@@ -136,7 +136,7 @@ export function ProjectForm({
         label="Phases"
         hint={
           usesPhases
-            ? "Per-stage staffing overrides the project-level slots, skills and date ranges above."
+            ? "Per-stage staffing overrides the project-level FTE, skills and date ranges above."
             : "Add phases for multi-stage staffing (e.g. design → build → handover). Leave empty for a single team."
         }
       >

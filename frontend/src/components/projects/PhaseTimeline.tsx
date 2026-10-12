@@ -1,6 +1,6 @@
 import { Badge, colors } from "@/components/common/ui";
 import {
-  assignedCount,
+  assignedFte,
   fillColors,
   fillStatus,
   type StaffingLane,
@@ -95,7 +95,7 @@ export function PhaseTimeline({ lanes }: { lanes: StaffingLane[] }) {
                 >
                   <strong>{lane.label}</strong>
                   <Badge color={fillColors[status]}>
-                    {assignedCount(lane)} / {lane.nSlots}
+                    {assignedFte(lane)} / {lane.nSlots} FTE
                   </Badge>
                 </div>
               </div>
@@ -130,7 +130,7 @@ export function PhaseTimeline({ lanes }: { lanes: StaffingLane[] }) {
             <span key={lane.key} style={{ display: "inline-flex", gap: "0.3rem" }}>
               <strong>{lane.label}</strong>
               <Badge color={fillColors[fillStatus(lane)]}>
-                {assignedCount(lane)} / {lane.nSlots}
+                {assignedFte(lane)} / {lane.nSlots} FTE
               </Badge>
             </span>
           ))}
