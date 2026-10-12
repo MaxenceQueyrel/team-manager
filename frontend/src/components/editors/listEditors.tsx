@@ -479,7 +479,7 @@ export function PhasesEditor({
             <input
               type="number"
               min={1}
-              title="Slots for this phase"
+              title="FTE needed for this phase (1 = one full-time person)"
               value={phase.n_slots}
               onChange={(e) => update(i, { n_slots: Math.max(1, Math.round(num(e.target.value))) })}
               style={{ ...inputStyle, width: 80 }}

@@ -83,7 +83,7 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
   }
   await importDatedProject(page, { id: `apply-${suffix}`, name: projectName });
   const lane = page.getByRole("region", { name: "Whole project" });
-  await expect(lane.getByText("0 / 1 · empty")).toBeVisible();
+  await expect(lane.getByText("0 / 1 FTE · empty")).toBeVisible();
 
   await runOptimization(page);
   const best = page.getByRole("region", { name: "Best team" });
@@ -94,7 +94,7 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
     page.getByText("This replaces current staffing for the whole project."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply", exact: true }).click();
-  await expect(lane.getByText("1 / 1 · complete")).toBeVisible();
+  await expect(lane.getByText("1 / 1 FTE · complete")).toBeVisible();
   await expect(best.getByText("added", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Show 2 alternative teams ▸" }).click();
@@ -146,7 +146,7 @@ test("applying a stale proposal reports the FTE conflict by name", async ({ page
   await lane.getByRole("button", { name: "Assign person to Whole project" }).click();
   await lane.getByLabel("Person").selectOption({ label: personName });
   await lane.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(lane.getByText("1 / 1 · complete")).toBeVisible();
+  await expect(lane.getByText("1 / 1 FTE · complete")).toBeVisible();
 
   await page.goto(`/projects/conflict-proposed-${suffix}`);
   await page.getByRole("button", { name: "Proposals (1) ▸" }).click();

@@ -22,7 +22,7 @@ export interface StaffingLane {
   key: string;
   label: string;
   phaseId: string | null; // sent as `phase_id` when assigning from this lane
-  nSlots: number | null; // null for the unphased lane, which has no requirements
+  nSlots: number | null; // FTE needed; null for the unphased lane, which has no requirements
   skillRequirements: SkillRequirement[];
   dateRanges: DateRange[];
   assignments: Assignment[];
@@ -81,10 +81,30 @@ export function assignedCount(lane: StaffingLane): number {
   return new Set(lane.assignments.map((a) => a.person_id)).size;
 }
 
+function roundFte(fte: number): number {
+  return Math.round(fte * 100) / 100;
+}
+
+/** FTE staffed on the lane: each distinct person counts once, at their ratio on the lane. */
+export function assignedFte(lane: StaffingLane): number {
+  // A project with several date ranges holds one assignment per range for the same person.
+  const ratioByPerson = new Map<string, number>();
+  for (const a of lane.assignments) {
+    ratioByPerson.set(a.person_id, Math.max(ratioByPerson.get(a.person_id) ?? 0, a.ratio));
+  }
+  let total = 0;
+  for (const ratio of ratioByPerson.values()) total += ratio;
+  return roundFte(total);
+}
+
+export function formatHeadcount(count: number): string {
+  return `${count} ${count === 1 ? "person" : "people"}`;
+}
+
 export function fillStatus(lane: StaffingLane): FillStatus {
-  const assigned = assignedCount(lane);
-  if (assigned === 0) return "empty";
-  return assigned >= (lane.nSlots ?? 0) ? "complete" : "partial";
+  const fte = assignedFte(lane);
+  if (fte === 0) return "empty";
+  return fte >= (lane.nSlots ?? 0) ? "complete" : "partial";
 }
 
 /** Requirements of the lane that no assigned person meets at the required level. */
@@ -97,16 +117,16 @@ export function missingSkills(lane: StaffingLane, people: Person[]): SkillRequir
   );
 }
 
-/** Slots filled across all lanes; over-staffing one lane never offsets a gap in another. */
-export function staffedSlots(lanes: StaffingLane[]): { staffed: number; total: number } {
+/** FTE staffed across all lanes; over-staffing one lane never offsets a gap in another. */
+export function staffedFte(lanes: StaffingLane[]): { staffed: number; total: number } {
   let staffed = 0;
   let total = 0;
   for (const lane of lanes) {
     if (lane.nSlots === null) continue;
-    staffed += Math.min(assignedCount(lane), lane.nSlots);
+    staffed += Math.min(assignedFte(lane), lane.nSlots);
     total += lane.nSlots;
   }
-  return { staffed, total };
+  return { staffed: roundFte(staffed), total };
 }
 
 /** Current staffing as team members, limited to the phases `proposed` covers: applying a
@@ -129,7 +149,7 @@ export function staffingBaseline(
   return [...byKey.values()];
 }
 
-/** Whether every lane with requirements has all its slots filled and all its skills covered. */
+/** Whether every lane with requirements has its FTE filled and all its skills covered. */
 export function isFullyStaffed(lanes: StaffingLane[], people: Person[]): boolean {
   return lanes.every(
     (lane) =>

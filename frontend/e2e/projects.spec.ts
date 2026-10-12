@@ -10,7 +10,7 @@ test("creating a project adds it to the list", async ({ page }) => {
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByRole("heading", { name })).toBeVisible();
-  await expect(page.getByRole("link", { name })).toContainText("0 / 1 slots staffedincomplete");
+  await expect(page.getByRole("link", { name })).toContainText("0 / 1 FTE staffedincomplete");
 });
 
 test("assigning a person from the project workspace shows the roster entry", async ({ page }) => {
@@ -38,11 +38,13 @@ test("assigning a person from the project workspace shows the roster entry", asy
 
   const rosterEntry = lane.getByRole("listitem").filter({ hasText: personName });
   await expect(rosterEntry).toContainText("Half-time");
-  await expect(lane.getByText("1 / 1 · complete")).toBeVisible();
+  // Half-time on a 1-FTE project leaves half of it unstaffed.
+  await expect(lane.getByText("0.5 / 1 FTE · partial")).toBeVisible();
+  await expect(lane.getByText("1 person", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "← Projects" }).click();
   await expect(page.getByRole("link", { name: projectName })).toContainText(
-    "1 / 1 slots staffedcomplete",
+    "0.5 / 1 FTE staffedincomplete",
   );
 });
 
@@ -81,8 +83,8 @@ test("assigning to a phase uses the phase dates and updates its fill", async ({ 
   await page.getByRole("link", { name: projectName }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectId}$`));
 
-  await expect(page.getByTitle("design: 2026-01-01 → 2026-01-31")).toContainText("0 / 1");
-  await expect(page.getByTitle("build: 2026-01-15 → 2026-02-28")).toContainText("0 / 2");
+  await expect(page.getByTitle("design: 2026-01-01 → 2026-01-31")).toContainText("0 / 1 FTE");
+  await expect(page.getByTitle("build: 2026-01-15 → 2026-02-28")).toContainText("0 / 2 FTE");
 
   const design = page.getByRole("region", { name: "design" });
   await design.getByRole("button", { name: "Assign person to design" }).click();
@@ -90,8 +92,8 @@ test("assigning to a phase uses the phase dates and updates its fill", async ({ 
   await expect(design.getByLabel("Start date", { exact: true })).toHaveValue("2026-01-01");
   await expect(design.getByLabel("End date", { exact: true })).toHaveValue("2026-01-31");
   await design.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(design.getByText("1 / 1 · complete")).toBeVisible();
-  await expect(page.getByTitle("design: 2026-01-01 → 2026-01-31")).toContainText("1 / 1");
+  await expect(design.getByText("1 / 1 FTE · complete")).toBeVisible();
+  await expect(page.getByTitle("design: 2026-01-01 → 2026-01-31")).toContainText("1 / 1 FTE");
 
   // Full-time on both overlapping phases exceeds 1.0 FTE; the error stays in the lane.
   const build = page.getByRole("region", { name: "build" });
@@ -102,9 +104,52 @@ test("assigning to a phase uses the phase dates and updates its fill", async ({ 
 
   await build.getByLabel("Start date", { exact: true }).fill("2026-02-01");
   await build.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(build.getByText("1 / 2 · partial")).toBeVisible();
+  await expect(build.getByText("1 / 2 FTE · partial")).toBeVisible();
   await expect(build.getByText("Missing skills: python ≥ 3")).toBeVisible();
-  await expect(page.getByTitle("build: 2026-01-15 → 2026-02-28")).toContainText("1 / 2");
+  await expect(page.getByTitle("build: 2026-01-15 → 2026-02-28")).toContainText("1 / 2 FTE");
+});
+
+test("three people at 30% leave a 3-FTE project incomplete", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const projectId = `part-time-${suffix}`;
+  const projectName = `Part-time Project ${suffix}`;
+  const personNames = ["Ada", "Grace", "Hedy"].map((first) => `${first} ${suffix}`);
+  for (const [i, personName] of personNames.entries()) {
+    await createPerson(page, personName, `part-time-${i}-${suffix}`);
+  }
+
+  const csv = [
+    "id,name,description,n_slots,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases",
+    `${projectId},${projectName},,3,high,[],[],[],[],[],[]`,
+  ].join("\n");
+  await page.goto("/projects");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+  await page.getByRole("link", { name: projectName }).click();
+  await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();
+
+  const lane = page.getByRole("region", { name: "Whole project" });
+  for (const personName of personNames) {
+    await lane.getByRole("button", { name: "Assign person to Whole project" }).click();
+    await lane.getByLabel("Person").selectOption({ label: personName });
+    await lane.getByLabel("Commitment").selectOption("custom");
+    await lane.getByRole("spinbutton", { name: /^Custom ratio/ }).fill("0.3");
+    await lane.getByLabel("Start date", { exact: true }).fill("2026-01-01");
+    await lane.getByLabel("End date", { exact: true }).fill("2026-01-31");
+    await lane.getByRole("button", { name: "Assign", exact: true }).click();
+    await expect(lane.getByRole("listitem").filter({ hasText: personName })).toBeVisible();
+  }
+
+  await expect(lane.getByText("0.9 / 3 FTE · partial")).toBeVisible();
+  await expect(lane.getByText("3 people", { exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: "← Projects" }).click();
+  await expect(page.getByRole("link", { name: projectName })).toContainText(
+    "0.9 / 3 FTE staffedincomplete",
+  );
 });
 
 test("an unknown project id shows a not-found state", async ({ page }) => {

@@ -91,7 +91,9 @@ export function OptimizationPanel({
         </button>
       </div>
       <p style={{ fontSize: "0.82rem", color: colors.muted, margin: "0.4rem 0 1rem" }}>
-        {project.phases.length ? `${project.phases.length} phase(s)` : `${project.n_slots} slot(s)`}
+        {project.phases.length
+          ? `${project.phases.length} phase(s)`
+          : `${project.n_slots} FTE needed`}
         {project.squads.length > 0 && ` · ${project.squads.length} squad(s)`}
         {project.included_person_ids.length > 0 &&
           ` · ${project.included_person_ids.length} forced member(s)`}
