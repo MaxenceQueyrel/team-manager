@@ -7,7 +7,9 @@ from optimizer.models.squad import Squad
 
 class ProjectPhase(BaseModel):
     id: str = Field(description="Identifier of the phase (e.g. a project stage).")
-    n_slots: int = Field(default=1, ge=1, description="Number of people to assign during this phase.")
+    n_slots: int = Field(
+        default=1, ge=1, description="FTE to staff during this phase; headcount varies with each person's allocation."
+    )
     skill_requirements: list[SkillRequirement] = Field(
         default=[], description="Skills required during this phase, with minimum levels."
     )
@@ -18,7 +20,9 @@ class ProjectPhase(BaseModel):
 
 class ProjectInput(BaseModel):
     id: str = Field(description="Identifier of the project.")
-    n_slots: int = Field(default=1, ge=1, description="Number of people to assign to the project.")
+    n_slots: int = Field(
+        default=1, ge=1, description="FTE to staff on the project; headcount varies with each person's allocation."
+    )
     skill_requirements: list[SkillRequirement] = Field(
         default=[], description="Skills required by the project, with minimum levels."
     )
