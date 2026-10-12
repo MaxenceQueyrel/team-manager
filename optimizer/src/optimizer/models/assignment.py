@@ -39,5 +39,5 @@ class AssignmentResult(BaseModel):
     members: list[AssignedMember] = Field(description="People assigned to the project, with their FTE allocation.")
     score: float = Field(description="Composite score of the assignment.")
     max_score: float = Field(
-        description="Theoretical maximum score achievable for this assignment's weights and slot count."
+        description="Theoretical maximum score achievable for this assignment's weights and required FTE."
     )
