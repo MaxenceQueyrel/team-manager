@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from optimizer.models.coverage import PhaseCoverage
+
 
 class AssignmentWeights(BaseModel):
     performance: float = Field(default=0.25, ge=0, le=1, description="Weight for skill fit and seniority.")
@@ -41,3 +43,7 @@ class AssignmentResult(BaseModel):
     max_score: float = Field(
         description="Theoretical maximum score achievable for this assignment's weights and required FTE."
     )
+    coverage: list[PhaseCoverage] = Field(
+        description="FTE and skill coverage of each phase (a single phase_id=None entry for unphased projects)."
+    )
+    fully_covered: bool = Field(description="Whether every phase is fully staffed and every skill requirement met.")

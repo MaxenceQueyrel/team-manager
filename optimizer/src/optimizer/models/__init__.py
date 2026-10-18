@@ -1,5 +1,7 @@
 from optimizer.models.assignment import AssignedMember, AssignmentResult, AssignmentWeights
+from optimizer.models.coverage import PhaseCoverage, SkillCoverage
 from optimizer.models.date_range import AvailabilityWindow, DateRange
+from optimizer.models.infeasibility import InfeasibilityReason, PhaseConflict
 from optimizer.models.person import PersonInput
 from optimizer.models.project import ProjectInput, ProjectPhase
 from optimizer.models.seniority import Seniority
@@ -12,10 +14,14 @@ __all__ = [
     "AssignmentWeights",
     "AvailabilityWindow",
     "DateRange",
+    "InfeasibilityReason",
     "PersonInput",
+    "PhaseConflict",
+    "PhaseCoverage",
     "ProjectInput",
     "ProjectPhase",
     "Seniority",
+    "SkillCoverage",
     "Squad",
     "Skill",
     "SkillLevel",

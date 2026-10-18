@@ -6,13 +6,16 @@ from optimizer.models import (
     AssignmentWeights,
     AssignedMember,
     AssignmentResult,
+    InfeasibilityReason,
+    PhaseConflict,
     ProjectPhase,
     Squad,
 )
 from optimizer.objectives import compute_person_scores
 from optimizer.constraints import feasible_people
 from optimizer.availability import effective_availability
-from optimizer.domain.solver import AssignmentSolverPort
+from optimizer.coverage import compute_coverage
+from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
 
 MAX_AFFINITY = 5.0  # matches the documented bound on PersonInput.affinities
 MIN_FTE_SHARE = 0.1  # smallest share a selected person carries, so nobody is staffed at ~0 FTE
@@ -54,29 +57,29 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
 
         model = pulp.LpProblem("team_assignment", pulp.LpMaximize)
         objective_terms = []
-        phases = []  # (phase_id, candidates, x, a) per scope, in order
+        phases = []  # (phase_id, scoped, candidates, x, a) per scope, in order
         need_per_phase = []
         for k, (phase_id, scoped) in enumerate(scopes):
             candidates = feasible_people(scoped, people, respect_exclusions)
             if not candidates:
-                phases.append((phase_id, [], {}, {}))
+                phases.append((phase_id, scoped, [], {}, {}))
                 need_per_phase.append(0.0)
                 continue
             x, a, terms, need = self._build_phase(model, str(k), scoped, candidates, weights)
             objective_terms += terms
-            phases.append((phase_id, candidates, x, a))
+            phases.append((phase_id, scoped, candidates, x, a))
             need_per_phase.append(need)
 
         if not objective_terms:
-            return [AssignmentResult(project_id=project.id, members=[], score=0.0, max_score=0.0)]
+            return [self._result(project.id, phases, [], score=0.0, max_score=0.0)]
 
         # Reward the FTE retained between consecutive phases, min(a_curr, a_next) per
         # person. Counting retained people instead would reward splitting the need
         # across more of them; retained FTE is bounded by the smaller phase's need.
         if weights.handover > 0:
             for k in range(len(phases) - 1):
-                a_curr = phases[k][3]
-                a_next = phases[k + 1][3]
+                a_curr = phases[k][4]
+                a_next = phases[k + 1][4]
                 for person_id in a_curr.keys() & a_next.keys():
                     retained = pulp.LpVariable(f"h_{k}_{person_id}", lowBound=0)
                     model += retained <= a_curr[person_id]
@@ -84,7 +87,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
                     objective_terms.append(weights.handover * retained)
 
         quality = pulp.lpSum(objective_terms)
-        headcount = pulp.lpSum(var for _, _, x, _ in phases for var in x.values())
+        headcount = pulp.lpSum(var for _, _, _, x, _ in phases for var in x.values())
         model += quality - HEADCOUNT_PENALTY * headcount
 
         max_score = round(
@@ -96,14 +99,14 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
         pool = []
         while True:
             model.solve(pulp.PULP_CBC_CMD(msg=False))
-            if not pool:
-                self._check_optimal(model, project)
-            elif pulp.LpStatus[model.status] != "Optimal":
+            if pulp.LpStatus[model.status] != "Optimal":
+                if not pool:
+                    raise InfeasibleAssignmentError(project.id, self._diagnose(phases, need_per_phase, weights))
                 break  # the cuts exclude every remaining team
 
             selected = [
                 (phase_id, p.id, x[p.id], a[p.id])
-                for phase_id, candidates, x, a in phases
+                for phase_id, _, candidates, x, a in phases
                 for p in candidates
                 if x[p.id].value() == 1
             ]
@@ -112,12 +115,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
                 for phase_id, person_id, _, a_var in selected
             ]
             pool.append(
-                AssignmentResult(
-                    project_id=project.id,
-                    members=members,
-                    score=round(pulp.value(quality), 6),
-                    max_score=max_score,
-                )
+                self._result(project.id, phases, members, score=round(pulp.value(quality), 6), max_score=max_score)
             )
             if len(pool) > n_alternatives:
                 break
@@ -130,13 +128,79 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
 
         return pool
 
-    def _check_optimal(self, model: pulp.LpProblem, project: ProjectInput) -> None:
-        status = pulp.LpStatus[model.status]
-        if status != "Optimal":
-            raise ValueError(
-                f"Could not solve assignment for project '{project.id}': solver status is '{status}'. "
-                "Check for conflicting constraints (e.g. a squad too large for the phase's required FTE)."
-            )
+    def _result(
+        self, project_id: str, phases: list, members: list[AssignedMember], score: float, max_score: float
+    ) -> AssignmentResult:
+        coverage = [
+            compute_coverage(phase_id, scoped, candidates, [m for m in members if m.phase_id == phase_id])
+            for phase_id, scoped, candidates, _, _ in phases
+        ]
+        return AssignmentResult(
+            project_id=project_id,
+            members=members,
+            score=score,
+            max_score=max_score,
+            coverage=coverage,
+            fully_covered=all(c.fte_met and all(s.met for s in c.skills) for c in coverage),
+        )
+
+    def _diagnose(self, phases: list, need_per_phase: list[float], weights: AssignmentWeights) -> list[PhaseConflict]:
+        # Phases share no hard constraint (handover is only rewarded), so the joint model
+        # is infeasible exactly when some phase is infeasible on its own. Each cause is
+        # identified by the relaxation that makes that phase solvable again.
+        conflicts = []
+        for (phase_id, scoped, candidates, _, _), need in zip(phases, need_per_phase):
+            if not candidates or self._is_feasible(scoped, candidates, weights):
+                continue
+            candidate_ids = {p.id for p in candidates}
+            squad_indices = [
+                i for i, squad in enumerate(scoped.squads) if len(set(squad.member_ids) & candidate_ids) > 1
+            ]
+            forced_ids = [pid for pid in scoped.included_person_ids if pid in candidate_ids]
+
+            causes = []
+            if squad_indices and self._is_feasible(scoped.model_copy(update={"squads": []}), candidates, weights):
+                # Name the squads whose removal alone suffices; if none does, they conflict jointly.
+                blocking = [
+                    i
+                    for i in squad_indices
+                    if self._is_feasible(
+                        scoped.model_copy(update={"squads": scoped.squads[:i] + scoped.squads[i + 1 :]}),
+                        candidates,
+                        weights,
+                    )
+                ]
+                causes.append((InfeasibilityReason.SQUAD_CONFLICT, blocking or squad_indices, []))
+            if forced_ids and self._is_feasible(
+                scoped.model_copy(update={"included_person_ids": []}), candidates, weights
+            ):
+                causes.append((InfeasibilityReason.FORCED_MEMBER_CONFLICT, [], forced_ids))
+            if not causes and squad_indices and forced_ids:
+                relaxed = scoped.model_copy(update={"squads": [], "included_person_ids": []})
+                if self._is_feasible(relaxed, candidates, weights):
+                    causes.append((InfeasibilityReason.SQUAD_AND_FORCED_MEMBER_CONFLICT, squad_indices, forced_ids))
+            if not causes:
+                causes.append((InfeasibilityReason.FTE_NOT_REACHABLE, [], []))
+
+            conflicts += [
+                PhaseConflict(
+                    phase_id=phase_id,
+                    reason=reason,
+                    required_fte=scoped.n_slots,
+                    need_fte=round(need, 6),
+                    squad_indices=squads,
+                    forced_person_ids=forced,
+                )
+                for reason, squads, forced in causes
+            ]
+        return conflicts
+
+    def _is_feasible(self, project: ProjectInput, candidates: list[PersonInput], weights: AssignmentWeights) -> bool:
+        model = pulp.LpProblem("feasibility", pulp.LpMaximize)
+        _, _, terms, _ = self._build_phase(model, "0", project, candidates, weights)
+        model += pulp.lpSum(terms)
+        model.solve(pulp.PULP_CBC_CMD(msg=False))
+        return pulp.LpStatus[model.status] == "Optimal"
 
     def _expand_included_via_squads(
         self, included_ids: set[str], squads: list[Squad], candidate_ids: set[str]
