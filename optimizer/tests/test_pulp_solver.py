@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 from optimizer.adapters.pulp_solver import MIN_FTE_SHARE, PuLPTeamAssignmentSolver
+from optimizer.domain.solver import InfeasibleAssignmentError
 from optimizer.models import (
     AssignmentWeights,
     AvailabilityWindow,
@@ -280,7 +281,7 @@ def _oversized_squad_project():
 
 def test_unsatisfiable_squad_raises(solver):
     project, candidates = _oversized_squad_project()
-    with pytest.raises(ValueError):
+    with pytest.raises(InfeasibleAssignmentError):
         solver.solve(project, candidates, AssignmentWeights())
 
 
@@ -397,7 +398,7 @@ def test_pool_without_alternatives_matches_solve(solver, python_project, pythoni
 
 def test_pool_first_solve_still_raises_when_infeasible(solver):
     project, candidates = _oversized_squad_project()
-    with pytest.raises(ValueError):
+    with pytest.raises(InfeasibleAssignmentError):
         solver.solve_pool(project, candidates, AssignmentWeights())
 
 
