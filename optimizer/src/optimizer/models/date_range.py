@@ -10,5 +10,5 @@ class DateRange(BaseModel):
 
 class AvailabilityWindow(DateRange):
     ratio: float = Field(
-        ge=0, le=1, description="Fraction of FTE available during this window, overriding fte_capacity."
+        ge=0, le=1, description="Fraction of FTE available during this window, overriding the working-pattern ratio."
     )
