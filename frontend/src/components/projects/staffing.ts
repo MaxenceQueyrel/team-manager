@@ -97,6 +97,10 @@ export function assignedFte(lane: StaffingLane): number {
   return roundFte(total);
 }
 
+export function formatFte(fte: number): string {
+  return String(roundFte(fte));
+}
+
 export function formatHeadcount(count: number): string {
   return `${count} ${count === 1 ? "person" : "people"}`;
 }

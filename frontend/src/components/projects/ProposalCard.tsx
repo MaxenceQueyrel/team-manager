@@ -1,8 +1,9 @@
 import { useId, useState } from "react";
 import { TeamMembers } from "@/components/common/TeamMembers";
 import { Button, Card, colors, Modal } from "@/components/common/ui";
+import { CoverageBreakdown } from "@/components/projects/CoverageBreakdown";
 import { errorMessage } from "@/services/api";
-import type { AssignedMember, Person } from "@/types";
+import type { AssignedMember, Person, PhaseCoverage } from "@/types";
 
 function replacedScope(members: AssignedMember[]): string {
   const phaseIds = [...new Set(members.map((m) => m.phase_id))];
@@ -11,13 +12,16 @@ function replacedScope(members: AssignedMember[]): string {
   return `${names.length === 1 ? "phase" : "phases"} ${names.join(", ")}`;
 }
 
-/** A team proposal diffed against current staffing, with an "Apply to project" action. */
+/** A team proposal diffed against current staffing, with its requirement coverage and an
+ * "Apply to project" action. */
 export function ProposalCard({
   title,
   members,
   score,
   maxScore,
   scoreNote,
+  coverage,
+  fullyCovered,
   people,
   baseline,
   onApply,
@@ -28,6 +32,8 @@ export function ProposalCard({
   score: number | null | undefined;
   maxScore: number | null | undefined;
   scoreNote?: string;
+  coverage: PhaseCoverage[];
+  fullyCovered: boolean | null;
   people: Person[];
   baseline: AssignedMember[];
   onApply: () => Promise<void>;
@@ -95,6 +101,7 @@ export function ProposalCard({
           </strong>
           {scoreNote && <span style={{ color: colors.muted }}> · {scoreNote}</span>}
         </p>
+        <CoverageBreakdown coverage={coverage} fullyCovered={fullyCovered} />
         {members.length === 0 ? (
           <p style={{ color: colors.muted, margin: 0 }}>
             No feasible assignment found for these constraints.

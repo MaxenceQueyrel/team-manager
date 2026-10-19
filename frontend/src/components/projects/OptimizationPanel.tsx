@@ -1,8 +1,14 @@
 import { useState } from "react";
 import { Button, colors, selectStyle } from "@/components/common/ui";
-import { errorMessage, optimizationApi } from "@/services/api";
+import { InfeasibilityReport } from "@/components/projects/InfeasibilityReport";
+import { errorMessage, infeasibilityDetail, optimizationApi } from "@/services/api";
 import { useAppStore } from "@/store";
-import type { OptimizationResponse, OptimizationWeights, Project } from "@/types";
+import type {
+  InfeasibilityDetail,
+  OptimizationResponse,
+  OptimizationWeights,
+  Project,
+} from "@/types";
 
 const WEIGHT_KEYS: { key: keyof OptimizationWeights; label: string; description: string }[] = [
   { key: "performance", label: "Performance", description: "Skill fit & seniority" },
@@ -30,15 +36,17 @@ export function OptimizationPanel({
   onResult: (result: OptimizationResponse) => void;
   onClose: () => void;
 }) {
-  const { optimizationWeights, setWeights } = useAppStore();
+  const { optimizationWeights, setWeights, people } = useAppStore();
   const [respectExclusions, setRespectExclusions] = useState(true);
   const [nAlternatives, setNAlternatives] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [infeasible, setInfeasible] = useState<InfeasibilityDetail | null>(null);
 
   const solve = async () => {
     setLoading(true);
     setError(null);
+    setInfeasible(null);
     try {
       onResult(
         await optimizationApi.solve({
@@ -49,7 +57,9 @@ export function OptimizationPanel({
         }),
       );
     } catch (e) {
-      setError(errorMessage(e));
+      const detail = infeasibilityDetail(e);
+      if (detail) setInfeasible(detail);
+      else setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -164,6 +174,7 @@ export function OptimizationPanel({
           {error}
         </p>
       )}
+      {infeasible && <InfeasibilityReport detail={infeasible} project={project} people={people} />}
     </aside>
   );
 }
