@@ -208,6 +208,8 @@ export default function ProjectWorkspacePage() {
             members={result.best.members}
             score={result.best.optimization_score}
             maxScore={result.best.optimization_max_score}
+            coverage={result.best.coverage}
+            fullyCovered={result.best.fully_covered}
             people={people}
             baseline={staffingBaseline(assignments, result.best.members)}
             onApply={() => applyTeam(result.best.id)}
@@ -235,6 +237,8 @@ export default function ProjectWorkspacePage() {
                       members={proposal.members}
                       score={proposal.optimization_score}
                       maxScore={proposal.optimization_max_score}
+                      coverage={proposal.coverage}
+                      fullyCovered={proposal.fully_covered}
                       scoreNote={deltaVsBest(proposal, result.best)}
                       people={people}
                       baseline={staffingBaseline(assignments, proposal.members)}
@@ -293,6 +297,8 @@ export default function ProjectWorkspacePage() {
                   members={team.members}
                   score={team.optimization_score}
                   maxScore={team.optimization_max_score}
+                  coverage={team.coverage}
+                  fullyCovered={team.fully_covered}
                   people={people}
                   baseline={staffingBaseline(assignments, team.members)}
                   onApply={() => applyTeam(team.id)}

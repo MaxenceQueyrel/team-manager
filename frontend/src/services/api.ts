@@ -1,6 +1,7 @@
 import axios, { isAxiosError } from "axios";
 import type {
   Assignment,
+  InfeasibilityDetail,
   OptimizationRequest,
   OptimizationResponse,
   Organization,
@@ -71,7 +72,22 @@ export function errorMessage(e: unknown): string {
   if (isAxiosError(e) && typeof e.response?.data?.detail === "string") {
     return e.response.data.detail;
   }
+  if (isAxiosError(e) && typeof e.response?.data?.detail?.message === "string") {
+    return e.response.data.detail.message;
+  }
   return e instanceof Error ? e.message : String(e);
+}
+
+/** The structured reason an optimization solve found no feasible team, or null for any other error. */
+export function infeasibilityDetail(e: unknown): InfeasibilityDetail | null {
+  if (
+    isAxiosError(e) &&
+    e.response?.status === 409 &&
+    Array.isArray(e.response.data?.detail?.conflicts)
+  ) {
+    return e.response.data.detail as InfeasibilityDetail;
+  }
+  return null;
 }
 
 let refreshPromise: Promise<string> | null = null;
