@@ -1,7 +1,14 @@
 from pydantic import BaseModel, Field
-from optimizer.models import AssignedMember, AssignmentWeights
+from optimizer.models import (
+    AssignedMember,
+    AssignmentWeights,
+    PhaseConflict,
+    PhaseCoverage,
+)
 
 
+# coverage/fully_covered default to empty/None for teams saved before the
+# optimizer reported coverage, and for teams created without a solver run.
 class Team(BaseModel):
     id: str
     organization_id: str
@@ -10,12 +17,16 @@ class Team(BaseModel):
     is_optimized: bool = False
     optimization_score: float | None = None
     optimization_max_score: float | None = None
+    coverage: list[PhaseCoverage] = []
+    fully_covered: bool | None = None
 
 
 class TeamProposal(BaseModel):
     members: list[AssignedMember] = []
     optimization_score: float
     optimization_max_score: float
+    coverage: list[PhaseCoverage] = []
+    fully_covered: bool | None = None
 
 
 class TeamCreate(TeamProposal):
@@ -32,3 +43,17 @@ class OptimizationRequest(BaseModel):
 class OptimizationResponse(BaseModel):
     best: Team
     alternatives: list[TeamProposal]
+
+
+class InfeasibilityDetail(BaseModel):
+    """The `detail` body of a 409 returned when a project admits no team at all.
+
+    Attributes:
+        message: Human-readable summary of the failure.
+        project_id: The project that could not be staffed.
+        conflicts: One entry per infeasible phase and cause, in phase order.
+    """
+
+    message: str
+    project_id: str
+    conflicts: list[PhaseConflict]
