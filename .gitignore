@@ -247,3 +247,6 @@ __marimo__/
 
 # Lefthook local overrides (personal, not shared)
 lefthook-local.yml
+
+# Worktrees created by /deliver-issue for parallel sub-issue work
+.worktrees/
