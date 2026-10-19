@@ -13,6 +13,7 @@ from api.v1 import people as people_module
 from api.v1 import projects as projects_module
 from api.v1 import roles as roles_module
 from api.v1 import teams as teams_module
+from optimizer.adapters.pulp_solver import MIN_FTE_SHARE
 from optimizer.models import Seniority
 
 
@@ -126,6 +127,8 @@ def test_promoting_a_proposal_creates_a_team(client, org_headers, project_id):
     assert team["project_id"] == project_id
     assert team["members"] == proposal["members"]
     assert team["optimization_score"] == proposal["optimization_score"]
+    assert team["coverage"] == proposal["coverage"]
+    assert team["fully_covered"] == proposal["fully_covered"]
     assert team["is_optimized"] is True
     assert (
         client.get(f"/api/v1/teams/{team['id']}", headers=org_headers).status_code
@@ -219,3 +222,104 @@ def test_solve_ignores_assignments_on_the_project_being_solved(client, org_heade
 
     assert response.status_code == 200
     assert _best_member_ids(response) == [bob_id]
+
+
+def test_solve_reports_coverage_for_best_and_alternatives(
+    client, org_headers, project_id
+):
+    body = _solve(client, org_headers, project_id, n_alternatives=2).json()
+
+    for proposal in [body["best"], *body["alternatives"]]:
+        assert proposal["fully_covered"] is True
+        assert proposal["coverage"] == [
+            {
+                "phase_id": None,
+                "required_fte": 2.0,
+                "staffed_fte": 2.0,
+                "available_fte": 6.0,
+                "fte_met": True,
+                "skills": [],
+            }
+        ]
+
+
+def test_solve_reports_unmet_skill_and_persists_coverage(client, org_headers):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    client.post(
+        "/api/v1/people/",
+        json={
+            "name": "Ada",
+            "role": "Backend Developer",
+            "seniority": Seniority.SENIOR,
+            "years_of_experience": 5.0,
+            "skills": [{"id": "python", "level": 2}],
+        },
+        headers=org_headers,
+    )
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Project Y",
+            "skill_requirements": [{"id": "python", "min_level": 4}],
+        },
+        headers=org_headers,
+    ).json()["id"]
+
+    best = _solve(client, org_headers, project_id, n_alternatives=0).json()["best"]
+
+    assert best["fully_covered"] is False
+    assert best["coverage"][0]["fte_met"] is True
+    assert best["coverage"][0]["skills"] == [
+        {
+            "skill_id": "python",
+            "required_level": 4.0,
+            "best_level": 2.0,
+            "covered_fte": 0.0,
+            "met": False,
+        }
+    ]
+    saved = client.get(f"/api/v1/teams/{best['id']}", headers=org_headers).json()
+    assert saved["coverage"] == best["coverage"]
+    assert saved["fully_covered"] is False
+
+
+def test_solve_returns_409_with_conflicts_when_no_team_is_feasible(client, org_headers):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    # Each selected person carries at least MIN_FTE_SHARE, so a squad bigger than
+    # 1 / MIN_FTE_SHARE can never fit a single FTE.
+    member_ids = [
+        client.post(
+            "/api/v1/people/",
+            json={
+                "name": f"Member {i}",
+                "role": "Backend Developer",
+                "seniority": Seniority.SENIOR,
+                "years_of_experience": 5.0,
+            },
+            headers=org_headers,
+        ).json()["id"]
+        for i in range(int(1 / MIN_FTE_SHARE) + 1)
+    ]
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={"name": "Project Z", "squads": [{"member_ids": member_ids}]},
+        headers=org_headers,
+    ).json()["id"]
+
+    response = _solve(client, org_headers, project_id)
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["project_id"] == project_id
+    assert detail["message"]
+    assert detail["conflicts"] == [
+        {
+            "phase_id": None,
+            "reason": "squad_conflict",
+            "required_fte": 1.0,
+            "need_fte": 1.0,
+            "squad_indices": [0],
+            "forced_person_ids": [],
+        }
+    ]
+    assert client.get("/api/v1/teams/", headers=org_headers).json() == []

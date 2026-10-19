@@ -5,6 +5,7 @@ from api.models.assignment import Assignment
 from api.models.person import Person
 from api.models.project import Project
 from api.models.team import (
+    InfeasibilityDetail,
     OptimizationRequest,
     OptimizationResponse,
     Team,
@@ -14,7 +15,7 @@ from api.models.team import (
 from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
-from optimizer.domain.solver import AssignmentSolverPort
+from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
 from optimizer.models import AvailabilityWindow, PersonInput, ProjectInput
 
 router = APIRouter()
@@ -79,13 +80,21 @@ def solve_assignment(
         for p in people
     ]
 
-    pool = solver.solve_pool(
-        project_input,
-        people_inputs,
-        request.weights,
-        request.respect_exclusions,
-        n_alternatives=request.n_alternatives,
-    )
+    try:
+        pool = solver.solve_pool(
+            project_input,
+            people_inputs,
+            request.weights,
+            request.respect_exclusions,
+            n_alternatives=request.n_alternatives,
+        )
+    except InfeasibleAssignmentError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=InfeasibilityDetail(
+                message=str(exc), project_id=exc.project_id, conflicts=exc.conflicts
+            ).model_dump(mode="json"),
+        ) from exc
     best, alternatives = pool[0], pool[1:]
 
     saved = teams_repo.create(
@@ -95,6 +104,8 @@ def solve_assignment(
             "is_optimized": True,
             "optimization_score": best.score,
             "optimization_max_score": best.max_score,
+            "coverage": [c.model_dump() for c in best.coverage],
+            "fully_covered": best.fully_covered,
         },
         organization_id,
     )
@@ -105,6 +116,8 @@ def solve_assignment(
                 members=alternative.members,
                 optimization_score=alternative.score,
                 optimization_max_score=alternative.max_score,
+                coverage=alternative.coverage,
+                fully_covered=alternative.fully_covered,
             )
             for alternative in alternatives
         ],
