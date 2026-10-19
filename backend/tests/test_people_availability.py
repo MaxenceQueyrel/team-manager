@@ -31,7 +31,7 @@ def _create_person(client, headers, **overrides):
         "role": "Backend Developer",
         "seniority": Seniority.SENIOR,
         "years_of_experience": 8.0,
-        "fte_capacity": 1.0,
+        "working_days_per_week": 5,
         "availability_windows": [],
         **overrides,
     }
@@ -41,8 +41,8 @@ def _create_person(client, headers, **overrides):
     return response.json()
 
 
-def test_empty_windows_falls_back_to_flat_capacity(client, org_headers):
-    person = _create_person(client, org_headers, fte_capacity=0.6)
+def test_empty_windows_falls_back_to_working_pattern_ratio(client, org_headers):
+    person = _create_person(client, org_headers, working_days_per_week=3)
 
     response = client.get(
         "/api/v1/people/availability",
@@ -60,13 +60,37 @@ def test_empty_windows_falls_back_to_flat_capacity(client, org_headers):
     ]
 
 
+def test_vacation_zeroes_availability_over_its_days(client, org_headers):
+    person = _create_person(
+        client,
+        org_headers,
+        vacations=[{"start": "2026-01-03", "end": "2026-01-04"}],
+    )
+
+    response = client.get(
+        "/api/v1/people/availability",
+        params={"start": "2026-01-01", "end": "2026-01-10"},
+        headers=org_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "person_id": person["id"],
+            "segments": [
+                {"start": "2026-01-01", "end": "2026-01-02", "ratio": 1.0},
+                {"start": "2026-01-03", "end": "2026-01-04", "ratio": 0.0},
+                {"start": "2026-01-05", "end": "2026-01-10", "ratio": 1.0},
+            ],
+        }
+    ]
+
+
 def test_partial_period_overlap_splits_into_segments(client, org_headers):
     window = AvailabilityWindow(
         start=date(2026, 1, 5), end=date(2026, 1, 31), ratio=0.5
     ).model_dump(mode="json")
-    person = _create_person(
-        client, org_headers, fte_capacity=1.0, availability_windows=[window]
-    )
+    person = _create_person(client, org_headers, availability_windows=[window])
 
     response = client.get(
         "/api/v1/people/availability",
@@ -103,7 +127,7 @@ def test_end_before_start_returns_400(client, org_headers):
 
 
 def test_assignment_reduces_computed_availability(client, org_headers):
-    person = _create_person(client, org_headers, fte_capacity=1.0)
+    person = _create_person(client, org_headers)
     assignment_response = client.post(
         "/api/v1/assignments/",
         json={
@@ -137,9 +161,7 @@ def test_availability_window_overrides_assignment_reduction(client, org_headers)
     window = AvailabilityWindow(
         start=date(2026, 1, 1), end=date(2026, 1, 5), ratio=0.0
     ).model_dump(mode="json")
-    person = _create_person(
-        client, org_headers, fte_capacity=1.0, availability_windows=[window]
-    )
+    person = _create_person(client, org_headers, availability_windows=[window])
     client.post(
         "/api/v1/assignments/",
         json={

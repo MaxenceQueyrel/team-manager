@@ -11,6 +11,7 @@ import type {
   PeopleImportSummary,
   Person,
   PersonAvailability,
+  PersonInput,
   Project,
   ProjectsImportSummary,
   Role,
@@ -146,9 +147,8 @@ export const authApi = {
 export const peopleApi = {
   list: () => client.get<Person[]>("/api/v1/people/").then((r) => r.data),
   get: (id: string) => client.get<Person>(`/api/v1/people/${id}`).then((r) => r.data),
-  create: (data: Omit<Person, "id">) =>
-    client.post<Person>("/api/v1/people/", data).then((r) => r.data),
-  update: (id: string, data: Omit<Person, "id">) =>
+  create: (data: PersonInput) => client.post<Person>("/api/v1/people/", data).then((r) => r.data),
+  update: (id: string, data: PersonInput) =>
     client.put<Person>(`/api/v1/people/${id}`, data).then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/people/${id}`),
   availability: (start: string, end: string) =>

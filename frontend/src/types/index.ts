@@ -42,13 +42,17 @@ export interface Person {
   role: string;
   seniority: Seniority;
   years_of_experience: number;
-  fte_capacity: number; // 0–1
+  working_days_per_week: number; // 1–7
   skills: SkillLevel[];
+  vacations: DateRange[]; // inclusive days off
   availability_windows: AvailabilityWindow[];
   preferences: string[]; // skill ids the person prefers
   growth_targets: string[]; // skill ids the person wants to grow in
   affinities: Record<string, number>; // person_id → score (-5..+5)
+  base_capacity: number; // read-only, derived from working_days_per_week
 }
+
+export type PersonInput = Omit<Person, "id" | "base_capacity">;
 
 export interface PeopleImportSummary {
   created: string[]; // ids of people created by the import

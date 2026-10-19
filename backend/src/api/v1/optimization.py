@@ -16,7 +16,7 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
-from optimizer.models import AvailabilityWindow, PersonInput, ProjectInput
+from optimizer.models import AvailabilityWindow, ProjectInput
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
@@ -64,21 +64,7 @@ def solve_assignment(
         phases=project.phases,
     )
 
-    people_inputs = [
-        PersonInput(
-            id=p.id,
-            seniority=p.seniority,
-            years_of_experience=p.years_of_experience,
-            fte_capacity=p.fte_capacity,
-            skills=p.skills,
-            availability_windows=p.availability_windows,
-            assignments=committed.get(p.id, []),
-            preferences=p.preferences,
-            growth_targets=p.growth_targets,
-            affinities=p.affinities,
-        )
-        for p in people
-    ]
+    people_inputs = [p.to_person_input(committed.get(p.id, [])) for p in people]
 
     try:
         pool = solver.solve_pool(

@@ -16,6 +16,8 @@ from optimizer.models import (
     Squad,
 )
 
+SPAN = DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))
+
 
 @pytest.fixture
 def solver():
@@ -39,7 +41,6 @@ def people():
             id="p1",
             seniority=Seniority.SENIOR,
             years_of_experience=8.0,
-            fte_capacity=1.0,
             skills=[SkillLevel(id="python", level=5)],
             growth_targets=[],
             affinities={"p2": 4.0},
@@ -48,7 +49,6 @@ def people():
             id="p2",
             seniority=Seniority.JUNIOR,
             years_of_experience=1.0,
-            fte_capacity=1.0,
             skills=[SkillLevel(id="react", level=3)],
             growth_targets=["python"],
             affinities={"p1": 4.0},
@@ -152,6 +152,22 @@ def test_fte_allocation_reflects_windowed_availability(solver, project, people):
     result = solver.solve(project, people, AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0))
     p1_member = next(m for m in result.members if m.person_id == "p1")
     assert p1_member.fte_allocation == pytest.approx(0.4)
+
+
+def test_vacation_excludes_person(solver, project, people):
+    project.date_ranges = [SPAN]
+    project.included_person_ids = ["p1"]
+    people[0].vacations = [DateRange(start=date(2026, 1, 1), end=date(2026, 1, 31))]
+    result = solver.solve(project, people, AssignmentWeights())
+    assert all(m.person_id != "p1" for m in result.members)
+
+
+def test_fte_allocation_reflects_working_pattern(solver, project, people):
+    project.included_person_ids = ["p1"]
+    people[0].working_days_per_week = 3
+    result = solver.solve(project, people, AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0))
+    p1_member = next(m for m in result.members if m.person_id == "p1")
+    assert p1_member.fte_allocation == pytest.approx(0.6)
 
 
 def test_fully_assigned_person_is_not_selected(solver, project, people):
@@ -334,7 +350,12 @@ def pythonistas():
 
 @pytest.fixture
 def python_project():
-    return ProjectInput(id="proj-test", n_slots=2, skill_requirements=[SkillRequirement(id="python", min_level=1)])
+    return ProjectInput(
+        id="proj-test",
+        n_slots=2,
+        skill_requirements=[SkillRequirement(id="python", min_level=1)],
+        date_ranges=[SPAN],
+    )
 
 
 def _team(result):
@@ -445,18 +466,19 @@ def test_phase_date_range_evaluates_assignments_per_phase(solver, people):
     assert p1_stage2.fte_allocation == pytest.approx(1.0)
 
 
-def _person(person_id, fte_capacity=1.0, python_level=4.0):
+def _person(person_id, availability=1.0, python_level=4.0):
+    # Fractional availability is a window over SPAN, so it only applies to projects running in SPAN.
     return PersonInput(
         id=person_id,
         seniority=Seniority.SENIOR,
         years_of_experience=5,
-        fte_capacity=fte_capacity,
+        availability_windows=[AvailabilityWindow(start=SPAN.start, end=SPAN.end, ratio=availability)],
         skills=[SkillLevel(id="python", level=python_level)],
     )
 
 
 def test_part_time_people_combine_to_cover_the_need(solver, python_project):
-    candidates = [_person(f"half{i}", fte_capacity=0.5) for i in range(5)]
+    candidates = [_person(f"half{i}", availability=0.5) for i in range(5)]
     result = solver.solve(python_project, candidates, AssignmentWeights())
     assert len(result.members) == 4
     assert all(m.fte_allocation == pytest.approx(0.5) for m in result.members)
@@ -464,12 +486,13 @@ def test_part_time_people_combine_to_cover_the_need(solver, python_project):
 
 
 def test_full_time_people_preferred_over_small_allocations_at_equal_quality(solver, python_project):
-    candidates = [_person("full_a"), _person("full_b")] + [_person(f"part{i}", fte_capacity=0.3) for i in range(4)]
+    candidates = [_person("full_a"), _person("full_b")] + [_person(f"part{i}", availability=0.3) for i in range(4)]
     result = solver.solve(python_project, candidates, AssignmentWeights())
     assert {m.person_id: m.fte_allocation for m in result.members} == pytest.approx({"full_a": 1.0, "full_b": 1.0})
 
 
 def test_better_part_timers_beat_a_weaker_full_timer(solver, project):
+    project.date_ranges = [SPAN]
     candidates = [_person("weak", python_level=1.5), _person("strong_a", 0.5, 5.0), _person("strong_b", 0.5, 5.0)]
     weights = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
     result = solver.solve(project, candidates, weights)
@@ -485,12 +508,14 @@ def test_chemistry_does_not_reward_adding_people(solver):
             id=person_id,
             seniority=Seniority.SENIOR,
             years_of_experience=5,
-            fte_capacity=1.0 if person_id in ("a", "b") else 0.5,
+            availability_windows=[
+                AvailabilityWindow(start=SPAN.start, end=SPAN.end, ratio=1.0 if person_id in ("a", "b") else 0.5)
+            ],
             affinities={other: 5.0 for other in ids if other != person_id},
         )
         for person_id in ids
     ]
-    project = ProjectInput(id="proj-test", n_slots=2)
+    project = ProjectInput(id="proj-test", n_slots=2, date_ranges=[SPAN])
     weights = AssignmentWeights(performance=0.0, growth=0.0, cost=0.0, chemistry=1.0)
     result = solver.solve(project, candidates, weights)
     assert {m.person_id for m in result.members} == {"a", "b"}
@@ -506,7 +531,7 @@ def test_single_fte_is_not_split_between_friends(solver, people):
 
 def test_under_capacity_pool_is_capped(solver, python_project):
     project = python_project.model_copy(update={"n_slots": 3})
-    candidates = [_person("full"), _person("half", fte_capacity=0.5)]
+    candidates = [_person("full"), _person("half", availability=0.5)]
     weights = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
     result = solver.solve(project, candidates, weights)
     assert {m.person_id: m.fte_allocation for m in result.members} == pytest.approx({"full": 1.0, "half": 0.5})
@@ -534,7 +559,7 @@ def test_handover_rewards_retained_fte(solver):
 
 
 def test_pool_alternatives_with_part_timers_differ_in_people(solver, python_project):
-    candidates = [_person(f"half{i}", fte_capacity=0.5, python_level=5.0 - i * 0.5) for i in range(8)]
+    candidates = [_person(f"half{i}", availability=0.5, python_level=5.0 - i * 0.5) for i in range(8)]
     pool = solver.solve_pool(python_project, candidates, AssignmentWeights(), n_alternatives=2, min_difference=2)
     teams = [{m.person_id for m in r.members} for r in pool]
     assert len(teams) == 3

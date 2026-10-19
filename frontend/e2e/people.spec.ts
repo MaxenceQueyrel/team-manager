@@ -34,8 +34,8 @@ test("importing a CSV adds new people and reports the result", async ({ page }) 
   await page.getByRole("button", { name: "Save" }).click();
 
   const csv = [
-    "id,name,role,seniority,years_of_experience,fte_capacity,manager_id,skills,availability_windows,preferences,growth_targets,affinities",
-    `${personId},${name},${roleId},mid,3,1,,[],[],[],[],{}`,
+    "id,name,role,seniority,years_of_experience,working_days_per_week,manager_id,skills,vacations,availability_windows,preferences,growth_targets,affinities",
+    `${personId},${name},${roleId},mid,3,5,,[],[],[],[],[],{}`,
   ].join("\n");
 
   await page.locator('input[type="file"]').setInputFiles({
@@ -58,8 +58,8 @@ test("importing a CSV with unknown roles/skills adds them to the catalog", async
   await page.goto("/people");
 
   const csv = [
-    "id,name,role,seniority,years_of_experience,fte_capacity,manager_id,skills,availability_windows,preferences,growth_targets,affinities",
-    `${personId},${name},${roleId},mid,3,1,,"[{""id"": ""${skillId}"", ""level"": 3}]",[],[],[],{}`,
+    "id,name,role,seniority,years_of_experience,working_days_per_week,manager_id,skills,vacations,availability_windows,preferences,growth_targets,affinities",
+    `${personId},${name},${roleId},mid,3,5,,"[{""id"": ""${skillId}"", ""level"": 3}]",[],[],[],[],{}`,
   ].join("\n");
 
   await page.locator('input[type="file"]').setInputFiles({
@@ -102,6 +102,55 @@ test("editing an availability window on the detail page updates the timeline", a
 
   await page.goBack();
   await expect(page).toHaveURL(/\/people$/);
+});
+
+test("working days per week derives the FTE shown on the roster and detail page", async ({
+  page,
+}) => {
+  const suffix = uniqueSuffix();
+  const name = `Hedy Lamarr ${suffix}`;
+  await createPerson(page, name, `qa-engineer-${suffix}`);
+
+  const row = page.getByRole("row", { name });
+  const fteCell = row.getByRole("cell").nth(4);
+  await expect(fteCell).toHaveText("100%");
+
+  await row.getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel("Working days per week").selectOption("4");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(fteCell).toHaveText("80%");
+  await page.getByRole("link", { name }).click();
+  await expect(page.getByText("4 days/week · 80% FTE")).toBeVisible();
+});
+
+test("marking vacation days on the detail page zeroes them on the timeline", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const name = `Mary Jackson ${suffix}`;
+  await createPerson(page, name, `qa-engineer-${suffix}`);
+
+  await page.getByRole("link", { name }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
+  await expect(page.getByTitle("2026-01-06: 100%")).toBeVisible();
+
+  await page.getByLabel("Vacation month").fill("2026-01");
+  await page.getByRole("button", { name: "2026-01-05", exact: true }).click();
+  await page
+    .getByRole("button", { name: "2026-01-07", exact: true })
+    .click({ modifiers: ["Shift"] });
+  await expect(page.getByText("2026-01-05 → 2026-01-07 (3 days)")).toBeVisible();
+  await page.getByRole("button", { name: "Save vacation" }).click();
+
+  await expect(page.getByTitle("2026-01-06: 0%")).toBeVisible();
+  await expect(page.getByTitle("2026-01-08: 100%")).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel("Vacation month").fill("2026-01");
+  await expect(page.getByRole("button", { name: "2026-01-06", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });
 
 test("an assigned person shows reduced availability on their detail page", async ({ page }) => {

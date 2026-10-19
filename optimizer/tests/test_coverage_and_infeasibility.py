@@ -21,6 +21,7 @@ from optimizer.models import (
 )
 
 PERF_ONLY = AssignmentWeights(performance=1.0, chemistry=0.0, growth=0.0, cost=0.0)
+SPAN = DateRange(start=date(2026, 1, 5), end=date(2026, 1, 25))
 
 
 @pytest.fixture
@@ -28,12 +29,13 @@ def solver():
     return PuLPTeamAssignmentSolver()
 
 
-def _person(person_id, fte_capacity=1.0, **skills):
+def _person(person_id, availability=1.0, **skills):
+    # Fractional availability is a window over SPAN, so it only applies to projects running in SPAN.
     return PersonInput(
         id=person_id,
         seniority=Seniority.SENIOR,
         years_of_experience=5,
-        fte_capacity=fte_capacity,
+        availability_windows=[AvailabilityWindow(start=SPAN.start, end=SPAN.end, ratio=availability)],
         skills=[SkillLevel(id=skill, level=level) for skill, level in skills.items()],
     )
 
@@ -78,9 +80,9 @@ def test_partially_covered_skills(solver):
 
 
 def test_under_filled_phase_reports_staffed_and_available_fte(solver):
-    phases = [ProjectPhase(id="build", n_slots=3), ProjectPhase(id="run", n_slots=1)]
+    phases = [ProjectPhase(id="build", n_slots=3, date_range=SPAN), ProjectPhase(id="run", n_slots=1, date_range=SPAN)]
     project = ProjectInput(id="proj", phases=phases)
-    result = solver.solve(project, [_person("full"), _person("half", fte_capacity=0.5)], PERF_ONLY)
+    result = solver.solve(project, [_person("full"), _person("half", availability=0.5)], PERF_ONLY)
 
     build, run = result.coverage
     assert (build.phase_id, build.required_fte, build.staffed_fte, build.available_fte, build.fte_met) == (
@@ -177,8 +179,8 @@ def test_forced_member_conflict(solver):
     # Below the minimum share, allocations are fixed at the person's availability: the
     # ten 0.1-FTE people fill the 1 FTE exactly, and forcing the 0.05-FTE person in
     # leaves no combination that adds up to it.
-    people = [_person("forced", fte_capacity=0.05)] + [_person(f"t{i}", fte_capacity=0.1) for i in range(10)]
-    project = ProjectInput(id="proj", n_slots=1, included_person_ids=["forced"])
+    people = [_person("forced", availability=0.05)] + [_person(f"t{i}", availability=0.1) for i in range(10)]
+    project = ProjectInput(id="proj", n_slots=1, included_person_ids=["forced"], date_ranges=[SPAN])
     assert _infeasibility(solver, project, people) == [
         PhaseConflict(
             phase_id=None,
@@ -195,12 +197,16 @@ def test_squad_and_forced_member_conflict(solver):
     # Only "s2" plus all twelve 0.08-FTE people add up to 1 FTE, which needs both the
     # forced person left out and the squad split.
     people = [
-        _person("forced", fte_capacity=0.01),
-        _person("s1", fte_capacity=0.01),
-        _person("s2", fte_capacity=0.04),
-    ] + [_person(f"t{i}", fte_capacity=0.08) for i in range(12)]
+        _person("forced", availability=0.01),
+        _person("s1", availability=0.01),
+        _person("s2", availability=0.04),
+    ] + [_person(f"t{i}", availability=0.08) for i in range(12)]
     project = ProjectInput(
-        id="proj", n_slots=1, included_person_ids=["forced"], squads=[Squad(member_ids=["s1", "s2"])]
+        id="proj",
+        n_slots=1,
+        included_person_ids=["forced"],
+        squads=[Squad(member_ids=["s1", "s2"])],
+        date_ranges=[SPAN],
     )
     conflicts = _infeasibility(solver, project, people)
     assert [(c.reason, c.squad_indices, c.forced_person_ids) for c in conflicts] == [
@@ -210,8 +216,8 @@ def test_squad_and_forced_member_conflict(solver):
 
 def test_fte_not_reachable(solver):
     # Eleven people fixed at 0.095 FTE each can sum to 0.95 or 1.045, never to 1.
-    people = [_person(f"t{i}", fte_capacity=0.095) for i in range(11)]
-    conflicts = _infeasibility(solver, ProjectInput(id="proj", n_slots=1), people)
+    people = [_person(f"t{i}", availability=0.095) for i in range(11)]
+    conflicts = _infeasibility(solver, ProjectInput(id="proj", n_slots=1, date_ranges=[SPAN]), people)
     assert [(c.reason, c.need_fte) for c in conflicts] == [(InfeasibilityReason.FTE_NOT_REACHABLE, 1.0)]
 
 
