@@ -110,6 +110,8 @@ export interface Team {
   is_optimized: boolean;
   optimization_score?: number | null;
   optimization_max_score?: number | null;
+  coverage: PhaseCoverage[]; // empty for teams saved before coverage was tracked
+  fully_covered: boolean | null;
 }
 
 export interface Skill {
@@ -137,6 +139,49 @@ export interface TeamProposal {
   members: AssignedMember[];
   optimization_score: number;
   optimization_max_score: number;
+  coverage: PhaseCoverage[];
+  fully_covered: boolean | null;
+}
+
+// skill_id is the SkillRequirement id; met means some staffed member reaches required_level.
+export interface SkillCoverage {
+  skill_id: string;
+  required_level: number;
+  best_level: number; // 0 when no staffed member has the skill
+  covered_fte: number; // FTE staffed by members at or above required_level
+  met: boolean;
+}
+
+// One per phase in project.phases order; a project without phases has a single entry with phase_id null.
+export interface PhaseCoverage {
+  phase_id: string | null;
+  required_fte: number;
+  staffed_fte: number;
+  available_fte: number; // what the eligible pool could supply during the phase
+  fte_met: boolean;
+  skills: SkillCoverage[];
+}
+
+export type InfeasibilityReason =
+  | "squad_conflict"
+  | "forced_member_conflict"
+  | "squad_and_forced_member_conflict"
+  | "fte_not_reachable";
+
+export interface PhaseConflict {
+  phase_id: string | null;
+  reason: InfeasibilityReason;
+  required_fte: number; // the phase's n_slots
+  need_fte: number; // FTE the solver had to staff exactly, after capping by pool capacity
+  squad_indices: number[]; // positions in project.squads
+  forced_person_ids: string[]; // subset of project.included_person_ids
+}
+
+// `detail` of the 409 returned by optimizationApi.solve when no team is feasible.
+export interface InfeasibilityDetail {
+  message: string;
+  project_id: string;
+  conflicts: PhaseConflict[];
 }
 
 export interface OptimizationResponse {

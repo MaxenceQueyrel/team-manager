@@ -5,7 +5,23 @@ from optimizer.models import (
     PersonInput,
     AssignmentWeights,
     AssignmentResult,
+    PhaseConflict,
 )
+
+
+class InfeasibleAssignmentError(ValueError):
+    """Raised when the project's hard constraints admit no team at all.
+
+    Attributes:
+        project_id: Identifier of the project that could not be staffed.
+        conflicts: One entry per infeasible phase and cause, in phase order.
+    """
+
+    def __init__(self, project_id: str, conflicts: list[PhaseConflict]) -> None:
+        self.project_id = project_id
+        self.conflicts = conflicts
+        causes = ", ".join(f"{c.reason} in phase {c.phase_id}" if c.phase_id else str(c.reason) for c in conflicts)
+        super().__init__(f"Could not staff project '{project_id}': {causes or 'no feasible assignment'}.")
 
 
 class AssignmentSolverPort(ABC):
@@ -33,7 +49,11 @@ class AssignmentSolverPort(ABC):
             respect_exclusions: Whether to honour project.excluded_person_ids.
 
         Returns:
-            An AssignmentResult with the selected members and a composite score.
+            An AssignmentResult with the selected members, a composite score, and the
+            per-phase FTE and skill coverage of the selected team.
+
+        Raises:
+            InfeasibleAssignmentError: If no feasible assignment exists at all.
         """
 
     @abstractmethod
@@ -68,5 +88,5 @@ class AssignmentSolverPort(ABC):
             distinct teams. ``max_score`` is identical across the pool.
 
         Raises:
-            ValueError: If no feasible assignment exists at all.
+            InfeasibleAssignmentError: If no feasible assignment exists at all.
         """
