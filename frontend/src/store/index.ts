@@ -4,6 +4,7 @@ import type {
   OptimizationWeights,
   PeopleImportSummary,
   Person,
+  PersonInput,
   Project,
   ProjectsImportSummary,
   Role,
@@ -27,7 +28,7 @@ interface AppState {
   fetchRoles: () => Promise<void>;
   fetchSkills: () => Promise<void>;
 
-  savePerson: (data: Omit<Person, "id">, id?: string) => Promise<void>;
+  savePerson: (data: PersonInput, id?: string) => Promise<void>;
   deletePerson: (id: string) => Promise<void>;
   importPeople: (file: File) => Promise<PeopleImportSummary>;
   saveProject: (data: Omit<Project, "id">, id?: string) => Promise<void>;

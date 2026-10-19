@@ -81,7 +81,7 @@ export default function PeoplePage() {
     fetchSkills();
   }, [fetchPeople, fetchRoles, fetchSkills]);
 
-  // Re-run whenever the roster is refetched so a saved FTE change shows up in the badge.
+  // Re-run whenever the roster is refetched so a saved working-pattern or vacation change shows up in the badge.
   useEffect(() => {
     if (people.length === 0) return;
     const today = new Date();
@@ -234,7 +234,7 @@ export default function PeoplePage() {
                     <Badge color={seniorityColors[p.seniority]}>{p.seniority}</Badge>
                   </td>
                   <td style={{ padding: "0.5rem" }}>{p.years_of_experience} yrs</td>
-                  <td style={{ padding: "0.5rem" }}>{(p.fte_capacity * 100).toFixed(0)}%</td>
+                  <td style={{ padding: "0.5rem" }}>{(p.base_capacity * 100).toFixed(0)}%</td>
                   <td style={{ padding: "0.5rem" }}>
                     {free === undefined ? (
                       "—"

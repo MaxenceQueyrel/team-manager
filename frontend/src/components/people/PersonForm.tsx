@@ -1,11 +1,17 @@
 import { useMemo, useState } from "react";
 import { Button, colors, Field, inputStyle, Modal, selectStyle } from "@/components/common/ui";
 import { AffinitiesEditor, SkillsEditor, TagSkillInput } from "@/components/editors/listEditors";
-import type { Person, Role, Seniority } from "@/types";
+import type { Person, PersonInput, Role, Seniority } from "@/types";
 
 const SENIORITIES: Seniority[] = ["junior", "mid", "senior", "lead"];
+const WORKING_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
-export type PersonDraft = Omit<Person, "id">;
+export type PersonDraft = PersonInput;
+
+// Mirrors the backend's derived base_capacity: a five-day week is full time.
+function baseCapacity(workingDaysPerWeek: number): number {
+  return Math.min(workingDaysPerWeek / 5, 1);
+}
 
 function emptyDraft(): PersonDraft {
   return {
@@ -13,8 +19,9 @@ function emptyDraft(): PersonDraft {
     role: "",
     seniority: "mid",
     years_of_experience: 0,
-    fte_capacity: 1,
+    working_days_per_week: 5,
     skills: [],
+    vacations: [],
     availability_windows: [],
     preferences: [],
     growth_targets: [],
@@ -22,7 +29,7 @@ function emptyDraft(): PersonDraft {
   };
 }
 
-/** Modal form to create a person or edit their profile; availability windows are edited on the person detail page. */
+/** Modal form to create a person or edit their profile; vacations and availability windows are edited on the person detail page. */
 export function PersonForm({
   person,
   people,
@@ -132,18 +139,20 @@ export function PersonForm({
       </div>
 
       <Field
-        label={`FTE capacity — ${(draft.fte_capacity * 100).toFixed(0)}%`}
-        hint="Baseline availability as a fraction of full-time"
+        label="Working days per week"
+        hint="FTE is derived from this; vacations are managed on the person's page."
       >
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={draft.fte_capacity}
-          onChange={(e) => set("fte_capacity", parseFloat(e.target.value))}
-          style={{ width: "100%" }}
-        />
+        <select
+          value={draft.working_days_per_week}
+          onChange={(e) => set("working_days_per_week", Number(e.target.value))}
+          style={selectStyle}
+        >
+          {WORKING_DAYS.map((days) => (
+            <option key={days} value={days}>
+              {days} {days === 1 ? "day" : "days"} — {(baseCapacity(days) * 100).toFixed(0)}% FTE
+            </option>
+          ))}
+        </select>
       </Field>
 
       <Field label="Skills" hint="Add skill ids from the catalog above.">
