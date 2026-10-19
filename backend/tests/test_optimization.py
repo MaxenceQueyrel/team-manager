@@ -46,7 +46,7 @@ def project_id(client, org_headers):
                 "role": "Backend Developer",
                 "seniority": Seniority.SENIOR,
                 "years_of_experience": float(i + 1),
-                "fte_capacity": 1.0,
+                "working_days_per_week": 5,
             },
             headers=org_headers,
         )

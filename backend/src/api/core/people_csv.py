@@ -9,6 +9,7 @@ from api.models.person import Person, PersonCreate
 
 _JSON_FIELDS = (
     "skills",
+    "vacations",
     "availability_windows",
     "preferences",
     "growth_targets",
@@ -20,7 +21,7 @@ FIELDNAMES = (
     "role",
     "seniority",
     "years_of_experience",
-    "fte_capacity",
+    "working_days_per_week",
     "manager_id",
     *_JSON_FIELDS,
 )
@@ -36,9 +37,10 @@ class PersonCsvRowError(ValueError):
 def encode_people_csv(people: list[Person]) -> str:
     """Encodes people as CSV text.
 
-    Scalar `PersonBase` fields become plain columns; `skills`,
+    Scalar `PersonBase` fields become plain columns; `skills`, `vacations`,
     `availability_windows`, `preferences`, `growth_targets`, and `affinities`
-    are each JSON-encoded into a single cell.
+    are each JSON-encoded into a single cell. The derived `base_capacity` is not
+    exported, since it is recomputed from `working_days_per_week` on import.
 
     Args:
         people: People to encode.
