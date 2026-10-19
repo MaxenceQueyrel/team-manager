@@ -12,7 +12,7 @@ from api.v1 import assignments as assignments_module
 from api.v1 import roles as roles_module
 from api.v1 import skills as skills_module
 from optimizer.availability import daily_availability
-from optimizer.models import AvailabilityWindow, DateRange, PersonInput
+from optimizer.models import AvailabilityWindow, DateRange
 
 router = APIRouter()
 repo: FileRepository[Person] = FileRepository("people", Person)
@@ -43,7 +43,7 @@ def list_people_availability(
             segments=[
                 AvailabilitySegment(start=seg_start, end=seg_end, ratio=ratio)
                 for seg_start, seg_end, ratio in daily_availability(
-                    _to_person_input(person),
+                    person.to_person_input(),
                     date_range,
                     _assignment_windows(person.id, organization_id),
                 )
@@ -61,20 +61,6 @@ def _assignment_windows(
         for a in assignments_module.repo.list(organization_id)
         if a.person_id == person_id
     ]
-
-
-def _to_person_input(person: Person) -> PersonInput:
-    return PersonInput(
-        id=person.id,
-        seniority=person.seniority,
-        years_of_experience=person.years_of_experience,
-        fte_capacity=person.fte_capacity,
-        skills=person.skills,
-        availability_windows=person.availability_windows,
-        preferences=person.preferences,
-        growth_targets=person.growth_targets,
-        affinities=person.affinities,
-    )
 
 
 @router.get("/", response_model=list[Person])

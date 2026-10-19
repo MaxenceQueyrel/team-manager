@@ -35,7 +35,7 @@ def _create_person(client, headers, **overrides):
         "role": "Backend Developer",
         "seniority": Seniority.SENIOR,
         "years_of_experience": 8.0,
-        "fte_capacity": 1.0,
+        "working_days_per_week": 5,
         **overrides,
     }
     _ensure_role(client, headers, payload["role"])
@@ -58,9 +58,10 @@ _CSV_FIELDNAMES = (
     "role",
     "seniority",
     "years_of_experience",
-    "fte_capacity",
+    "working_days_per_week",
     "manager_id",
     "skills",
+    "vacations",
     "availability_windows",
     "preferences",
     "growth_targets",
@@ -75,9 +76,10 @@ def _row_values(**overrides):
         "role": "Frontend Developer",
         "seniority": "mid",
         "years_of_experience": "4.0",
-        "fte_capacity": "1.0",
+        "working_days_per_week": "5",
         "manager_id": "",
         "skills": "[]",
+        "vacations": "[]",
         "availability_windows": "[]",
         "preferences": "[]",
         "growth_targets": "[]",
@@ -245,7 +247,14 @@ def test_import_does_not_recreate_an_existing_skill(client, org_headers):
 
 
 def test_export_round_trips_through_import(client, org_headers):
-    alice = _create_person(client, org_headers, name="Alice Martin")
+    vacation = {"start": "2026-07-01", "end": "2026-07-15"}
+    alice = _create_person(
+        client,
+        org_headers,
+        name="Alice Martin",
+        working_days_per_week=4,
+        vacations=[vacation],
+    )
     carol = _create_person(client, org_headers, name="Carol Diaz", role="Designer")
 
     export_response = client.get("/api/v1/people/export", headers=org_headers)
@@ -271,3 +280,6 @@ def test_export_round_trips_through_import(client, org_headers):
     ).json()
     assert imported_alice["name"] == "Alice Martin"
     assert imported_alice["role"] == "Backend Developer"
+    assert imported_alice["working_days_per_week"] == 4
+    assert imported_alice["vacations"] == [vacation]
+    assert imported_alice["base_capacity"] == 0.8

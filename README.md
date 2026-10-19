@@ -284,7 +284,7 @@ Effective availability is the day-weighted average of the person's FTE windows a
 
 $$\text{avail}_i = \frac{\displaystyle\sum_{d \in \mathcal{D}} \text{ratio}_i(d)}{|\mathcal{D}|}$$
 
-where $\mathcal{D}$ is the union of all project date-range days and $\text{ratio}_i(d)$ comes from the person's `availability_windows`, falling back to `fte_capacity` for uncovered days.
+where $\mathcal{D}$ is the union of all project date-range days and $\text{ratio}_i(d)$ is 0 on the person's `vacations` days, otherwise the lowest covering `availability_windows` ratio, otherwise the base ratio $\min(\text{working\_days\_per\_week} / 5, 1)$ minus the person's committed assignments on other projects (floored at 0).
 
 ### Phased projects
 
