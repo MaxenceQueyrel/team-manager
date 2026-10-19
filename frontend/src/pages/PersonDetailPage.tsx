@@ -14,10 +14,18 @@ import {
 } from "@/components/common/ui";
 import { AvailabilityEditor } from "@/components/editors/listEditors";
 import { PersonForm } from "@/components/people/PersonForm";
+import { VacationPicker } from "@/components/people/VacationPicker";
 import { assignmentsApi, peopleApi } from "@/services/api";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type { Assignment, AvailabilitySegment, AvailabilityWindow, Person, Project } from "@/types";
+import type {
+  Assignment,
+  AvailabilitySegment,
+  AvailabilityWindow,
+  DateRange,
+  Person,
+  Project,
+} from "@/types";
 
 function message(e: unknown): string {
   if (typeof e === "object" && e && "message" in e)
@@ -60,6 +68,8 @@ export default function PersonDetailPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [savingWindows, setSavingWindows] = useState(false);
+  const [vacations, setVacations] = useState<DateRange[]>([]);
+  const [savingVacations, setSavingVacations] = useState(false);
 
   useEffect(() => {
     fetchPeople();
@@ -87,9 +97,10 @@ export default function PersonDetailPage() {
 
   useEffect(() => {
     setWindows(person?.availability_windows ?? []);
+    setVacations(person?.vacations ?? []);
   }, [person]);
 
-  // Depends on `person` so the timeline refreshes after windows or FTE capacity are saved.
+  // Depends on `person` so the timeline refreshes after windows, vacations or the working pattern are saved.
   useEffect(() => {
     if (!person) return;
     if (start > end) {
@@ -114,6 +125,22 @@ export default function PersonDetailPage() {
 
   const windowsDirty =
     person !== null && JSON.stringify(windows) !== JSON.stringify(person.availability_windows);
+
+  const vacationsDirty =
+    person !== null && JSON.stringify(vacations) !== JSON.stringify(person.vacations);
+
+  const saveVacations = async () => {
+    if (!person) return;
+    setSavingVacations(true);
+    setError(null);
+    try {
+      setPerson(await peopleApi.update(person.id, { ...person, vacations }));
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setSavingVacations(false);
+    }
+  };
 
   const saveWindows = async () => {
     if (!person) return;
@@ -173,7 +200,10 @@ export default function PersonDetailPage() {
           >
             <span>{person.role}</span>
             <Badge color={seniorityColors[person.seniority]}>{person.seniority}</Badge>
-            <span>{(person.fte_capacity * 100).toFixed(0)}% FTE</span>
+            <span>
+              {person.working_days_per_week} days/week · {(person.base_capacity * 100).toFixed(0)}%
+              FTE
+            </span>
           </div>
         </div>
         {canWritePeople && <Button onClick={() => setEditingProfile(true)}>Edit profile</Button>}
@@ -208,7 +238,12 @@ export default function PersonDetailPage() {
           start={start}
           end={end}
           rows={[{ id: person.id, label: person.name, segments }]}
-          overlays={[]}
+          overlays={person.vacations.map((v) => ({
+            key: `${v.start}-${v.end}`,
+            label: "Vacation",
+            start: v.start,
+            end: v.end,
+          }))}
         />
 
         <h3 style={{ margin: "1.5rem 0 0.5rem", fontSize: "1rem" }}>Assignments</h3>
@@ -232,10 +267,43 @@ export default function PersonDetailPage() {
           </>
         )}
 
+        <h3 style={{ margin: "1.5rem 0 0.25rem", fontSize: "1rem" }}>Vacation</h3>
+        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: colors.muted }}>
+          Days off count as 0% available, overriding windows and assignments.
+          {canWritePeople && " Click a day to toggle it; shift-click to toggle a range."}
+        </p>
+        {canWritePeople ? (
+          <>
+            <VacationPicker value={vacations} onChange={setVacations} />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              {vacationsDirty && (
+                <Button onClick={() => setVacations(person.vacations)}>Discard</Button>
+              )}
+              <Button
+                variant="primary"
+                disabled={!vacationsDirty || savingVacations}
+                onClick={saveVacations}
+              >
+                {savingVacations ? "Saving…" : "Save vacation"}
+              </Button>
+            </div>
+          </>
+        ) : person.vacations.length === 0 ? (
+          <p style={{ color: colors.muted, margin: 0 }}>None.</p>
+        ) : (
+          <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.85rem" }}>
+            {person.vacations.map((v) => (
+              <li key={`${v.start}-${v.end}`}>
+                {v.start} → {v.end}
+              </li>
+            ))}
+          </ul>
+        )}
+
         <h3 style={{ margin: "1.5rem 0 0.25rem", fontSize: "1rem" }}>Availability windows</h3>
         <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: colors.muted }}>
-          Exceptions to FTE capacity for specific date spans (e.g. leave). They take precedence over
-          assignments.
+          Exceptions to the working pattern for specific date spans (e.g. a part-time month). They
+          take precedence over assignments.
         </p>
         {canWritePeople ? (
           <>

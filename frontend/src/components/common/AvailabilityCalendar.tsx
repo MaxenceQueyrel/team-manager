@@ -45,7 +45,7 @@ export function daysBetween(startIso: string, endIso: string): number {
   );
 }
 
-function enumerateDays(startIso: string, endIso: string): string[] {
+export function enumerateDays(startIso: string, endIso: string): string[] {
   const count = daysBetween(startIso, endIso) + 1;
   const days: string[] = [];
   const cursor = parseISODate(startIso);

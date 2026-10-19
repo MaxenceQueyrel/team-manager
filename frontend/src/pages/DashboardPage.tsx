@@ -15,7 +15,7 @@ export default function DashboardPage() {
     fetchSkills();
   }, [fetchPeople, fetchProjects, fetchTeams, fetchSkills]);
 
-  const totalCapacity = people.reduce((sum, p) => sum + p.fte_capacity, 0);
+  const totalCapacity = people.reduce((sum, p) => sum + p.base_capacity, 0);
 
   return (
     <div>
