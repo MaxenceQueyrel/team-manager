@@ -18,7 +18,6 @@ import type { OrganizationMembership } from "@/types";
 
 function membershipSummary(org: OrganizationMembership): string {
   const role = org.role === "owner" ? "Owner" : "Contributor";
-  if (org.member_count === undefined) return role;
   return `${role} · ${org.member_count} ${org.member_count === 1 ? "member" : "members"}`;
 }
 
@@ -118,7 +117,7 @@ function OrganizationSwitcher() {
             className="menu-item"
             onClick={() => {
               setOpen(false);
-              navigate("/organization");
+              navigate("/organization", { state: { newOrganization: true } });
             }}
           >
             <Plus size={16} aria-hidden style={{ color: colors.muted }} />
