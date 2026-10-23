@@ -124,7 +124,7 @@ export function VacationPicker({
                 fontSize: "0.8rem",
                 cursor: "pointer",
                 border: `1px solid ${off ? ratioColor(0) : colors.borderStrong}`,
-                background: off ? ratioColor(0) : isWeekend(day) ? colors.light : "#fff",
+                background: off ? ratioColor(0) : isWeekend(day) ? colors.light : colors.surface,
                 color: off ? "#fff" : colors.text,
                 fontWeight: anchor === day ? 700 : 400,
               }}

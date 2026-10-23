@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Badge, Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { Button, Card, colors, Field, inputStyle, Pill } from "@/components/common/ui";
 import { organizationsApi } from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
 import type { OrganizationDetail } from "@/types";
@@ -149,7 +149,7 @@ export default function OrganizationPage() {
               >
                 <span>{m.email}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Badge color={m.role === "owner" ? colors.primary : colors.muted}>{m.role}</Badge>
+                  <Pill tone={m.role === "owner" ? "primary" : "neutral"}>{m.role}</Pill>
                   {isOwner && m.user_id !== user?.id && (
                     <Button
                       variant="ghost"

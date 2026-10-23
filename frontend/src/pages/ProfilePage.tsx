@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, colors, Field, inputStyle } from "@/components/common/ui";
+import { Button, Card, colors, Field, inputStyle, Pill } from "@/components/common/ui";
 import { useAuthStore } from "@/store/authStore";
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
@@ -57,7 +57,7 @@ export default function ProfilePage() {
         <InfoRow label="Roles">
           <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
             {user.roles.length > 0 ? (
-              user.roles.map((role) => <Badge key={role}>{role}</Badge>)
+              user.roles.map((role) => <Pill key={role}>{role}</Pill>)
             ) : (
               <span style={{ color: colors.muted }}>—</span>
             )}

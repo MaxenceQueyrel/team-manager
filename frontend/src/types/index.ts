@@ -212,6 +212,7 @@ export interface Organization {
 // Membership is many-to-many, so a user's role lives per-organization rather than on User.
 export interface OrganizationMembership extends Organization {
   role: OrganizationRole;
+  member_count?: number; // optional until the backend lists it (#111)
 }
 
 export interface OrganizationMember {
