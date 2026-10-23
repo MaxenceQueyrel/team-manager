@@ -1,7 +1,13 @@
 import { useEffect, useId, useState } from "react";
-import { daysBetween, enumerateDays } from "@/components/common/AvailabilityCalendar";
+import {
+  addDays,
+  daysBetween,
+  enumerateDays,
+  isoToday,
+  MONTH_NAMES,
+  mondayOf,
+} from "@/components/common/dates";
 import { Card, colors, Field, fonts, inputStyle, Tabs } from "@/components/common/ui";
-import { addDays, MONTHS, mondayOf, todayISO } from "@/components/people/dates";
 import { errorMessage, peopleApi } from "@/services/api";
 import type { AvailabilitySegment, Person } from "@/types";
 
@@ -79,7 +85,7 @@ function monthLabels(weeks: Week[]): (string | null)[] {
     if (!starts[i]) return null;
     const next = starts.indexOf(true, i + 1);
     const span = (next === -1 ? weeks.length : next) - i;
-    const name = MONTHS[Number(week.start.slice(5, 7)) - 1];
+    const name = MONTH_NAMES[Number(week.start.slice(5, 7)) - 1];
     return span < 3 ? name.slice(0, 3) : name;
   });
 }
@@ -105,11 +111,11 @@ function visibleRange(
 export function WeeklyAvailability({ person }: { person: Person }) {
   const headingId = useId();
   const [choice, setChoice] = useState<RangeChoice>("3m");
-  const [custom, setCustom] = useState(() => ({ from: todayISO(), to: addDays(todayISO(), 90) }));
+  const [custom, setCustom] = useState(() => ({ from: isoToday(), to: addDays(isoToday(), 90) }));
   const [segments, setSegments] = useState<AvailabilitySegment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const thisWeek = mondayOf(todayISO());
+  const thisWeek = mondayOf(isoToday());
   const range = visibleRange(choice, custom, thisWeek);
   const start = range?.start ?? "";
   const end = range?.end ?? "";

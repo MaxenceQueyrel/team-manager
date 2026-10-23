@@ -1,7 +1,8 @@
 import { Columns2 } from "lucide-react";
 import { type CSSProperties, useId, useState } from "react";
+import { formatDay } from "@/components/common/dates";
 import { Button, Card, colors, Modal } from "@/components/common/ui";
-import { formatDay, formatFte, staffingBaseline } from "@/components/projects/staffing";
+import { formatFte, staffingBaseline } from "@/components/projects/staffing";
 import type { AssignedMember, Assignment, Person, Team } from "@/types";
 
 const memberKey = (m: AssignedMember) => `${m.person_id}|${m.phase_id}`;

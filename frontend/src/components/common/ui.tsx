@@ -18,7 +18,7 @@ import {
   useState,
 } from "react";
 import { Link, NavLink } from "react-router-dom";
-import type { Priority, Seniority } from "@/types";
+import type { OrganizationRole, Priority, Seniority } from "@/types";
 
 /** Design tokens as CSS `var()` references; the values live in `index.css`. */
 export const colors = {
@@ -290,6 +290,18 @@ export const seniorityTones: Record<Seniority, PillTone> = {
   lead: "primary",
 };
 
+export const seniorityLabels: Record<Seniority, string> = {
+  junior: "Junior",
+  mid: "Mid",
+  senior: "Senior",
+  lead: "Lead",
+};
+
+export const roleLabels: Record<OrganizationRole, string> = {
+  owner: "Owner",
+  contributor: "Member",
+};
+
 // Pastel background with a matching ink, picked per name so a person keeps one tint everywhere.
 const avatarPalette = [
   { background: "#e6e8fb", color: "#3b4bdb" },
@@ -308,7 +320,7 @@ function avatarColors(name: string) {
 }
 
 /** Up to two uppercase initials; an email uses its local part ("ada.lovelace@x.io" → "AL"). */
-export function initials(name: string): string {
+function initials(name: string): string {
   const words = name
     .split("@")[0]
     .split(/[\s._-]+/)

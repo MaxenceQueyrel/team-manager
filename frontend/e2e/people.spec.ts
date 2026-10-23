@@ -148,7 +148,8 @@ test("editing an availability window on the detail page updates the weekly strip
   await expect(page.getByTitle("Week of 2026-01-05: partly booked, 25% free")).toBeVisible();
   await expect(page.getByTitle("Week of 2026-01-12: free", { exact: true })).toBeVisible();
   const timeOff = page.getByRole("region", { name: "Time off & exceptions" });
-  await expect(timeOff.getByText("5 Jan → 11 Jan 2026")).toBeVisible();
+  // Spans only carry their year once it differs from the current one.
+  await expect(timeOff.getByText(/^5 Jan( 2026)? → 11 Jan( 2026)?$/)).toBeVisible();
   await expect(timeOff.getByText("0.25 FTE")).toBeVisible();
 
   await page.goBack();
@@ -164,7 +165,7 @@ test("working days per week derives the FTE shown on the roster and detail page"
 
   const row = page.getByRole("row", { name });
   const fteCell = row.getByRole("cell").nth(3);
-  await expect(fteCell).toHaveText("1.0");
+  await expect(fteCell).toHaveText("1");
 
   await row.getByRole("button", { name: `Actions for ${name}` }).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
@@ -239,7 +240,7 @@ test("an assigned person shows reduced availability on their detail page", async
 
   const assignments = page.getByRole("region", { name: "Assignments" });
   await expect(assignments.getByText("Not on any project right now")).toBeVisible();
-  await expect(assignments.getByText("1 Jan → 10 Jan 2026 · 10 days")).toBeVisible();
+  await expect(assignments.getByText(/^1 Jan( 2026)? → 10 Jan( 2026)? · 10 days$/)).toBeVisible();
   await assignments.getByRole("link", { name: projectName }).click();
   await expect(page).toHaveURL(/\/projects\/[^/]+$/);
   await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();

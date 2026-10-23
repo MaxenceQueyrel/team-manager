@@ -3,15 +3,9 @@ import { useState } from "react";
 import { Button, Card, colors, Menu, type MenuItem } from "@/components/common/ui";
 import { type CatalogItem, type CatalogKind, CatalogModal } from "@/components/people/CatalogModal";
 import { formatHeadcount } from "@/components/projects/staffing";
-import { rolesApi, skillsApi } from "@/services/api";
+import { errorMessage, rolesApi, skillsApi } from "@/services/api";
 import { useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-
-function message(e: unknown): string {
-  if (typeof e === "object" && e && "message" in e)
-    return String((e as { message: unknown }).message);
-  return String(e);
-}
 
 const headerCell = {
   padding: "0.6rem 0.75rem",
@@ -42,18 +36,13 @@ export default function PeopleCatalogView() {
     { kind, item }: { kind: CatalogKind; item?: CatalogItem },
     data: { id: string; description: string },
   ) => {
-    setError(null);
-    try {
-      if (item) {
-        await (kind === "role" ? rolesApi : skillsApi).update(item.id, data);
-        await (kind === "role" ? fetchRoles() : fetchSkills());
-      } else if (kind === "role") {
-        await createRole(data);
-      } else {
-        await createSkill(data);
-      }
-    } catch (e) {
-      setError(message(e));
+    if (item) {
+      await (kind === "role" ? rolesApi : skillsApi).update(item.id, data);
+      await (kind === "role" ? fetchRoles() : fetchSkills());
+    } else if (kind === "role") {
+      await createRole(data);
+    } else {
+      await createSkill(data);
     }
     setEditing(null);
   };
@@ -66,7 +55,7 @@ export default function PeopleCatalogView() {
       await (kind === "role" ? rolesApi : skillsApi).delete(id);
       await (kind === "role" ? fetchRoles() : fetchSkills());
     } catch (e) {
-      setError(message(e));
+      setError(errorMessage(e));
     }
   };
 

@@ -1,5 +1,6 @@
+import { formatDay, formatDuration, MONTHS } from "@/components/common/dates";
 import { colors } from "@/components/common/ui";
-import { assignedFte, formatDay, MONTHS, type StaffingLane } from "@/components/projects/staffing";
+import { assignedFte, type StaffingLane } from "@/components/projects/staffing";
 
 const DAY_MS = 86_400_000;
 const MAX_TICKS = 6;
@@ -26,11 +27,6 @@ function monthTicks(firstDay: number, lastDay: number): { day: number; label: st
   // The sidebar is narrow: keep a handful of labels so long projects stay legible.
   const step = Math.ceil(ticks.length / MAX_TICKS);
   return ticks.filter((_, i) => i % step === 0);
-}
-
-function formatDuration(days: number): string {
-  if (days < 14) return `${days} ${days === 1 ? "day" : "days"}`;
-  return `${Math.round(days / 7)} weeks`;
 }
 
 /** Date ranges and phases as bars on a month axis with a today marker, followed by the
@@ -177,7 +173,7 @@ export function PhaseTimeline({ lanes, today }: { lanes: StaffingLane[]; today: 
       </div>
       <TimelineFacts
         facts={[
-          ["Duration", formatDuration(endDay - startDay)],
+          ["Duration", formatDuration(firstDate, lastDate)],
           ["Phases", phasesLabel],
           ...(undated.length > 0
             ? [

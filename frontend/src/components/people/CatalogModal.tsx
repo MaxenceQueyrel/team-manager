@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, colors, Field, inputStyle, Modal } from "@/components/common/ui";
+import { errorMessage } from "@/services/api";
 import type { Role, Skill } from "@/types";
 
 export type CatalogKind = "role" | "skill";
@@ -21,14 +22,18 @@ export function CatalogModal({
 }) {
   const [draft, setDraft] = useState({ id: item?.id ?? "", description: item?.description ?? "" });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const normalizedId = draft.id.trim();
   const duplicate = !item && items.some((existing) => existing.id === normalizedId);
   const noun = kind === "role" ? "role" : "skill";
 
   const submit = async () => {
     setSaving(true);
+    setError(null);
     try {
       await onSave({ id: normalizedId, description: draft.description.trim() });
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -86,6 +91,11 @@ export function CatalogModal({
       {duplicate && (
         <p style={{ margin: "0.5rem 0 0", color: colors.danger, fontSize: "0.8rem" }}>
           That id already exists.
+        </p>
+      )}
+      {error && (
+        <p role="alert" style={{ margin: "0.5rem 0 0", color: colors.danger, fontSize: "0.8rem" }}>
+          {error}
         </p>
       )}
     </Modal>

@@ -28,7 +28,7 @@ test("assigning a person to a project from their page lists the assignment", asy
   await page.getByRole("button", { name: "Assign", exact: true }).click();
 
   const row = assignments.getByRole("link", { name: projectName });
-  await expect(row).toContainText("7 Jan → 3 Feb 2030 · 4 weeks");
+  await expect(row).toContainText("7 Jan 2030 → 3 Feb 2030 · 4 weeks");
   await expect(row).toContainText("Half-time");
   await expect(assignments.getByText("Not on any project right now")).toHaveCount(0);
 });

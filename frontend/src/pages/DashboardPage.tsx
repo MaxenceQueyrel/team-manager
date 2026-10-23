@@ -10,7 +10,16 @@ import {
 import { type CSSProperties, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { enumerateDays } from "@/components/common/AvailabilityCalendar";
+import {
+  addDays,
+  enumerateDays,
+  formatDay,
+  formatSpan,
+  isoToday,
+  MONTH_NAMES,
+  mondayOf,
+  parseISODate,
+} from "@/components/common/dates";
 import {
   Avatar,
   Button,
@@ -21,8 +30,7 @@ import {
   Pill,
   StatTile,
 } from "@/components/common/ui";
-import { addDays, formatDay, MONTHS, mondayOf } from "@/components/people/dates";
-import { FREE_HORIZON_DAYS } from "@/components/people/PeopleWorkspace";
+import { FREE_HORIZON_DAYS, freeNextDays } from "@/components/people/PeopleWorkspace";
 import { PersonForm } from "@/components/people/PersonForm";
 import {
   STATUS_STYLES,
@@ -35,10 +43,9 @@ import {
   fillTones,
   formatFte,
   formatHeadcount,
-  formatSpan,
-  isoToday,
   needsStaffing,
   type ProjectStatus,
+  projectFill,
   projectSpan,
   projectStatus,
   projectStatusLabels,
@@ -109,16 +116,8 @@ interface PersonWeeks {
 }
 
 function longDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
-}
-
-function averageFree(segments: AvailabilitySegment[], days: string[]): number {
-  const total = days.reduce(
-    (sum, day) => sum + (segments.find((s) => s.start <= day && day <= s.end)?.ratio ?? 0),
-    0,
-  );
-  return total / days.length;
+  const date = parseISODate(iso);
+  return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]}`;
 }
 
 function seniorityBreakdown(people: Person[]): string {
@@ -204,11 +203,24 @@ function attentionItems(
     });
   }
 
-  // Proposals only matter while there is still staffing to decide on.
-  for (const { project, needsStaffing } of rows) {
+  // Proposals only matter while there is still staffing to decide on. Without any, a running
+  // project short of FTE still needs staffing; unstaffed and ended ones have their rows above.
+  for (const { project, staffed, total, status, needsStaffing, span } of rows) {
     if (!needsStaffing) continue;
     const count = teams.filter((t) => t.project_id === project.id).length;
-    if (count === 0) continue;
+    if (count === 0) {
+      if (status !== "running") continue;
+      items.push({
+        key: `partly-staffed-${project.id}`,
+        icon: UserPlus,
+        tone: "warning",
+        title: `${project.name} is partly staffed`,
+        detail: `${formatFte(staffed)} / ${formatFte(total)} FTE staffed · ${span ? formatSpan(span, today) : "no dates set"}`,
+        action: "Staff it",
+        to: `/projects/${encodeURIComponent(project.id)}`,
+      });
+      continue;
+    }
     items.push({
       key: `proposals-${project.id}`,
       icon: SlidersHorizontal,
@@ -304,8 +316,7 @@ export default function DashboardPage() {
 
   const freeByPerson = useMemo(() => {
     if (!availability) return null;
-    const horizon = enumerateDays(today, addDays(today, FREE_HORIZON_DAYS));
-    return new Map(people.map((p) => [p.id, averageFree(availability.get(p.id) ?? [], horizon)]));
+    return new Map(people.map((p) => [p.id, freeNextDays(availability.get(p.id) ?? [], today)]));
   }, [availability, people, today]);
 
   const capacity = people.reduce((sum, p) => sum + p.base_capacity, 0);
@@ -567,7 +578,7 @@ function AttentionCard({ items }: { items: AttentionItem[] | null }) {
           }}
         >
           <CircleCheck size={18} aria-hidden />
-          All clear: every project is staffed and every skill is covered.
+          All clear: nothing needs a decision right now.
         </p>
       ) : (
         <>
@@ -801,7 +812,7 @@ function ProjectsCard({ rows, today }: { rows: ProjectRow[] | null; today: strin
       <div style={{ overflowX: "auto" }}>
         <ul style={{ listStyle: "none", margin: 0, padding: 0, minWidth: 640 }}>
           {shown.map(({ project, staffed, total, status, span }) => {
-            const fill = staffed >= total ? "complete" : staffed === 0 ? "empty" : "partial";
+            const fill = projectFill(staffed, total);
             return (
               <li key={project.id} style={rowGrid}>
                 <div style={{ minWidth: 0 }}>

@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { isoToday } from "@/components/common/dates";
 import { colors, Field, Modal, selectStyle } from "@/components/common/ui";
 import { AssignForm } from "@/components/projects/StaffingLaneCard";
-import { buildLanes } from "@/components/projects/staffing";
+import { buildLanes, isOpenForStaffing } from "@/components/projects/staffing";
 import { assignmentsApi, errorMessage } from "@/services/api";
 import type { Assignment, Person, Project } from "@/types";
 
-/** Picks a project (and phase, for phased projects), then assigns `person` to it with the
+/** Picks an open project (and phase, for phased projects), then assigns `person` to it with the
  * same form the project workspace uses. */
 export function AssignToProjectModal({
   person,
@@ -25,7 +26,10 @@ export function AssignToProjectModal({
   const project = projects.find((p) => p.id === projectId);
   const lanes = project ? buildLanes(project, []) : [];
   const lane = lanes.length === 1 ? lanes[0] : lanes.find((l) => l.key === laneKey);
-  const sortedProjects = [...projects].sort((a, b) => a.name.localeCompare(b.name));
+  const today = isoToday();
+  const openProjects = projects
+    .filter((p) => isOpenForStaffing(p, today))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Modal title="Assign to project" onClose={onClose}>
@@ -40,7 +44,7 @@ export function AssignToProjectModal({
           style={selectStyle}
         >
           <option value="">Select a project</option>
-          {sortedProjects.map((p) => (
+          {openProjects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>

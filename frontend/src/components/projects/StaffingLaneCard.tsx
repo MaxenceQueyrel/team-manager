@@ -1,6 +1,7 @@
 import { Check, CircleAlert, CircleCheck, Plus, Sparkles, UserPlus, X } from "lucide-react";
 import { type CSSProperties, useId, useState } from "react";
 import { Link } from "react-router-dom";
+import { formatSpan } from "@/components/common/dates";
 import {
   Avatar,
   Button,
@@ -12,11 +13,11 @@ import {
   Pill,
   StackedFillBar,
   selectStyle,
+  seniorityLabels,
 } from "@/components/common/ui";
 import {
   assignedFte,
   formatFte,
-  formatSpan,
   fteByPerson,
   missingSkills,
   type StaffingLane,
@@ -58,10 +59,6 @@ function joinRequirements(requirements: SkillRequirement[]): string {
   const parts = requirements.map((r) => `${r.id} ≥ ${r.min_level}`);
   if (parts.length < 2) return parts.join("");
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-}
-
-function capitalize(text: string): string {
-  return text[0].toUpperCase() + text.slice(1);
 }
 
 /** One phase (or the whole project): FTE headline, a per-person stacked bar, the skill
@@ -192,7 +189,7 @@ export function StaffingLaneCard({
               const name = nameOf(assignment.person_id);
               const details = [
                 person?.role,
-                person && capitalize(person.seniority),
+                person && seniorityLabels[person.seniority],
                 lane.nSlots === null && assignment.phase_id,
               ].filter(Boolean);
               return (

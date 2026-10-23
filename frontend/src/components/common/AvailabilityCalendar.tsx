@@ -1,5 +1,6 @@
 import { Fragment, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { enumerateDays, MONTHS, parseISODate } from "@/components/common/dates";
 import { colors } from "@/components/common/ui";
 import type { AvailabilitySegment } from "@/types";
 
@@ -17,44 +18,8 @@ export interface TimelineOverlay {
   end: string;
 }
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const CELL_SIZE = 22;
 const LABEL_COLUMN_WIDTH = 180;
-const MONTH_NAMES = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-function parseISODate(iso: string): Date {
-  return new Date(`${iso}T00:00:00Z`);
-}
-
-export function daysBetween(startIso: string, endIso: string): number {
-  return Math.round(
-    (parseISODate(endIso).getTime() - parseISODate(startIso).getTime()) / MS_PER_DAY,
-  );
-}
-
-export function enumerateDays(startIso: string, endIso: string): string[] {
-  const count = daysBetween(startIso, endIso) + 1;
-  const days: string[] = [];
-  const cursor = parseISODate(startIso);
-  for (let i = 0; i < count; i++) {
-    days.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return days;
-}
 
 /** Assigns each day in `days` the ratio of the segment covering it, relying on segments being sorted and contiguous. */
 function dailyRatios(days: string[], segments: AvailabilitySegment[]): (number | null)[] {
@@ -183,7 +148,7 @@ export function AvailabilityCalendar({
               <span
                 style={{ fontSize: "0.6rem", visibility: isFirstOfMonth ? "visible" : "hidden" }}
               >
-                {MONTH_NAMES[date.getUTCMonth()]}
+                {MONTHS[date.getUTCMonth()]}
               </span>
               <span>{date.getUTCDate()}</span>
             </div>

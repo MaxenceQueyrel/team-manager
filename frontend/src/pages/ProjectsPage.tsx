@@ -2,6 +2,7 @@ import { ChevronRight, Download, Plus, Upload } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
+import { daysBetween, formatSpan, isoToday } from "@/components/common/dates";
 import {
   AvatarStack,
   Button,
@@ -19,10 +20,9 @@ import {
   buildLanes,
   fillTones,
   formatFte,
-  formatSpan,
-  isoToday,
   needsStaffing,
   type ProjectStatus,
+  projectFill,
   projectSpan,
   projectStatus,
   projectStatusLabels,
@@ -89,10 +89,6 @@ function relativeDays(days: number): string {
   if (abs < 45) return relativeTime.format(days, "day");
   if (abs < 365) return relativeTime.format(Math.round(days / 30), "month");
   return relativeTime.format(Math.round(days / 365), "year");
-}
-
-function daysBetween(from: string, to: string): number {
-  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
 }
 
 function spanTiming(span: DateRange, today: string): string {
@@ -354,7 +350,7 @@ function ProjectListRow({
   onSetDates?: () => void;
 }) {
   const { project, staffed, total, status, span, members } = row;
-  const fill = staffed >= total ? "complete" : staffed === 0 ? "empty" : "partial";
+  const fill = projectFill(staffed, total);
 
   return (
     <li

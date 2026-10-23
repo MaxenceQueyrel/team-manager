@@ -2,11 +2,11 @@ import { CircleAlert, CircleCheck, Download, Plus, Upload, X } from "lucide-reac
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { daysBetween } from "@/components/common/AvailabilityCalendar";
+import { addDays, daysBetween, isoToday } from "@/components/common/dates";
 import { Button, colors, IconButton, PageHeader, Tabs } from "@/components/common/ui";
 import { PersonForm } from "@/components/people/PersonForm";
 import { formatFte, formatHeadcount } from "@/components/projects/staffing";
-import { peopleApi } from "@/services/api";
+import { errorMessage, peopleApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
@@ -21,25 +21,17 @@ export interface PeopleWorkspaceContext {
   editPerson: (person: Person) => void;
 }
 
-function message(e: unknown): string {
-  if (typeof e === "object" && e && "message" in e)
-    return String((e as { message: unknown }).message);
-  return String(e);
-}
-
-function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function averageRatio(segments: AvailabilitySegment[]): number {
-  let weighted = 0;
-  let days = 0;
+/** Average FTE free per day over the FREE_HORIZON_DAYS days starting `today`, from
+ * availability segments that may extend past either end of that window. */
+export function freeNextDays(segments: AvailabilitySegment[], today: string): number {
+  const horizonEnd = addDays(today, FREE_HORIZON_DAYS - 1);
+  let total = 0;
   for (const segment of segments) {
-    const length = daysBetween(segment.start, segment.end) + 1;
-    weighted += segment.ratio * length;
-    days += length;
+    const start = segment.start > today ? segment.start : today;
+    const end = segment.end < horizonEnd ? segment.end : horizonEnd;
+    if (start <= end) total += (daysBetween(start, end) + 1) * segment.ratio;
   }
-  return days === 0 ? 0 : weighted / days;
+  return total / FREE_HORIZON_DAYS;
 }
 
 function summaryLine(people: Person[], freeRatios: Map<string, number>): string {
@@ -92,15 +84,15 @@ export default function PeopleWorkspace() {
   // Re-run whenever the roster is refetched so a saved working-pattern or vacation change shows up.
   useEffect(() => {
     if (people.length === 0) return;
-    const today = new Date();
-    const horizon = new Date(today);
-    horizon.setDate(horizon.getDate() + FREE_HORIZON_DAYS);
+    const today = isoToday();
     peopleApi
-      .availability(toISODate(today), toISODate(horizon))
+      .availability(today, addDays(today, FREE_HORIZON_DAYS - 1))
       .then((availability) =>
-        setFreeRatios(new Map(availability.map((a) => [a.person_id, averageRatio(a.segments)]))),
+        setFreeRatios(
+          new Map(availability.map((a) => [a.person_id, freeNextDays(a.segments, today)])),
+        ),
       )
-      .catch((e) => setError(message(e)));
+      .catch((e) => setError(errorMessage(e)));
   }, [people]);
 
   const handleImportFile = async (file: File) => {
@@ -110,7 +102,7 @@ export default function PeopleWorkspace() {
     try {
       setImportSummary(await importPeople(file));
     } catch (e) {
-      setError(message(e));
+      setError(errorMessage(e));
     } finally {
       setImporting(false);
     }
@@ -121,7 +113,7 @@ export default function PeopleWorkspace() {
     try {
       downloadBlob(await peopleApi.exportCsv(), "people.csv");
     } catch (e) {
-      setError(message(e));
+      setError(errorMessage(e));
     } finally {
       setExporting(false);
     }

@@ -3,7 +3,13 @@ import { ChevronRight, Pencil, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { daysBetween } from "@/components/common/AvailabilityCalendar";
+import {
+  addDays,
+  formatDay,
+  formatDuration,
+  formatSpan,
+  isoToday,
+} from "@/components/common/dates";
 import {
   Avatar,
   Button,
@@ -13,34 +19,23 @@ import {
   PageHeader,
   Pill,
   StatTile,
+  seniorityLabels,
   seniorityTones,
 } from "@/components/common/ui";
 import { AssignToProjectModal } from "@/components/people/AssignToProjectModal";
-import {
-  addDays,
-  formatDay,
-  formatDuration,
-  formatSpan,
-  todayISO,
-} from "@/components/people/dates";
+import { FREE_HORIZON_DAYS, freeNextDays } from "@/components/people/PeopleWorkspace";
 import { PersonForm } from "@/components/people/PersonForm";
 import { SkillsModal } from "@/components/people/SkillsModal";
 import { TimeOffModal } from "@/components/people/TimeOffModal";
 import { WeeklyAvailability } from "@/components/people/WeeklyAvailability";
 import { commitmentForRatio } from "@/components/projects/StaffingLaneCard";
-import { buildLanes } from "@/components/projects/staffing";
+import { buildLanes, formatFte, isOpenForStaffing } from "@/components/projects/staffing";
 import { assignmentsApi, errorMessage, peopleApi } from "@/services/api";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { Assignment, Person, Project } from "@/types";
 
 type Dialog = "profile" | "assign" | "skills" | "time-off" | null;
-
-/** An FTE amount with at least one decimal: 1 → "1.0", 0.25 → "0.25". */
-function formatFte(fte: number): string {
-  const hundredths = Math.round(fte * 100);
-  return (hundredths / 100).toFixed(hundredths % 10 === 0 ? 1 : 2);
-}
 
 function joinList(items: string[]): string {
   if (items.length < 2) return items.join("");
@@ -51,11 +46,8 @@ function joinList(items: string[]): string {
 function skillMatchHint(person: Person, projects: Project[], today: string): string {
   let best: { project: Project; skills: string[] } | null = null;
   for (const project of projects) {
+    if (!isOpenForStaffing(project, today)) continue;
     const lanes = buildLanes(project, []);
-    const open = lanes.some(
-      (lane) => lane.dateRanges.length === 0 || lane.dateRanges.some((r) => r.end >= today),
-    );
-    if (!open) continue;
     const matched = new Set<string>();
     for (const lane of lanes) {
       for (const req of lane.skillRequirements) {
@@ -91,7 +83,7 @@ export default function PersonDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [freeNext30, setFreeNext30] = useState<number | null>(null);
+  const [freeSoon, setFreeSoon] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPeople();
@@ -120,23 +112,18 @@ export default function PersonDetailPage() {
   // Depends on `person` so the figure refreshes after time off or assignments change.
   useEffect(() => {
     if (!person) return;
-    const start = todayISO();
-    const end = addDays(start, 29);
-    setFreeNext30(null);
+    const today = isoToday();
+    setFreeSoon(null);
     peopleApi
-      .availability(start, end)
+      .availability(today, addDays(today, FREE_HORIZON_DAYS - 1))
       .then((all) => {
         const segments = all.find((a) => a.person_id === person.id)?.segments ?? [];
-        const dayRatios = segments.reduce(
-          (sum, s) => sum + (daysBetween(s.start, s.end) + 1) * s.ratio,
-          0,
-        );
-        setFreeNext30(dayRatios / 30);
+        setFreeSoon(freeNextDays(segments, today));
       })
       .catch((e) => setError(errorMessage(e)));
   }, [person]);
 
-  const today = todayISO();
+  const today = isoToday();
   const { current, past } = useMemo(() => {
     const sorted = [...assignments].sort((a, b) => a.start.localeCompare(b.start));
     return {
@@ -178,7 +165,7 @@ export default function PersonDetailPage() {
         subtitle={
           <span style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
             <span>{person.role}</span>
-            <Pill tone={seniorityTones[person.seniority]}>{person.seniority}</Pill>
+            <Pill tone={seniorityTones[person.seniority]}>{seniorityLabels[person.seniority]}</Pill>
             <span>
               {years} {years === 1 ? "yr" : "yrs"} experience
             </span>
@@ -216,11 +203,11 @@ export default function PersonDetailPage() {
           sub={`${person.working_days_per_week} ${person.working_days_per_week === 1 ? "day" : "days"}/week`}
         />
         <StatTile
-          label="Free next 30 days"
+          label={`Free next ${FREE_HORIZON_DAYS} days`}
           mono
-          value={freeNext30 === null ? "…" : formatFte(freeNext30)}
+          value={freeSoon === null ? "…" : formatFte(freeSoon)}
           unit="FTE"
-          accent={freeNext30 === 0 ? "warning" : "success"}
+          accent={freeSoon === 0 ? "warning" : "success"}
         />
         <StatTile label="Active projects" mono value={activeProjects.size} />
         <StatTile
@@ -241,7 +228,7 @@ export default function PersonDetailPage() {
           }
           sub={
             lastProject &&
-            `ended ${formatDay(lastProject.end, lastProject.end.slice(0, 4) !== today.slice(0, 4))}`
+            `ended ${formatDay(lastProject.end, !lastProject.end.startsWith(today.slice(0, 4)))}`
           }
         />
       </div>
@@ -282,7 +269,7 @@ export default function PersonDetailPage() {
                 </div>
               </div>
             ) : (
-              <AssignmentList assignments={current} projectName={projectName} />
+              <AssignmentList assignments={current} projectName={projectName} today={today} />
             )}
             {past.length > 0 && (
               <>
@@ -295,7 +282,7 @@ export default function PersonDetailPage() {
                 >
                   Past
                 </div>
-                <AssignmentList assignments={past} projectName={projectName} />
+                <AssignmentList assignments={past} projectName={projectName} today={today} />
               </>
             )}
           </SectionCard>
@@ -328,7 +315,7 @@ export default function PersonDetailPage() {
               Leave, part-time weeks or any period where {person.name} works less than the usual{" "}
               {formatFte(person.base_capacity)} FTE. These override project assignments.
             </p>
-            <TimeOffList person={person} />
+            <TimeOffList person={person} today={today} />
             {canWritePeople && (
               <Button
                 icon={Plus}
@@ -435,9 +422,11 @@ function SectionCard({
 function AssignmentList({
   assignments,
   projectName,
+  today,
 }: {
   assignments: Assignment[];
   projectName: (projectId: string) => string;
+  today: string;
 }) {
   return (
     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -465,7 +454,7 @@ function AssignmentList({
                 className="mono"
                 style={{ marginTop: 2, fontSize: "0.85rem", color: colors.muted }}
               >
-                {formatSpan(a.start, a.end)} · {formatDuration(a.start, a.end)}
+                {formatSpan(a, today)} · {formatDuration(a.start, a.end)}
               </div>
             </div>
             <Pill tone="primary">{commitmentForRatio(a.ratio)}</Pill>
@@ -520,7 +509,7 @@ function SkillLevels({ person }: { person: Person }) {
   );
 }
 
-function TimeOffList({ person }: { person: Person }) {
+function TimeOffList({ person, today }: { person: Person; today: string }) {
   const entries = [
     ...person.vacations.map((v) => ({ ...v, label: "Time off" })),
     ...person.availability_windows.map((w) => ({ ...w, label: `${formatFte(w.ratio)} FTE` })),
@@ -541,7 +530,7 @@ function TimeOffList({ person }: { person: Person }) {
           }}
         >
           <span className="mono" style={{ fontSize: "0.85rem" }}>
-            {formatSpan(entry.start, entry.end)}
+            {formatSpan(entry, today)}
           </span>
           <Pill tone={entry.label === "Time off" ? "warning" : "neutral"}>{entry.label}</Pill>
         </li>

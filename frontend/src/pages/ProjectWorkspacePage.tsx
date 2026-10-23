@@ -13,6 +13,7 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
+import { formatDay, isoToday } from "@/components/common/dates";
 import {
   Button,
   Card,
@@ -36,9 +37,7 @@ import { ProposalsCard } from "@/components/projects/ProposalsCard";
 import { StaffingLaneCard } from "@/components/projects/StaffingLaneCard";
 import {
   buildLanes,
-  formatDay,
   formatFte,
-  isoToday,
   projectSpan,
   projectStatus,
   projectStatusLabels,
@@ -141,7 +140,7 @@ export default function ProjectWorkspacePage() {
   const { staffed, total } = staffedFte(lanes);
   const status = projectStatus(project, lanes, today);
   const span = projectSpan(project);
-  const endedButOpen = !project.completed_at && span !== null && span.end < today;
+  const endedButOpen = status === "ended";
   const phased = project.phases.length > 0;
   // The store keeps teams in creation order.
   const proposals = teams.filter((t) => t.project_id === project.id).reverse();

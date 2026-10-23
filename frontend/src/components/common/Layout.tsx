@@ -11,14 +11,20 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Avatar, colors, IconButton, popoverStyle, useDismiss } from "@/components/common/ui";
+import {
+  Avatar,
+  colors,
+  IconButton,
+  popoverStyle,
+  roleLabels,
+  useDismiss,
+} from "@/components/common/ui";
 import { useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { OrganizationMembership } from "@/types";
 
 function membershipSummary(org: OrganizationMembership): string {
-  const role = org.role === "owner" ? "Owner" : "Contributor";
-  return `${role} · ${org.member_count} ${org.member_count === 1 ? "member" : "members"}`;
+  return `${roleLabels[org.role]} · ${org.member_count} ${org.member_count === 1 ? "member" : "members"}`;
 }
 
 function LogoMark() {

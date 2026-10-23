@@ -12,14 +12,13 @@ import {
   Modal,
   PageHeader,
   Pill,
+  roleLabels,
   selectStyle,
 } from "@/components/common/ui";
 import { errorMessage, organizationsApi } from "@/services/api";
 import { useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { OrganizationDetail, OrganizationMembership, OrganizationRole } from "@/types";
-
-const roleLabels: Record<OrganizationRole, string> = { owner: "Owner", contributor: "Member" };
 
 const errorStyle: CSSProperties = {
   margin: "0.5rem 0 0",
@@ -484,7 +483,7 @@ export default function OrganizationPage() {
       <PageHeader
         leading={<Avatar name={organization.name} tone="solid" shape="square" size="lg" />}
         title={organization.name}
-        subtitle={`Organization settings · you're ${isOwner ? "the owner" : "a contributor"}`}
+        subtitle={`Organization settings · you're ${isOwner ? "the owner" : "a member"}`}
         actions={
           <Button icon={Plus} onClick={() => setCreating(true)}>
             New organization

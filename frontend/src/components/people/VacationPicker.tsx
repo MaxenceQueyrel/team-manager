@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { daysBetween, enumerateDays, ratioColor } from "@/components/common/AvailabilityCalendar";
+import { ratioColor } from "@/components/common/AvailabilityCalendar";
+import { daysBetween, enumerateDays } from "@/components/common/dates";
 import { Button, colors, inputStyle } from "@/components/common/ui";
 import type { DateRange } from "@/types";
 

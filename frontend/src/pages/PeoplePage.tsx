@@ -13,6 +13,7 @@ import {
   type MenuItem,
   Pill,
   SearchInput,
+  seniorityLabels,
   seniorityTones,
 } from "@/components/common/ui";
 import { type CatalogKind, CatalogModal } from "@/components/people/CatalogModal";
@@ -20,7 +21,7 @@ import {
   FREE_HORIZON_DAYS,
   type PeopleWorkspaceContext,
 } from "@/components/people/PeopleWorkspace";
-import { formatHeadcount } from "@/components/projects/staffing";
+import { formatFte, formatHeadcount } from "@/components/projects/staffing";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { Person, Seniority } from "@/types";
@@ -61,10 +62,6 @@ function filtersToParams(filters: DirectoryFilters): URLSearchParams {
   for (const s of filters.skills) params.append("skill", s);
   if (filters.availableOnly) params.set("available", "1");
   return params;
-}
-
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const headerCell = {
@@ -166,7 +163,7 @@ export default function PeoplePage() {
         />
         <FilterMenu
           label="Seniority"
-          options={SENIORITIES.map((s) => ({ value: s, label: capitalize(s) }))}
+          options={SENIORITIES.map((s) => ({ value: s, label: seniorityLabels[s] }))}
           selected={filters.seniorities}
           onChange={(selected) => update({ seniorities: selected as Seniority[] })}
         />
@@ -248,13 +245,13 @@ export default function PeoplePage() {
                       </div>
                     </td>
                     <td style={bodyCell}>
-                      <Pill tone={seniorityTones[p.seniority]}>{capitalize(p.seniority)}</Pill>
+                      <Pill tone={seniorityTones[p.seniority]}>{seniorityLabels[p.seniority]}</Pill>
                     </td>
                     <td style={{ ...bodyCell, whiteSpace: "nowrap" }} className="mono">
                       {p.years_of_experience} yrs
                     </td>
                     <td style={bodyCell} className="mono">
-                      {p.base_capacity.toFixed(1)}
+                      {formatFte(p.base_capacity)}
                     </td>
                     <td style={bodyCell}>
                       {free === undefined ? (
@@ -270,7 +267,7 @@ export default function PeoplePage() {
                             className="mono"
                             style={{ color: free > 0 ? colors.success : colors.muted }}
                           >
-                            {free.toFixed(1)}
+                            {formatFte(free)}
                           </span>
                         </div>
                       )}
