@@ -1,8 +1,31 @@
 import { isAxiosError } from "axios";
-import { useEffect, useState } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  Pencil,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
+import { formatDay, isoToday } from "@/components/common/dates";
+import {
+  Button,
+  Card,
+  colors,
+  IconButton,
+  Menu,
+  type MenuItem,
+  PageHeader,
+  Pill,
+  priorityIcons,
+  priorityTones,
+} from "@/components/common/ui";
 import {
   OPTIMIZATION_PANEL_WIDTH,
   OptimizationPanel,
@@ -10,34 +33,22 @@ import {
 import { PhaseTimeline } from "@/components/projects/PhaseTimeline";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { ProposalCard } from "@/components/projects/ProposalCard";
+import { ProposalsCard } from "@/components/projects/ProposalsCard";
 import { StaffingLaneCard } from "@/components/projects/StaffingLaneCard";
 import {
   buildLanes,
-  formatHeadcount,
+  formatFte,
+  projectSpan,
+  projectStatus,
+  projectStatusLabels,
+  projectStatusTones,
   staffedFte,
   staffingBaseline,
 } from "@/components/projects/staffing";
-import { assignmentsApi, projectsApi, teamsApi } from "@/services/api";
+import { assignmentsApi, errorMessage, projectsApi, teamsApi } from "@/services/api";
 import { knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
 import type { Assignment, OptimizationResponse, Project, Team, TeamProposal } from "@/types";
-
-function message(e: unknown): string {
-  if (typeof e === "object" && e && "message" in e)
-    return String((e as { message: unknown }).message);
-  return String(e);
-}
-
-function dateSpan(project: Project): string | null {
-  const ranges = [
-    ...project.date_ranges,
-    ...project.phases.flatMap((phase) => (phase.date_range ? [phase.date_range] : [])),
-  ];
-  if (ranges.length === 0) return null;
-  const start = ranges.map((r) => r.start).sort()[0];
-  const ends = ranges.map((r) => r.end).sort();
-  return `${start} → ${ends[ends.length - 1]}`;
-}
 
 // Expressed as a share of max_score rather than of the best score: the best score can be
 // zero or negative (negative affinities), while max_score is shared by the whole pool.
@@ -79,7 +90,8 @@ export default function ProjectWorkspacePage() {
   // Alternatives are only persisted when applied; remembering the saved id keeps a
   // retried apply (e.g. after an FTE conflict) from saving the same proposal twice.
   const [savedAlternativeIds, setSavedAlternativeIds] = useState<Record<number, string>>({});
-  const [showProposals, setShowProposals] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [savingCompletion, setSavingCompletion] = useState(false);
 
   useEffect(() => {
     fetchPeople();
@@ -93,17 +105,18 @@ export default function ProjectWorkspacePage() {
     setNotFound(false);
     setError(null);
     setResult(null);
+    setReviewingId(null);
     projectsApi
       .get(id)
       .then(setProject)
       .catch((e) => {
         if (isAxiosError(e) && e.response?.status === 404) setNotFound(true);
-        else setError(message(e));
+        else setError(errorMessage(e));
       });
     assignmentsApi
       .list({ project_id: id })
       .then(setAssignments)
-      .catch((e) => setError(message(e)));
+      .catch((e) => setError(errorMessage(e)));
   }, [id]);
 
   if (notFound) {
@@ -122,12 +135,17 @@ export default function ProjectWorkspacePage() {
     return error ? <p style={{ color: colors.danger }}>{error}</p> : <p>Loading…</p>;
   }
 
+  const today = isoToday();
   const lanes = buildLanes(project, assignments);
   const { staffed, total } = staffedFte(lanes);
-  const headcount = new Set(lanes.flatMap((lane) => lane.assignments.map((a) => a.person_id))).size;
-  const span = dateSpan(project);
+  const status = projectStatus(project, lanes, today);
+  const span = projectSpan(project);
+  const endedButOpen = status === "ended";
+  const phased = project.phases.length > 0;
   // The store keeps teams in creation order.
   const proposals = teams.filter((t) => t.project_id === project.id).reverse();
+  const reviewIndex = proposals.findIndex((t) => t.id === reviewingId);
+  const reviewed = reviewIndex === -1 ? null : proposals[reviewIndex];
 
   const applyTeam = async (teamId: string) => {
     await teamsApi.apply(teamId);
@@ -144,175 +162,276 @@ export default function ProjectWorkspacePage() {
     await applyTeam(teamId);
   };
 
+  // PUT replaces the whole project, so completion is saved with the full payload.
+  const setCompletedAt = async (completedAt: string | null) => {
+    const { id: projectId, ...draft } = project;
+    setSavingCompletion(true);
+    setError(null);
+    try {
+      await saveProject({ ...draft, completed_at: completedAt }, projectId);
+      setProject(await projectsApi.get(projectId));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSavingCompletion(false);
+    }
+  };
+
+  const menuItems: MenuItem[] = [];
+  if (canWriteProjects) {
+    menuItems.push(
+      project.completed_at
+        ? { label: "Reopen project", icon: RotateCcw, onSelect: () => setCompletedAt(null) }
+        : { label: "Mark complete", icon: CircleCheck, onSelect: () => setCompletedAt(today) },
+    );
+  }
+  if (canDeleteProjects) {
+    menuItems.push({
+      label: "Delete project",
+      icon: Trash2,
+      danger: true,
+      onSelect: async () => {
+        if (!confirm(`Delete ${project.name}?`)) return;
+        await deleteProject(project.id);
+        navigate("/projects");
+      },
+    });
+  }
+
   return (
     <div style={{ marginRight: optimizing ? OPTIMIZATION_PANEL_WIDTH : 0 }}>
-      <Link to="/projects" style={{ fontSize: "0.85rem", color: colors.muted }}>
-        ← Projects
-      </Link>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: "1rem",
-          flexWrap: "wrap",
-          margin: "0.5rem 0 1rem",
-        }}
-      >
-        <div>
-          <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-            <h1 style={{ margin: 0 }}>{project.name}</h1>
-            <Badge color={priorityColors[project.priority]}>{project.priority}</Badge>
-          </div>
-          {project.description && (
-            <p style={{ margin: "0.4rem 0 0", color: colors.muted }}>{project.description}</p>
-          )}
-          <div style={{ marginTop: "0.4rem", fontSize: "0.85rem", color: colors.muted }}>
-            {span ?? "No dates set"} · {staffed} / {total} FTE staffed ·{" "}
-            {formatHeadcount(headcount)}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: "0.4rem" }}>
-          {canRunOptimization && (
-            <Button variant="primary" onClick={() => setOptimizing(true)}>
-              Optimize staffing
-            </Button>
-          )}
-          {canWriteProjects && <Button onClick={() => setEditing(true)}>Edit</Button>}
-          {canDeleteProjects && (
-            <Button
-              variant="danger"
-              onClick={async () => {
-                if (!confirm(`Delete ${project.name}?`)) return;
-                await deleteProject(project.id);
-                navigate("/projects");
-              }}
-            >
-              Delete
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        breadcrumb={[{ label: "Projects", to: "/projects" }, { label: project.name }]}
+        title={project.name}
+        badges={
+          <>
+            <Pill tone={priorityTones[project.priority]} icon={priorityIcons[project.priority]}>
+              {project.priority[0].toUpperCase() + project.priority.slice(1)} priority
+            </Pill>
+            <Pill tone={projectStatusTones[status]} dot>
+              {projectStatusLabels[status]}
+            </Pill>
+          </>
+        }
+        subtitle={project.description || undefined}
+        actions={
+          <>
+            {canWriteProjects && (
+              <Button icon={Pencil} onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            )}
+            {canRunOptimization && (
+              <Button
+                variant="primary"
+                icon={SlidersHorizontal}
+                onClick={() => setOptimizing(true)}
+              >
+                Optimize staffing
+              </Button>
+            )}
+            {menuItems.length > 0 && (
+              <Menu
+                items={menuItems}
+                ariaLabel={`More actions for ${project.name}`}
+                variant="secondary"
+              />
+            )}
+          </>
+        }
+      />
+
+      {endedButOpen && span && (
+        <Banner
+          actions={
+            canWriteProjects && (
+              <>
+                <Button onClick={() => setEditing(true)}>Extend dates</Button>
+                <Button disabled={savingCompletion} onClick={() => setCompletedAt(today)}>
+                  Mark complete
+                </Button>
+              </>
+            )
+          }
+        >
+          <strong>This project ended on {formatDay(span.end, true)}</strong> and is still open
+          {staffed < total ? ` with ${formatFte(total - staffed)} FTE never filled` : ""}. Close it,
+          or extend the dates to keep staffing it.
+        </Banner>
+      )}
+      {project.completed_at && (
+        <Banner
+          actions={
+            canWriteProjects && (
+              <Button
+                icon={RotateCcw}
+                disabled={savingCompletion}
+                onClick={() => setCompletedAt(null)}
+              >
+                Reopen
+              </Button>
+            )
+          }
+        >
+          <strong>Marked complete on {formatDay(project.completed_at, true)}.</strong> Reopen it to
+          keep staffing it.
+        </Banner>
+      )}
 
       {error && <p style={{ color: colors.danger, margin: "0 0 1rem" }}>{error}</p>}
 
-      {result && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <h2 style={{ margin: "0 0 0.25rem", fontSize: "1.1rem" }}>Optimization result</h2>
-          <p style={{ margin: "0 0 0.75rem", fontSize: "0.85rem", color: colors.muted }}>
-            Compared with current staffing: <span style={{ color: colors.success }}>added</span> and{" "}
-            <span style={{ color: colors.danger }}>dropped</span> people per phase.
-          </p>
-          <ProposalCard
-            title="Best team"
-            members={result.best.members}
-            score={result.best.optimization_score}
-            maxScore={result.best.optimization_max_score}
-            coverage={result.best.coverage}
-            fullyCovered={result.best.fully_covered}
-            people={people}
-            baseline={staffingBaseline(assignments, result.best.members)}
-            onApply={() => applyTeam(result.best.id)}
-          />
-          {result.alternatives.length > 0 && (
-            <div style={{ marginTop: "0.75rem" }}>
-              <Button variant="ghost" onClick={() => setShowAlternatives(!showAlternatives)}>
-                {showAlternatives
-                  ? "Hide alternatives ▾"
-                  : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"} ▸`}
-              </Button>
-              {showAlternatives && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1rem",
-                    marginTop: "0.75rem",
-                  }}
-                >
-                  {result.alternatives.map((proposal, i) => (
-                    <ProposalCard
-                      key={i}
-                      title={`Alternative ${i + 1}`}
-                      members={proposal.members}
-                      score={proposal.optimization_score}
-                      maxScore={proposal.optimization_max_score}
-                      coverage={proposal.coverage}
-                      fullyCovered={proposal.fully_covered}
-                      scoreNote={deltaVsBest(proposal, result.best)}
-                      people={people}
-                      baseline={staffingBaseline(assignments, proposal.members)}
-                      onApply={() => applyAlternative(proposal, i)}
-                    />
-                  ))}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "1.5rem" }}>
+        <div
+          style={{
+            flex: "1 1 34rem",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.5rem",
+          }}
+        >
+          {result && (
+            <section>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "1rem",
+                  marginBottom: "0.75rem",
+                }}
+              >
+                <div>
+                  <h2 style={{ margin: 0 }}>Optimization result</h2>
+                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.88rem", color: colors.muted }}>
+                    Compared with current staffing:{" "}
+                    <span style={{ color: colors.success }}>added</span> and{" "}
+                    <span style={{ color: colors.danger }}>dropped</span> people per phase.
+                  </p>
+                </div>
+                <IconButton icon={X} ariaLabel="Dismiss result" onClick={() => setResult(null)} />
+              </div>
+              <ProposalCard
+                title="Best team"
+                members={result.best.members}
+                score={result.best.optimization_score}
+                maxScore={result.best.optimization_max_score}
+                coverage={result.best.coverage}
+                fullyCovered={result.best.fully_covered}
+                people={people}
+                baseline={staffingBaseline(assignments, result.best.members)}
+                onApply={() => applyTeam(result.best.id)}
+              />
+              {result.alternatives.length > 0 && (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <Button
+                    variant="ghost"
+                    icon={showAlternatives ? ChevronDown : ChevronRight}
+                    onClick={() => setShowAlternatives(!showAlternatives)}
+                  >
+                    {showAlternatives
+                      ? "Hide alternatives"
+                      : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"}`}
+                  </Button>
+                  {showAlternatives && (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "1rem",
+                        marginTop: "0.75rem",
+                      }}
+                    >
+                      {result.alternatives.map((proposal, i) => (
+                        <ProposalCard
+                          key={i}
+                          title={`Alternative ${i + 1}`}
+                          members={proposal.members}
+                          score={proposal.optimization_score}
+                          maxScore={proposal.optimization_max_score}
+                          coverage={proposal.coverage}
+                          fullyCovered={proposal.fully_covered}
+                          scoreNote={deltaVsBest(proposal, result.best)}
+                          people={people}
+                          baseline={staffingBaseline(assignments, proposal.members)}
+                          onApply={() => applyAlternative(proposal, i)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </section>
           )}
-        </div>
-      )}
 
-      <Card style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ margin: "0 0 0.75rem", fontSize: "1.1rem" }}>Timeline</h2>
-        <PhaseTimeline lanes={lanes} />
-      </Card>
+          {reviewed && (
+            <ProposalCard
+              title={`Proposal ${proposals.length - reviewIndex}`}
+              members={reviewed.members}
+              score={reviewed.optimization_score}
+              maxScore={reviewed.optimization_max_score}
+              coverage={reviewed.coverage}
+              fullyCovered={reviewed.fully_covered}
+              people={people}
+              baseline={staffingBaseline(assignments, reviewed.members)}
+              onApply={() => applyTeam(reviewed.id)}
+              onDelete={
+                canDeleteTeams
+                  ? async () => {
+                      if (!confirm("Delete this proposal?")) return;
+                      await deleteTeam(reviewed.id);
+                      setReviewingId(null);
+                    }
+                  : undefined
+              }
+              onClose={() => setReviewingId(null)}
+            />
+          )}
 
-      <h2 style={{ margin: "0 0 0.75rem", fontSize: "1.1rem" }}>Staffing</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {lanes.map((lane) => (
-          <StaffingLaneCard
-            key={lane.key}
-            lane={lane}
-            people={people}
-            onAssign={async (data) => {
-              const created = await assignmentsApi.create({ ...data, project_id: project.id });
-              setAssignments((current) => [...current, created]);
-            }}
-            onRemove={async (assignmentId) => {
-              await assignmentsApi.delete(assignmentId);
-              setAssignments((current) => current.filter((a) => a.id !== assignmentId));
-            }}
-          />
-        ))}
-      </div>
-
-      {proposals.length > 0 && (
-        <div style={{ marginTop: "1.5rem" }}>
-          <Button variant="ghost" onClick={() => setShowProposals(!showProposals)}>
-            {showProposals ? "Hide proposals ▾" : `Proposals (${proposals.length}) ▸`}
-          </Button>
-          {showProposals && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-                marginTop: "0.75rem",
+          {lanes.map((lane) => (
+            <StaffingLaneCard
+              key={lane.key}
+              lane={lane}
+              title={phased ? lane.label : "Staffing"}
+              people={people}
+              today={today}
+              onAssign={async (data) => {
+                const created = await assignmentsApi.create({ ...data, project_id: project.id });
+                setAssignments((current) => [...current, created]);
               }}
-            >
-              {proposals.map((team, i) => (
-                <ProposalCard
-                  key={team.id}
-                  title={`Proposal ${proposals.length - i}`}
-                  members={team.members}
-                  score={team.optimization_score}
-                  maxScore={team.optimization_max_score}
-                  coverage={team.coverage}
-                  fullyCovered={team.fully_covered}
-                  people={people}
-                  baseline={staffingBaseline(assignments, team.members)}
-                  onApply={() => applyTeam(team.id)}
-                  onDelete={
-                    canDeleteTeams
-                      ? () => confirm("Delete this proposal?") && deleteTeam(team.id)
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          )}
+              onRemove={async (assignmentId) => {
+                await assignmentsApi.delete(assignmentId);
+                setAssignments((current) => current.filter((a) => a.id !== assignmentId));
+              }}
+              onSuggest={canRunOptimization ? () => setOptimizing(true) : undefined}
+            />
+          ))}
         </div>
-      )}
+
+        <div
+          style={{
+            flex: "1 1 20rem",
+            maxWidth: "26rem",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.5rem",
+          }}
+        >
+          <SidebarCard title="Timeline">
+            <PhaseTimeline lanes={lanes} today={today} />
+          </SidebarCard>
+          <ProposalsCard
+            proposals={proposals}
+            people={people}
+            assignments={assignments}
+            totalFte={total}
+            today={today}
+            reviewingId={reviewingId}
+            onReview={setReviewingId}
+          />
+        </div>
+      </div>
 
       {optimizing && (
         <OptimizationPanel
@@ -341,5 +460,50 @@ export default function ProjectWorkspacePage() {
         />
       )}
     </div>
+  );
+}
+
+function Banner({ children, actions }: { children: ReactNode; actions?: ReactNode }) {
+  return (
+    <Card
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "1rem",
+        marginBottom: "1.5rem",
+        padding: "1rem 1.25rem",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 40,
+          height: 40,
+          flexShrink: 0,
+          borderRadius: "var(--radius)",
+          background: colors.neutralBg,
+          color: colors.muted,
+        }}
+      >
+        <CalendarDays size={18} />
+      </span>
+      <p style={{ flex: "1 1 20rem", margin: 0, lineHeight: 1.5 }}>{children}</p>
+      {actions && <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>{actions}</div>}
+    </Card>
+  );
+}
+
+function SidebarCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title}>
+      <Card style={{ padding: "1.25rem 1.5rem" }}>
+        <h2 style={{ margin: "0 0 1rem" }}>{title}</h2>
+        {children}
+      </Card>
+    </section>
   );
 }

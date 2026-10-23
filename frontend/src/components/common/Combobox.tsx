@@ -10,7 +10,7 @@ const listStyle: CSSProperties = {
   margin: 0,
   padding: "0.25rem",
   listStyle: "none",
-  background: "#fff",
+  background: colors.surface,
   border: `1px solid ${colors.borderStrong}`,
   borderRadius: 8,
   boxShadow: "0 8px 24px rgba(0,0,0,0.12)",

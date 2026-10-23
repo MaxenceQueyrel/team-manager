@@ -1,107 +1,264 @@
+import {
+  Building,
+  Check,
+  ChevronsUpDown,
+  Folder,
+  LayoutGrid,
+  LogOut,
+  type LucideIcon,
+  Plus,
+  Users,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { selectStyle } from "@/components/common/ui";
+import {
+  Avatar,
+  colors,
+  IconButton,
+  popoverStyle,
+  roleLabels,
+  useDismiss,
+} from "@/components/common/ui";
+import { useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
+import type { OrganizationMembership } from "@/types";
 
-const navItems = [
-  { to: "/", label: "Dashboard" },
-  { to: "/people", label: "People" },
-  { to: "/projects", label: "Projects" },
-  { to: "/organization", label: "Organization" },
-];
+function membershipSummary(org: OrganizationMembership): string {
+  return `${roleLabels[org.role]} · ${org.member_count} ${org.member_count === 1 ? "member" : "members"}`;
+}
 
-export default function Layout() {
-  const user = useAuthStore((s) => s.user);
+function LogoMark() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+      <rect width="30" height="30" rx="8" style={{ fill: colors.text }} />
+      <rect x="8" y="9" width="14" height="2.4" rx="1.2" style={{ fill: colors.surface }} />
+      <rect x="8" y="13.8" width="11" height="2.4" rx="1.2" style={{ fill: colors.surface }} />
+      <rect x="8" y="18.6" width="8" height="2.4" rx="1.2" style={{ fill: colors.primarySoft }} />
+    </svg>
+  );
+}
+
+function OrganizationSwitcher() {
   const organizations = useAuthStore((s) => s.organizations);
   const activeOrganizationId = useAuthStore((s) => s.activeOrganizationId);
   const setActiveOrganization = useAuthStore((s) => s.setActiveOrganization);
-  const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(ref, open, () => setOpen(false));
+
+  const active = organizations.find((o) => o.id === activeOrganizationId);
+  if (!active) return null;
+
+  return (
+    <div ref={ref} style={{ position: "relative", marginBottom: "1.5rem" }}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.7rem",
+          width: "100%",
+          padding: "0.6rem 0.75rem",
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+          borderRadius: "var(--radius-lg)",
+          boxShadow: "var(--shadow-sm)",
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+      >
+        <Avatar name={active.name} tone="solid" shape="square" />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              display: "block",
+              fontWeight: 600,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {active.name}
+          </span>
+          <span style={{ display: "block", fontSize: "0.8rem", color: colors.muted }}>
+            {membershipSummary(active)}
+          </span>
+        </span>
+        <ChevronsUpDown size={16} aria-hidden style={{ color: colors.muted, flexShrink: 0 }} />
+      </button>
+      {open && (
+        <div role="menu" aria-label="Organizations" style={{ ...popoverStyle, left: 0, right: 0 }}>
+          {organizations.map((org) => (
+            <button
+              key={org.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={org.id === activeOrganizationId}
+              className="menu-item"
+              onClick={() => {
+                setActiveOrganization(org.id);
+                setOpen(false);
+              }}
+            >
+              <Avatar name={org.name} tone="solid" shape="square" size="sm" />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 500 }}>{org.name}</span>
+                <span style={{ display: "block", fontSize: "0.75rem", color: colors.muted }}>
+                  {membershipSummary(org)}
+                </span>
+              </span>
+              {org.id === activeOrganizationId && (
+                <Check size={16} aria-hidden style={{ color: colors.primary }} />
+              )}
+            </button>
+          ))}
+          <div style={{ borderTop: `1px solid ${colors.border}`, margin: "0.3rem 0" }} />
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-item"
+            onClick={() => {
+              setOpen(false);
+              navigate("/organization", { state: { newOrganization: true } });
+            }}
+          >
+            <Plus size={16} aria-hidden style={{ color: colors.muted }} />
+            New organization
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Layout() {
+  const user = useAuthStore((s) => s.user);
+  const activeOrganizationId = useAuthStore((s) => s.activeOrganizationId);
+  const logout = useAuthStore((s) => s.logout);
+  const peopleCount = useAppStore((s) => s.people.length);
+  const projectCount = useAppStore((s) => s.projects.length);
+  const fetchPeople = useAppStore((s) => s.fetchPeople);
+  const fetchProjects = useAppStore((s) => s.fetchProjects);
+  const navigate = useNavigate();
+
+  // The nav counts read the shared store, so it is reloaded whenever the organization changes.
+  useEffect(() => {
+    if (!activeOrganizationId) return;
+    fetchPeople();
+    fetchProjects();
+  }, [activeOrganizationId, fetchPeople, fetchProjects]);
+
+  const navItems: { to: string; label: string; icon: LucideIcon; count?: number }[] = [
+    { to: "/", label: "Dashboard", icon: LayoutGrid },
+    { to: "/people", label: "People", icon: Users, count: peopleCount },
+    { to: "/projects", label: "Projects", icon: Folder, count: projectCount },
+    { to: "/organization", label: "Organization", icon: Building },
+  ];
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <nav
+        aria-label="Main"
         style={{
-          width: 220,
-          padding: "1.5rem 1rem",
-          background: "#f8f9fa",
-          borderRight: "1px solid #e9ecef",
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          width: 260,
+          padding: "1.25rem 1rem 1rem",
+          background: colors.sidebar,
+          borderRight: `1px solid ${colors.border}`,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <h2 style={{ margin: "0 0 1.5rem", fontSize: "1.1rem" }}>Team Manager</h2>
-        {organizations.length > 0 && (
-          <label style={{ display: "block", marginBottom: "1.25rem" }}>
-            <div style={{ fontSize: "0.75rem", fontWeight: 600, marginBottom: 4 }}>
-              Organization
-            </div>
-            <select
-              value={activeOrganizationId ?? ""}
-              onChange={(e) => setActiveOrganization(e.target.value)}
-              style={{ ...selectStyle, fontSize: "0.8rem", padding: "0.35rem 0.5rem" }}
-            >
-              {organizations.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {navItems.map(({ to, label }) => (
-            <li key={to} style={{ marginBottom: "0.25rem" }}>
-              <NavLink
-                to={to}
-                end={to === "/"}
-                style={({ isActive }) => ({
-                  display: "block",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 6,
-                  color: isActive ? "#4f6ef7" : "inherit",
-                  background: isActive ? "#eef0fd" : "transparent",
-                  fontWeight: isActive ? 600 : 400,
-                })}
-              >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.65rem",
+            padding: "0 0.25rem",
+            marginBottom: "1.4rem",
+            fontFamily: "var(--font-display)",
+            fontSize: "1.15rem",
+            fontWeight: 600,
+          }}
+        >
+          <LogoMark />
+          Team Manager
+        </div>
+        <OrganizationSwitcher />
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.2rem",
+          }}
+        >
+          {navItems.map(({ to, label, icon: Icon, count }) => (
+            <li key={to}>
+              <NavLink to={to} end={to === "/"} className="nav-item">
+                <Icon size={18} aria-hidden style={{ color: colors.muted }} />
                 {label}
+                {count !== undefined && activeOrganizationId && (
+                  // Hidden from the accessible name so links stay "People" / "Projects".
+                  <span
+                    aria-hidden
+                    className="mono"
+                    style={{ marginLeft: "auto", fontSize: "0.8rem", color: colors.muted }}
+                  >
+                    {count}
+                  </span>
+                )}
               </NavLink>
             </li>
           ))}
         </ul>
-        <div style={{ marginTop: "auto", paddingTop: "1rem", fontSize: "0.8rem" }}>
+        <div
+          style={{
+            marginTop: "auto",
+            paddingTop: "0.75rem",
+            borderTop: `1px solid ${colors.border}`,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+        >
           <NavLink
             to="/profile"
-            style={({ isActive }) => ({
-              display: "block",
-              color: isActive ? "#4f6ef7" : "#6c757d",
-              marginBottom: "0.5rem",
-              wordBreak: "break-all",
-              textDecoration: "none",
-            })}
+            className="nav-item"
+            style={{ flex: 1, minWidth: 0, padding: "0.4rem 0.5rem", fontWeight: 400 }}
           >
-            {user?.email}
+            <Avatar name={user?.email ?? ""} tone="dark" />
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: "0.88rem",
+              }}
+            >
+              {user?.email}
+            </span>
           </NavLink>
-          <button
-            type="button"
+          <IconButton
+            icon={LogOut}
+            ariaLabel="Sign out"
             onClick={() => {
               logout();
               navigate("/login", { replace: true });
             }}
-            style={{
-              border: "none",
-              background: "none",
-              padding: 0,
-              color: "#4f6ef7",
-              cursor: "pointer",
-              font: "inherit",
-            }}
-          >
-            Sign out
-          </button>
+          />
         </div>
       </nav>
-      <main style={{ flex: 1, padding: "2rem", overflow: "auto" }}>
+      <main style={{ flex: 1, minWidth: 0, padding: "2.5rem 3rem" }}>
         <Outlet />
       </main>
     </div>

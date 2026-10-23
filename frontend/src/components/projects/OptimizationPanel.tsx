@@ -75,7 +75,7 @@ export function OptimizationPanel({
         bottom: 0,
         width: OPTIMIZATION_PANEL_WIDTH,
         padding: "1.25rem",
-        background: "#fff",
+        background: colors.surface,
         borderLeft: `1px solid ${colors.border}`,
         boxShadow: "-6px 0 24px rgba(0,0,0,0.08)",
         overflow: "auto",

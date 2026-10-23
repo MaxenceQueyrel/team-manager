@@ -1,47 +1,66 @@
 import { isAxiosError } from "axios";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, Pencil, Plus } from "lucide-react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { AvailabilityCalendar, AvailabilityLegend } from "@/components/common/AvailabilityCalendar";
 import {
-  Badge,
+  addDays,
+  formatDay,
+  formatDuration,
+  formatSpan,
+  isoToday,
+} from "@/components/common/dates";
+import {
+  Avatar,
   Button,
   Card,
   colors,
-  Field,
-  inputStyle,
-  seniorityColors,
+  fonts,
+  PageHeader,
+  Pill,
+  StatTile,
+  seniorityLabels,
+  seniorityTones,
 } from "@/components/common/ui";
-import { AvailabilityEditor } from "@/components/editors/listEditors";
+import { AssignToProjectModal } from "@/components/people/AssignToProjectModal";
+import { FREE_HORIZON_DAYS, freeNextDays } from "@/components/people/PeopleWorkspace";
 import { PersonForm } from "@/components/people/PersonForm";
-import { VacationPicker } from "@/components/people/VacationPicker";
-import { assignmentsApi, peopleApi } from "@/services/api";
+import { SkillsModal } from "@/components/people/SkillsModal";
+import { TimeOffModal } from "@/components/people/TimeOffModal";
+import { WeeklyAvailability } from "@/components/people/WeeklyAvailability";
+import { commitmentForRatio } from "@/components/projects/StaffingLaneCard";
+import { buildLanes, formatFte, isOpenForStaffing } from "@/components/projects/staffing";
+import { assignmentsApi, errorMessage, peopleApi } from "@/services/api";
 import { knownRoleIds, knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type {
-  Assignment,
-  AvailabilitySegment,
-  AvailabilityWindow,
-  DateRange,
-  Person,
-  Project,
-} from "@/types";
+import type { Assignment, Person, Project } from "@/types";
 
-function message(e: unknown): string {
-  if (typeof e === "object" && e && "message" in e)
-    return String((e as { message: unknown }).message);
-  return String(e);
+type Dialog = "profile" | "assign" | "skills" | "time-off" | null;
+
+function joinList(items: string[]): string {
+  if (items.length < 2) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function defaultRange(): { start: string; end: string } {
-  const today = new Date();
-  const later = new Date(today);
-  later.setDate(later.getDate() + 90);
-  return { start: toISODate(today), end: toISODate(later) };
+/** Points at the open project whose skill requirements the person meets the most of. */
+function skillMatchHint(person: Person, projects: Project[], today: string): string {
+  let best: { project: Project; skills: string[] } | null = null;
+  for (const project of projects) {
+    if (!isOpenForStaffing(project, today)) continue;
+    const lanes = buildLanes(project, []);
+    const matched = new Set<string>();
+    for (const lane of lanes) {
+      for (const req of lane.skillRequirements) {
+        if (person.skills.some((s) => s.id === req.id && s.level >= req.min_level)) {
+          matched.add(req.id);
+        }
+      }
+    }
+    if (matched.size > (best?.skills.length ?? 0)) best = { project, skills: [...matched] };
+  }
+  if (!best) return `No open project asks for ${person.name}'s skills yet.`;
+  const verb = best.skills.length === 1 ? "matches" : "match";
+  return `${person.name}'s ${joinList(best.skills)} ${verb} the requirements on ${best.project.name}.`;
 }
 
 export default function PersonDetailPage() {
@@ -62,14 +81,9 @@ export default function PersonDetailPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [{ start, end }, setRange] = useState(defaultRange);
-  const [segments, setSegments] = useState<AvailabilitySegment[]>([]);
+  const [dialog, setDialog] = useState<Dialog>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
-  const [savingWindows, setSavingWindows] = useState(false);
-  const [vacations, setVacations] = useState<DateRange[]>([]);
-  const [savingVacations, setSavingVacations] = useState(false);
+  const [freeSoon, setFreeSoon] = useState<number | null>(null);
 
   useEffect(() => {
     fetchPeople();
@@ -87,73 +101,36 @@ export default function PersonDetailPage() {
       .then(setPerson)
       .catch((e) => {
         if (isAxiosError(e) && e.response?.status === 404) setNotFound(true);
-        else setError(message(e));
+        else setError(errorMessage(e));
       });
     assignmentsApi
       .list({ person_id: id })
       .then(setAssignments)
-      .catch((e) => setError(message(e)));
+      .catch((e) => setError(errorMessage(e)));
   }, [id]);
 
-  useEffect(() => {
-    setWindows(person?.availability_windows ?? []);
-    setVacations(person?.vacations ?? []);
-  }, [person]);
-
-  // Depends on `person` so the timeline refreshes after windows, vacations or the working pattern are saved.
+  // Depends on `person` so the figure refreshes after time off or assignments change.
   useEffect(() => {
     if (!person) return;
-    if (start > end) {
-      setError("Start date must not be after the end date.");
-      return;
-    }
-    setError(null);
+    const today = isoToday();
+    setFreeSoon(null);
     peopleApi
-      .availability(start, end)
-      .then((all) => setSegments(all.find((a) => a.person_id === person.id)?.segments ?? []))
-      .catch((e) => setError(message(e)));
-  }, [person, start, end]);
+      .availability(today, addDays(today, FREE_HORIZON_DAYS - 1))
+      .then((all) => {
+        const segments = all.find((a) => a.person_id === person.id)?.segments ?? [];
+        setFreeSoon(freeNextDays(segments, today));
+      })
+      .catch((e) => setError(errorMessage(e)));
+  }, [person]);
 
-  const today = toISODate(new Date());
+  const today = isoToday();
   const { current, past } = useMemo(() => {
     const sorted = [...assignments].sort((a, b) => a.start.localeCompare(b.start));
     return {
       current: sorted.filter((a) => a.end >= today),
-      past: sorted.filter((a) => a.end < today),
+      past: sorted.filter((a) => a.end < today).reverse(),
     };
   }, [assignments, today]);
-
-  const windowsDirty =
-    person !== null && JSON.stringify(windows) !== JSON.stringify(person.availability_windows);
-
-  const vacationsDirty =
-    person !== null && JSON.stringify(vacations) !== JSON.stringify(person.vacations);
-
-  const saveVacations = async () => {
-    if (!person) return;
-    setSavingVacations(true);
-    setError(null);
-    try {
-      setPerson(await peopleApi.update(person.id, { ...person, vacations }));
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setSavingVacations(false);
-    }
-  };
-
-  const saveWindows = async () => {
-    if (!person) return;
-    setSavingWindows(true);
-    setError(null);
-    try {
-      setPerson(await peopleApi.update(person.id, { ...person, availability_windows: windows }));
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setSavingWindows(false);
-    }
-  };
 
   if (notFound) {
     return (
@@ -171,196 +148,232 @@ export default function PersonDetailPage() {
     return error ? <p style={{ color: colors.danger }}>{error}</p> : <p>Loading…</p>;
   }
 
+  const projectName = (projectId: string) =>
+    projects.find((p) => p.id === projectId)?.name ?? projectId;
+  const activeProjects = new Set(current.filter((a) => a.start <= today).map((a) => a.project_id));
+  const lastProject = [...past].sort((a, b) => b.end.localeCompare(a.end))[0];
+  const years = person.years_of_experience;
+  const closeDialog = () => setDialog(null);
+  const refreshPerson = async () => setPerson(await peopleApi.get(person.id));
+
   return (
     <div>
-      <Link to="/people" style={{ fontSize: "0.85rem", color: colors.muted }}>
-        ← People
-      </Link>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "1rem",
-          flexWrap: "wrap",
-          margin: "0.5rem 0 1rem",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0 }}>{person.name}</h1>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.6rem",
-              marginTop: "0.4rem",
-              color: colors.muted,
-              fontSize: "0.9rem",
-            }}
-          >
+      <PageHeader
+        breadcrumb={[{ label: "People", to: "/people" }, { label: person.name }]}
+        leading={<Avatar name={person.name} size="lg" />}
+        title={person.name}
+        subtitle={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
             <span>{person.role}</span>
-            <Badge color={seniorityColors[person.seniority]}>{person.seniority}</Badge>
+            <Pill tone={seniorityTones[person.seniority]}>{seniorityLabels[person.seniority]}</Pill>
             <span>
-              {person.working_days_per_week} days/week · {(person.base_capacity * 100).toFixed(0)}%
-              FTE
+              {years} {years === 1 ? "yr" : "yrs"} experience
             </span>
-          </div>
-        </div>
-        {canWritePeople && <Button onClick={() => setEditingProfile(true)}>Edit profile</Button>}
-      </div>
+          </span>
+        }
+        actions={
+          <>
+            {canWritePeople && (
+              <Button icon={Pencil} onClick={() => setDialog("profile")}>
+                Edit profile
+              </Button>
+            )}
+            <Button variant="primary" icon={Plus} onClick={() => setDialog("assign")}>
+              Assign to project
+            </Button>
+          </>
+        }
+      />
 
       {error && <p style={{ color: colors.danger, margin: "0 0 1rem" }}>{error}</p>}
 
-      <Card style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ margin: "0 0 1rem", fontSize: "1.1rem" }}>Availability & workload</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
-          <Field label="From">
-            <input
-              type="date"
-              value={start}
-              onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label="To">
-            <input
-              type="date"
-              value={end}
-              onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-          <AvailabilityLegend />
-        </div>
-        <AvailabilityCalendar
-          start={start}
-          end={end}
-          rows={[{ id: person.id, label: person.name, segments }]}
-          overlays={person.vacations.map((v) => ({
-            key: `${v.start}-${v.end}`,
-            label: "Vacation",
-            start: v.start,
-            end: v.end,
-          }))}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "0.75rem",
+          marginBottom: "1.5rem",
+        }}
+      >
+        <StatTile
+          label="Contracted"
+          mono
+          value={formatFte(person.base_capacity)}
+          unit="FTE"
+          sub={`${person.working_days_per_week} ${person.working_days_per_week === 1 ? "day" : "days"}/week`}
         />
-
-        <h3 style={{ margin: "1.5rem 0 0.5rem", fontSize: "1rem" }}>Assignments</h3>
-        {current.length === 0 && past.length === 0 ? (
-          <p style={{ color: colors.muted, margin: 0 }}>Not assigned to any project.</p>
-        ) : (
-          <>
-            {current.length === 0 ? (
-              <p style={{ color: colors.muted, margin: 0 }}>No current or upcoming assignments.</p>
+        <StatTile
+          label={`Free next ${FREE_HORIZON_DAYS} days`}
+          mono
+          value={freeSoon === null ? "…" : formatFte(freeSoon)}
+          unit="FTE"
+          accent={freeSoon === 0 ? "warning" : "success"}
+        />
+        <StatTile label="Active projects" mono value={activeProjects.size} />
+        <StatTile
+          label="Last project"
+          value={
+            lastProject ? (
+              <Link
+                to={`/projects/${encodeURIComponent(lastProject.project_id)}`}
+                style={{ fontFamily: fonts.sans, fontSize: "1.05rem", fontWeight: 500 }}
+              >
+                {projectName(lastProject.project_id)}
+              </Link>
             ) : (
-              <AssignmentsTable assignments={current} projects={projects} />
+              <span style={{ fontFamily: fonts.sans, fontSize: "1.05rem", color: colors.muted }}>
+                None yet
+              </span>
+            )
+          }
+          sub={
+            lastProject &&
+            `ended ${formatDay(lastProject.end, !lastProject.end.startsWith(today.slice(0, 4)))}`
+          }
+        />
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
+        <div
+          style={{
+            flex: "999 1 520px",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+          }}
+        >
+          <WeeklyAvailability person={person} />
+          <SectionCard title="Assignments" flush>
+            {current.length === 0 ? (
+              <div style={{ padding: "0 1.5rem 1.25rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "1rem",
+                    flexWrap: "wrap",
+                    padding: "1.1rem 1.4rem",
+                    border: `1.5px dashed ${colors.borderStrong}`,
+                    borderRadius: "var(--radius-lg)",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Not on any project right now</div>
+                    <div style={{ marginTop: 2, fontSize: "0.88rem", color: colors.muted }}>
+                      {skillMatchHint(person, projects, today)}
+                    </div>
+                  </div>
+                  <Button onClick={() => setDialog("assign")}>Assign to project</Button>
+                </div>
+              </div>
+            ) : (
+              <AssignmentList assignments={current} projectName={projectName} today={today} />
             )}
             {past.length > 0 && (
-              <details style={{ marginTop: "0.75rem" }}>
-                <summary style={{ cursor: "pointer", fontSize: "0.85rem", color: colors.muted }}>
-                  Past assignments ({past.length})
-                </summary>
-                <AssignmentsTable assignments={past} projects={projects} />
-              </details>
+              <>
+                <div
+                  style={{
+                    padding: "0.25rem 1.5rem 0.5rem",
+                    fontSize: "0.85rem",
+                    color: colors.muted,
+                  }}
+                >
+                  Past
+                </div>
+                <AssignmentList assignments={past} projectName={projectName} today={today} />
+              </>
             )}
-          </>
-        )}
+          </SectionCard>
+        </div>
 
-        <h3 style={{ margin: "1.5rem 0 0.25rem", fontSize: "1rem" }}>Vacation</h3>
-        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: colors.muted }}>
-          Days off count as 0% available, overriding windows and assignments.
-          {canWritePeople && " Click a day to toggle it; shift-click to toggle a range."}
-        </p>
-        {canWritePeople ? (
-          <>
-            <VacationPicker value={vacations} onChange={setVacations} />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              {vacationsDirty && (
-                <Button onClick={() => setVacations(person.vacations)}>Discard</Button>
-              )}
+        <div
+          style={{
+            flex: "1 1 320px",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+          }}
+        >
+          <SectionCard
+            title="Skills"
+            action={
+              canWritePeople && (
+                <Button size="sm" ariaLabel="Edit skills" onClick={() => setDialog("skills")}>
+                  Edit
+                </Button>
+              )
+            }
+          >
+            <SkillLevels person={person} />
+          </SectionCard>
+
+          <SectionCard title="Time off & exceptions">
+            <p style={{ margin: 0, fontSize: "0.88rem", color: colors.muted }}>
+              Leave, part-time weeks or any period where {person.name} works less than the usual{" "}
+              {formatFte(person.base_capacity)} FTE. These override project assignments.
+            </p>
+            <TimeOffList person={person} today={today} />
+            {canWritePeople && (
               <Button
-                variant="primary"
-                disabled={!vacationsDirty || savingVacations}
-                onClick={saveVacations}
+                icon={Plus}
+                onClick={() => setDialog("time-off")}
+                style={{ marginTop: "1rem" }}
               >
-                {savingVacations ? "Saving…" : "Save vacation"}
+                Add time off
               </Button>
-            </div>
-          </>
-        ) : person.vacations.length === 0 ? (
-          <p style={{ color: colors.muted, margin: 0 }}>None.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.85rem" }}>
-            {person.vacations.map((v) => (
-              <li key={`${v.start}-${v.end}`}>
-                {v.start} → {v.end}
-              </li>
-            ))}
-          </ul>
-        )}
+            )}
+          </SectionCard>
+        </div>
+      </div>
 
-        <h3 style={{ margin: "1.5rem 0 0.25rem", fontSize: "1rem" }}>Availability windows</h3>
-        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: colors.muted }}>
-          Exceptions to the working pattern for specific date spans (e.g. a part-time month). They
-          take precedence over assignments.
-        </p>
-        {canWritePeople ? (
-          <>
-            <AvailabilityEditor value={windows} onChange={setWindows} />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              {windowsDirty && (
-                <Button onClick={() => setWindows(person.availability_windows)}>Discard</Button>
-              )}
-              <Button
-                variant="primary"
-                disabled={!windowsDirty || savingWindows}
-                onClick={saveWindows}
-              >
-                {savingWindows ? "Saving…" : "Save windows"}
-              </Button>
-            </div>
-          </>
-        ) : person.availability_windows.length === 0 ? (
-          <p style={{ color: colors.muted, margin: 0 }}>None.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.85rem" }}>
-            {person.availability_windows.map((w) => (
-              <li key={`${w.start}-${w.end}`}>
-                {w.start} → {w.end}: {(w.ratio * 100).toFixed(0)}%
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card>
-        <h2 style={{ margin: "0 0 0.75rem", fontSize: "1.1rem" }}>Skills</h2>
-        {person.skills.length === 0 ? (
-          <p style={{ color: colors.muted, margin: 0 }}>No skills recorded.</p>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-            {person.skills.map((s) => (
-              <Badge key={s.id} color={colors.primary}>
-                {s.id} · {s.level}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {editingProfile && (
+      {dialog === "profile" && (
         <PersonForm
           person={person}
           people={people}
           roles={roles}
           roleOptions={roleOptions}
           skillOptions={skillOptions}
-          onClose={() => setEditingProfile(false)}
+          onClose={closeDialog}
           onSave={async (draft) => {
             await savePerson(draft, person.id);
-            setPerson(await peopleApi.get(person.id));
-            setEditingProfile(false);
+            await refreshPerson();
+            closeDialog();
+          }}
+        />
+      )}
+      {dialog === "assign" && (
+        <AssignToProjectModal
+          person={person}
+          projects={projects}
+          onClose={closeDialog}
+          onAssigned={async (assignment) => {
+            setAssignments((existing) => [...existing, assignment]);
+            closeDialog();
+            await refreshPerson();
+          }}
+        />
+      )}
+      {dialog === "skills" && (
+        <SkillsModal
+          person={person}
+          skillOptions={skillOptions}
+          onClose={closeDialog}
+          onSaved={(saved) => {
+            setPerson(saved);
+            closeDialog();
+          }}
+        />
+      )}
+      {dialog === "time-off" && (
+        <TimeOffModal
+          person={person}
+          onClose={closeDialog}
+          onSaved={(saved) => {
+            setPerson(saved);
+            closeDialog();
           }}
         />
       )}
@@ -368,42 +381,160 @@ export default function PersonDetailPage() {
   );
 }
 
-function AssignmentsTable({
+/** A card with an `h2` title and an optional header action; `flush` lets lists span the
+ * card's full width. */
+function SectionCard({
+  title,
+  action,
+  flush,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  flush?: boolean;
+  children: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId}>
+      <Card style={{ padding: flush ? "1.4rem 0 0" : "1.4rem 1.5rem", overflow: "hidden" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            margin: "0 0 1rem",
+            padding: flush ? "0 1.5rem" : 0,
+          }}
+        >
+          <h2 id={headingId} style={{ margin: 0 }}>
+            {title}
+          </h2>
+          {action}
+        </div>
+        {children}
+      </Card>
+    </section>
+  );
+}
+
+function AssignmentList({
   assignments,
-  projects,
+  projectName,
+  today,
 }: {
   assignments: Assignment[];
-  projects: Project[];
+  projectName: (projectId: string) => string;
+  today: string;
 }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
-      <thead>
-        <tr style={{ textAlign: "left", borderBottom: `2px solid ${colors.border}` }}>
-          <th style={{ padding: "0.4rem" }}>Project</th>
-          <th style={{ padding: "0.4rem" }}>Phase</th>
-          <th style={{ padding: "0.4rem" }}>Dates</th>
-          <th style={{ padding: "0.4rem" }}>FTE</th>
-        </tr>
-      </thead>
-      <tbody>
-        {assignments.map((a) => (
-          <tr key={a.id} style={{ borderBottom: `1px solid ${colors.light}` }}>
-            <td style={{ padding: "0.4rem" }}>
-              <Link
-                to={`/projects/${encodeURIComponent(a.project_id)}`}
-                style={{ color: colors.primary }}
+    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      {assignments.map((a) => (
+        <li key={a.id} style={{ borderTop: `1px solid ${colors.border}` }}>
+          <Link
+            to={`/projects/${encodeURIComponent(a.project_id)}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              padding: "0.85rem 1.5rem",
+              color: colors.text,
+              textDecoration: "none",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>
+                {projectName(a.project_id)}
+                {a.phase_id && (
+                  <span style={{ fontWeight: 400, color: colors.muted }}> · {a.phase_id}</span>
+                )}
+              </div>
+              <div
+                className="mono"
+                style={{ marginTop: 2, fontSize: "0.85rem", color: colors.muted }}
               >
-                {projects.find((p) => p.id === a.project_id)?.name ?? a.project_id}
-              </Link>
-            </td>
-            <td style={{ padding: "0.4rem" }}>{a.phase_id ?? "—"}</td>
-            <td style={{ padding: "0.4rem", whiteSpace: "nowrap" }}>
-              {a.start} → {a.end}
-            </td>
-            <td style={{ padding: "0.4rem" }}>{(a.ratio * 100).toFixed(0)}%</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+                {formatSpan(a, today)} · {formatDuration(a.start, a.end)}
+              </div>
+            </div>
+            <Pill tone="primary">{commitmentForRatio(a.ratio)}</Pill>
+            <ChevronRight size={16} aria-hidden style={{ color: colors.muted, flexShrink: 0 }} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SkillLevels({ person }: { person: Person }) {
+  if (person.skills.length === 0) {
+    return <p style={{ color: colors.muted, margin: 0 }}>No skills recorded.</p>;
+  }
+  const skills = [...person.skills].sort((a, b) => b.level - a.level);
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: "0.9rem" }}>
+      {skills.map((skill) => (
+        <li key={skill.id}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+            <span style={{ fontWeight: 500 }}>{skill.id}</span>
+            <span className="mono" style={{ fontSize: "0.88rem", color: colors.muted }}>
+              {skill.level} / 5
+            </span>
+          </div>
+          <div aria-hidden style={{ display: "flex", gap: 3, marginTop: 6 }}>
+            {[0, 1, 2, 3, 4].map((step) => (
+              <div
+                key={step}
+                style={{
+                  flex: 1,
+                  height: 5,
+                  borderRadius: 3,
+                  background: colors.track,
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(Math.max(skill.level - step, 0), 1) * 100}%`,
+                    height: "100%",
+                    background: colors.primary,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TimeOffList({ person, today }: { person: Person; today: string }) {
+  const entries = [
+    ...person.vacations.map((v) => ({ ...v, label: "Time off" })),
+    ...person.availability_windows.map((w) => ({ ...w, label: `${formatFte(w.ratio)} FTE` })),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+  if (entries.length === 0) return null;
+  return (
+    <ul style={{ listStyle: "none", margin: "1rem 0 0", padding: 0 }}>
+      {entries.map((entry) => (
+        <li
+          key={`${entry.label}-${entry.start}-${entry.end}`}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "0.5rem",
+            padding: "0.5rem 0",
+            borderTop: `1px solid ${colors.border}`,
+          }}
+        >
+          <span className="mono" style={{ fontSize: "0.85rem" }}>
+            {formatSpan(entry, today)}
+          </span>
+          <Pill tone={entry.label === "Time off" ? "warning" : "neutral"}>{entry.label}</Pill>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 from optimizer.models import (
     AssignedMember,
@@ -9,6 +11,7 @@ from optimizer.models import (
 
 # coverage/fully_covered default to empty/None for teams saved before the
 # optimizer reported coverage, and for teams created without a solver run.
+# created_at is None for teams saved before it was recorded.
 class Team(BaseModel):
     id: str
     organization_id: str
@@ -19,6 +22,7 @@ class Team(BaseModel):
     optimization_max_score: float | None = None
     coverage: list[PhaseCoverage] = []
     fully_covered: bool | None = None
+    created_at: datetime | None = None
 
 
 class TeamProposal(BaseModel):

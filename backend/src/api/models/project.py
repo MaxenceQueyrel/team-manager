@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
 from optimizer.models import SkillRequirement, ProjectPhase, DateRange, Squad
 
@@ -13,6 +15,7 @@ class ProjectBase(BaseModel):
     date_ranges: list[DateRange] = []
     phases: list[ProjectPhase] = []
     priority: str = "medium"
+    completed_at: date | None = None
 
 
 class Project(ProjectBase):

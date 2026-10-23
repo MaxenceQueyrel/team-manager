@@ -84,7 +84,7 @@ test("optimizing from the project workspace shows the best team", async ({ page 
   const name = `Optimization Smoke ${uniqueSuffix()}`;
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("link", { name }).click();
@@ -120,7 +120,7 @@ test("alternative teams are collapsed by default and show their delta vs best", 
     page.getByRole("region", { name: "Best team" }).getByText("All requirements covered"),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Show 2 alternative teams ▸" }).click();
+  await page.getByRole("button", { name: "Show 2 alternative teams" }).click();
   await expect(alternativeHeadings).toHaveCount(2);
   await expect(page.getByText(/vs best|same score as best/)).toHaveCount(2);
 });
@@ -132,8 +132,8 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
     await createPerson(page, `Applicant ${i} ${suffix}`, `applicant-${i}-${suffix}`);
   }
   await importDatedProject(page, { id: `apply-${suffix}`, name: projectName });
-  const lane = page.getByRole("region", { name: "Whole project" });
-  await expect(lane.getByText("0 / 1 FTE · empty")).toBeVisible();
+  const lane = page.getByRole("region", { name: "Staffing" });
+  await expect(lane).toContainText("0 of 1 FTE");
 
   await runOptimization(page);
   const best = page.getByRole("region", { name: "Best team" });
@@ -144,10 +144,10 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
     page.getByText("This replaces current staffing for the whole project."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply", exact: true }).click();
-  await expect(lane.getByText("1 / 1 FTE · complete")).toBeVisible();
+  await expect(lane).toContainText("1 of 1 FTE");
   await expect(best.getByText("added", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Show 2 alternative teams ▸" }).click();
+  await page.getByRole("button", { name: "Show 2 alternative teams" }).click();
   const alternative = page.getByRole("region", { name: "Alternative 1" });
   await expect(alternative.getByText("added", { exact: true })).toHaveCount(1);
   await expect(alternative.getByText("dropped", { exact: true })).toHaveCount(1);
@@ -158,8 +158,8 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
   await expect(lane.getByRole("listitem")).toHaveCount(1);
 
   // The solve saves the best team; applying the alternative saves it too.
-  await page.getByRole("button", { name: "Proposals (2) ▸" }).click();
-  await expect(page.getByRole("heading", { name: /^Proposal \d+$/ })).toHaveCount(2);
+  const proposals = page.getByRole("region", { name: "Proposals", exact: true });
+  await expect(proposals.getByRole("listitem")).toHaveCount(2);
 });
 
 test("applying a stale proposal reports the FTE conflict by name", async ({ page }) => {
@@ -182,14 +182,14 @@ test("applying a stale proposal reports the FTE conflict by name", async ({ page
     id: `conflict-other-${suffix}`,
     name: `Conflict Other ${suffix}`,
   });
-  const lane = page.getByRole("region", { name: "Whole project" });
+  const lane = page.getByRole("region", { name: "Staffing" });
   await lane.getByRole("button", { name: "Assign person to Whole project" }).click();
   await lane.getByLabel("Person").selectOption({ label: personName });
   await lane.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(lane.getByText("1 / 1 FTE · complete")).toBeVisible();
+  await expect(lane).toContainText("1 of 1 FTE");
 
   await page.goto(`/projects/conflict-proposed-${suffix}`);
-  await page.getByRole("button", { name: "Proposals (1) ▸" }).click();
+  await page.getByRole("button", { name: "Review proposal 1" }).click();
   await page
     .getByRole("region", { name: "Proposal 1" })
     .getByRole("button", { name: "Apply to project" })
@@ -267,20 +267,20 @@ test("a partially covered proposal breaks down its unmet requirements", async ({
 
   // The breakdown is saved with the proposal, so it survives a reload.
   await page.reload();
-  await page.getByRole("button", { name: "Proposals (1) ▸" }).click();
+  await page.getByRole("button", { name: "Review proposal 1" }).click();
   await expect(
     page.getByRole("region", { name: "Proposal 1" }).getByText("2 unmet requirements"),
   ).toBeVisible();
 });
 
 test("the retired Teams and Optimization pages redirect to projects", async ({ page }) => {
-  const nav = page.getByRole("navigation");
+  const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav.getByRole("link")).toHaveText([
     "Dashboard",
-    "People",
-    "Projects",
+    /^People\d*$/,
+    /^Projects\d*$/,
     "Organization",
-    "e2e-manager@example.com",
+    /e2e-manager@example\.com$/,
   ]);
 
   await page.goto("/teams");

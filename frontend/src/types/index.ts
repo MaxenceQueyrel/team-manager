@@ -89,6 +89,7 @@ export interface Project {
   date_ranges: DateRange[];
   phases: ProjectPhase[];
   priority: Priority;
+  completed_at: string | null; // ISO date the project was marked complete
 }
 
 export interface Assignment {
@@ -116,6 +117,7 @@ export interface Team {
   optimization_max_score?: number | null;
   coverage: PhaseCoverage[]; // empty for teams saved before coverage was tracked
   fully_covered: boolean | null;
+  created_at: string | null; // ISO-8601 datetime; null for teams saved before it was tracked
 }
 
 export interface Skill {
@@ -212,6 +214,7 @@ export interface Organization {
 // Membership is many-to-many, so a user's role lives per-organization rather than on User.
 export interface OrganizationMembership extends Organization {
   role: OrganizationRole;
+  member_count: number;
 }
 
 export interface OrganizationMember {

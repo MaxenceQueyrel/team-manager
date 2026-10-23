@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.core.deps import require_org_member, require_permission
@@ -92,6 +94,7 @@ def solve_assignment(
             "optimization_max_score": best.max_score,
             "coverage": [c.model_dump() for c in best.coverage],
             "fully_covered": best.fully_covered,
+            "created_at": datetime.now(UTC),
         },
         organization_id,
     )

@@ -7,7 +7,7 @@ import {
   setActiveOrganizationId,
   setOnAuthFailure,
 } from "@/services/api";
-import type { OrganizationMembership, User } from "@/types";
+import type { OrganizationMember, OrganizationMembership, OrganizationRole, User } from "@/types";
 
 const ACTIVE_ORG_STORAGE_KEY = "activeOrganizationId";
 
@@ -32,6 +32,14 @@ interface AuthState {
   setActiveOrganization: (id: string) => void;
   createOrganization: (name: string) => Promise<void>;
   refreshOrganizations: () => Promise<void>;
+  renameOrganization: (id: string, name: string) => Promise<void>;
+  deleteOrganization: (id: string) => Promise<void>;
+  addOrganizationMember: (
+    id: string,
+    email: string,
+    role: OrganizationRole,
+  ) => Promise<OrganizationMember>;
+  removeOrganizationMember: (id: string, userId: string) => Promise<void>;
 }
 
 function message(e: unknown): string {
@@ -214,6 +222,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     );
     applyActiveOrganization(activeOrganizationId);
     set({ organizations, activeOrganizationId });
+  },
+
+  // Each mutation re-lists the memberships so the switcher's name and member count stay current.
+  renameOrganization: async (id, name) => {
+    await organizationsApi.update(id, { name });
+    await get().refreshOrganizations();
+  },
+
+  deleteOrganization: async (id) => {
+    await organizationsApi.delete(id);
+    await get().refreshOrganizations();
+  },
+
+  addOrganizationMember: async (id, email, role) => {
+    const member = await organizationsApi.addMember(id, email, role);
+    await get().refreshOrganizations();
+    return member;
+  },
+
+  removeOrganizationMember: async (id, userId) => {
+    await organizationsApi.removeMember(id, userId);
+    await get().refreshOrganizations();
   },
 }));
 

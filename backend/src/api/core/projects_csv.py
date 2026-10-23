@@ -21,6 +21,7 @@ FIELDNAMES = (
     "description",
     "n_slots",
     "priority",
+    "completed_at",
     *_JSON_FIELDS,
 )
 
@@ -37,7 +38,8 @@ def encode_projects_csv(projects: list[Project]) -> str:
 
     Scalar `ProjectBase` fields become plain columns; `skill_requirements`,
     `excluded_person_ids`, `included_person_ids`, `squads`, `date_ranges`, and
-    `phases` are each JSON-encoded into a single cell.
+    `phases` are each JSON-encoded into a single cell. An open project's
+    `completed_at` is written as an empty cell.
 
     Args:
         projects: Projects to encode.
@@ -65,7 +67,9 @@ def decode_projects_csv(content: str) -> list[tuple[str, ProjectCreate]]:
     """Decodes CSV text produced by `encode_projects_csv` into projects.
 
     Args:
-        content: CSV text with the schema written by `encode_projects_csv`.
+        content: CSV text with the schema written by `encode_projects_csv`. The
+            `completed_at` column may be absent, as in exports made before it
+            existed; an empty or missing cell imports as an open project.
 
     Returns:
         A list of (project id, ProjectCreate) pairs, in row order.
@@ -83,13 +87,14 @@ def decode_projects_csv(content: str) -> list[tuple[str, ProjectCreate]]:
             data: dict[str, Any] = {
                 field: json.loads(row[field]) if field in _JSON_FIELDS else row[field]
                 for field in FIELDNAMES
-                if field != "id"
+                if field not in ("id", "completed_at")
             }
         except KeyError as exc:
             raise ProjectCsvRowError(row_number, f"missing column {exc}") from exc
         except json.JSONDecodeError as exc:
             raise ProjectCsvRowError(row_number, f"malformed JSON cell: {exc}") from exc
 
+        data["completed_at"] = row.get("completed_at") or None
         try:
             project = ProjectCreate.model_validate(data)
         except ValidationError as exc:

@@ -8,6 +8,7 @@ import type {
   OrganizationDetail,
   OrganizationMember,
   OrganizationMembership,
+  OrganizationRole,
   PeopleImportSummary,
   Person,
   PersonAvailability,
@@ -240,9 +241,12 @@ export const organizationsApi = {
     client.post<Organization>("/api/v1/organizations/", data).then((r) => r.data),
   get: (id: string) =>
     client.get<OrganizationDetail>(`/api/v1/organizations/${id}`).then((r) => r.data),
-  addMember: (id: string, email: string) =>
+  update: (id: string, data: { name: string }) =>
+    client.patch<Organization>(`/api/v1/organizations/${id}`, data).then((r) => r.data),
+  delete: (id: string) => client.delete(`/api/v1/organizations/${id}`),
+  addMember: (id: string, email: string, role: OrganizationRole) =>
     client
-      .post<OrganizationMember>(`/api/v1/organizations/${id}/members`, { email })
+      .post<OrganizationMember>(`/api/v1/organizations/${id}/members`, { email, role })
       .then((r) => r.data),
   removeMember: (id: string, userId: string) =>
     client.delete(`/api/v1/organizations/${id}/members/${userId}`),

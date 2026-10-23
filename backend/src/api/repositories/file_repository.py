@@ -83,3 +83,9 @@ class FileRepository(Generic[T]):
             return False
         self._save(filtered)
         return True
+
+    def delete_all(self, organization_id: str):
+        items = self._load()
+        self._save(
+            [item for item in items if item.get("organization_id") != organization_id]
+        )

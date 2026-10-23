@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { daysBetween, enumerateDays, ratioColor } from "@/components/common/AvailabilityCalendar";
+import { ratioColor } from "@/components/common/AvailabilityCalendar";
+import { daysBetween, enumerateDays } from "@/components/common/dates";
 import { Button, colors, inputStyle } from "@/components/common/ui";
 import type { DateRange } from "@/types";
 
@@ -124,7 +125,7 @@ export function VacationPicker({
                 fontSize: "0.8rem",
                 cursor: "pointer",
                 border: `1px solid ${off ? ratioColor(0) : colors.borderStrong}`,
-                background: off ? ratioColor(0) : isWeekend(day) ? colors.light : "#fff",
+                background: off ? ratioColor(0) : isWeekend(day) ? colors.light : colors.surface,
                 color: off ? "#fff" : colors.text,
                 fontWeight: anchor === day ? 700 : 400,
               }}

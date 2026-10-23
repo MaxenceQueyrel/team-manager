@@ -31,7 +31,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
       aria-label="Remove"
       style={{
         border: `1px solid ${colors.borderStrong}`,
-        background: "#fff",
+        background: colors.surface,
         color: colors.danger,
         borderRadius: 6,
         width: 30,
