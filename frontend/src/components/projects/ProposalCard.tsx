@@ -1,6 +1,7 @@
+import { Check, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
 import { TeamMembers } from "@/components/common/TeamMembers";
-import { Button, Card, colors, Modal } from "@/components/common/ui";
+import { Button, Card, colors, IconButton, Modal } from "@/components/common/ui";
 import { CoverageBreakdown } from "@/components/projects/CoverageBreakdown";
 import { errorMessage } from "@/services/api";
 import type { AssignedMember, Person, PhaseCoverage } from "@/types";
@@ -13,7 +14,7 @@ function replacedScope(members: AssignedMember[]): string {
 }
 
 /** A team proposal diffed against current staffing, with its requirement coverage and an
- * "Apply to project" action. */
+ * "Apply to project" action. `onClose` adds a close button (a proposal opened for review). */
 export function ProposalCard({
   title,
   members,
@@ -26,6 +27,7 @@ export function ProposalCard({
   baseline,
   onApply,
   onDelete,
+  onClose,
 }: {
   title: string;
   members: AssignedMember[];
@@ -38,6 +40,7 @@ export function ProposalCard({
   baseline: AssignedMember[];
   onApply: () => Promise<void>;
   onDelete?: () => void;
+  onClose?: () => void;
 }) {
   const headingId = useId();
   const [confirming, setConfirming] = useState(false);
@@ -76,27 +79,32 @@ export function ProposalCard({
             gap: "0.75rem",
           }}
         >
-          <h3 id={headingId} style={{ fontSize: "0.95rem", margin: 0 }}>
+          <h3 id={headingId} style={{ margin: 0 }}>
             {title}
           </h3>
-          <div style={{ display: "flex", gap: "0.4rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
             <Button
               variant="primary"
+              size="sm"
+              icon={Check}
               onClick={() => setConfirming(true)}
               disabled={members.length === 0}
             >
               Apply to project
             </Button>
             {onDelete && (
-              <Button variant="danger" onClick={onDelete}>
+              <Button variant="danger" size="sm" icon={Trash2} onClick={onDelete}>
                 Delete
               </Button>
             )}
+            {onClose && (
+              <IconButton icon={X} size="sm" ariaLabel={`Close ${title}`} onClick={onClose} />
+            )}
           </div>
         </div>
-        <p style={{ margin: "0.4rem 0 0.75rem", fontSize: "0.875rem" }}>
+        <p style={{ margin: "0.4rem 0 0.75rem", fontSize: "0.875rem", color: colors.muted }}>
           Optimization score:{" "}
-          <strong>
+          <strong className="mono" style={{ color: colors.text }}>
             {score != null && maxScore != null ? `${score.toFixed(2)}/${maxScore.toFixed(2)}` : "—"}
           </strong>
           {scoreNote && <span style={{ color: colors.muted }}> · {scoreNote}</span>}

@@ -86,15 +86,20 @@ function roundFte(fte: number): number {
   return Math.round(fte * 100) / 100;
 }
 
-/** FTE staffed on the lane: each distinct person counts once, at their ratio on the lane. */
-export function assignedFte(lane: StaffingLane): number {
+/** Each distinct person's FTE on the lane, in roster order: their highest ratio on it. */
+export function fteByPerson(lane: StaffingLane): Map<string, number> {
   // A project with several date ranges holds one assignment per range for the same person.
   const ratioByPerson = new Map<string, number>();
   for (const a of lane.assignments) {
     ratioByPerson.set(a.person_id, Math.max(ratioByPerson.get(a.person_id) ?? 0, a.ratio));
   }
+  return ratioByPerson;
+}
+
+/** FTE staffed on the lane: each distinct person counts once, at their ratio on the lane. */
+export function assignedFte(lane: StaffingLane): number {
   let total = 0;
-  for (const ratio of ratioByPerson.values()) total += ratio;
+  for (const ratio of fteByPerson(lane).values()) total += ratio;
   return roundFte(total);
 }
 
@@ -226,9 +231,23 @@ export function needsStaffing(project: Project, lanes: StaffingLane[]): boolean 
 
 // Spelled out rather than via toLocaleDateString, whose en-GB short month for September
 // ("Sept") varies across ICU versions.
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
-function formatDay(iso: string, withYear: boolean): string {
+/** "1 Jul", or "1 Jul 2026" with `withYear`, from a `YYYY-MM-DD` date. */
+export function formatDay(iso: string, withYear: boolean): string {
   const [year, month, day] = iso.split("-");
   const dayMonth = `${Number(day)} ${MONTHS[Number(month) - 1]}`;
   return withYear ? `${dayMonth} ${year}` : dayMonth;

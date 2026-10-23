@@ -1,14 +1,4 @@
-import {
-  ChevronRight,
-  Download,
-  type LucideIcon,
-  Plus,
-  Signal,
-  SignalHigh,
-  SignalLow,
-  SignalMedium,
-  Upload,
-} from "lucide-react";
+import { ChevronRight, Download, Plus, Upload } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
@@ -19,6 +9,7 @@ import {
   FillBar,
   PageHeader,
   Pill,
+  priorityIcons,
   priorityTones,
   SearchInput,
   Tabs,
@@ -42,7 +33,7 @@ import { assignmentsApi, projectsApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
 import { useAuthStore } from "@/store/authStore";
-import type { Assignment, DateRange, Priority, Project, ProjectsImportSummary } from "@/types";
+import type { Assignment, DateRange, Project, ProjectsImportSummary } from "@/types";
 
 type StatusFilter = "all" | "needs-staffing" | "running" | "ended";
 
@@ -53,13 +44,6 @@ const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
   "needs-staffing": "Needs staffing",
   running: "Running",
   ended: "Ended",
-};
-
-const PRIORITY_ICONS: Record<Priority, LucideIcon> = {
-  low: SignalLow,
-  medium: SignalMedium,
-  high: SignalHigh,
-  critical: Signal,
 };
 
 const COLUMNS = "minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 1.7fr) 7.5rem 1.25rem";
@@ -392,7 +376,7 @@ function ProjectListRow({
               <span aria-hidden style={{ position: "absolute", inset: 0 }} />
             </Link>
           </h3>
-          <Pill tone={priorityTones[project.priority]} icon={PRIORITY_ICONS[project.priority]}>
+          <Pill tone={priorityTones[project.priority]} icon={priorityIcons[project.priority]}>
             {project.priority[0].toUpperCase() + project.priority.slice(1)}
           </Pill>
         </div>
