@@ -17,11 +17,11 @@ export async function loginAsManager(page: Page): Promise<void> {
 export async function createPerson(page: Page, name: string, roleId: string): Promise<void> {
   await page.goto("/people");
 
-  await page.getByRole("button", { name: "+ Add role" }).click();
+  await page.getByRole("button", { name: "Add role", exact: true }).click();
   await page.getByLabel("Role id").fill(roleId);
   await page.getByRole("button", { name: "Save" }).click();
 
-  await page.getByRole("button", { name: "+ Add person" }).click();
+  await page.getByRole("button", { name: "Add person", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Role", { exact: false }).selectOption(roleId);
   await page.getByRole("button", { name: "Save" }).click();
