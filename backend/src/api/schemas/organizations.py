@@ -1,10 +1,15 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
 
 class OrganizationCreate(BaseModel):
+    name: str
+
+
+class OrganizationUpdate(BaseModel):
     name: str
 
 
@@ -18,6 +23,7 @@ class OrganizationOut(BaseModel):
 
 class OrganizationMembershipOut(OrganizationOut):
     role: str
+    member_count: int
 
 
 class MemberOut(BaseModel):
@@ -32,3 +38,4 @@ class OrganizationDetail(OrganizationOut):
 
 class MemberAdd(BaseModel):
     email: str
+    role: Literal["owner", "contributor"] = "contributor"

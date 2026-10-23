@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from api.core.deps import get_current_user
@@ -14,12 +14,18 @@ from api.schemas.organizations import (
     OrganizationDetail,
     OrganizationMembershipOut,
     OrganizationOut,
+    OrganizationUpdate,
 )
+from api.v1 import assignments as assignments_module
+from api.v1 import people as people_module
+from api.v1 import projects as projects_module
+from api.v1 import roles as roles_module
+from api.v1 import skills as skills_module
+from api.v1 import teams as teams_module
 
 router = APIRouter()
 
 OWNER = "owner"
-CONTRIBUTOR = "contributor"
 
 
 def _get_membership(
@@ -88,9 +94,18 @@ def create_organization(
 def list_organizations(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
+    member_counts = (
+        select(
+            OrganizationMember.organization_id,
+            func.count().label("member_count"),
+        )
+        .group_by(OrganizationMember.organization_id)
+        .subquery()
+    )
     rows = db.execute(
-        select(Organization, OrganizationMember.role)
+        select(Organization, OrganizationMember.role, member_counts.c.member_count)
         .join(OrganizationMember, OrganizationMember.organization_id == Organization.id)
+        .join(member_counts, member_counts.c.organization_id == Organization.id)
         .where(OrganizationMember.user_id == current_user.id)
     ).all()
     return [
@@ -99,8 +114,9 @@ def list_organizations(
             name=organization.name,
             created_at=organization.created_at,
             role=role,
+            member_count=member_count,
         )
-        for organization, role in rows
+        for organization, role, member_count in rows
     ]
 
 
@@ -129,11 +145,32 @@ def get_organization(
     )
 
 
+@router.patch("/{organization_id}", response_model=OrganizationOut)
+def update_organization(
+    data: OrganizationUpdate,
+    organization: Organization = Depends(require_org_owner),
+    db: Session = Depends(get_db),
+):
+    organization.name = data.name
+    db.commit()
+    db.refresh(organization)
+    return organization
+
+
 @router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_organization(
     organization: Organization = Depends(require_org_owner),
     db: Session = Depends(get_db),
 ):
+    for module in (
+        people_module,
+        projects_module,
+        teams_module,
+        assignments_module,
+        roles_module,
+        skills_module,
+    ):
+        module.repo.delete_all(str(organization.id))
     db.execute(
         delete(OrganizationMember).where(
             OrganizationMember.organization_id == organization.id
@@ -161,11 +198,11 @@ def add_member(
 
     db.add(
         OrganizationMember(
-            organization_id=organization.id, user_id=user.id, role=CONTRIBUTOR
+            organization_id=organization.id, user_id=user.id, role=data.role
         )
     )
     db.commit()
-    return MemberOut(user_id=user.id, email=user.email, role=CONTRIBUTOR)
+    return MemberOut(user_id=user.id, email=user.email, role=data.role)
 
 
 @router.delete(
