@@ -6,7 +6,7 @@ import { errorMessage, peopleApi } from "@/services/api";
 import type { AvailabilitySegment, Person } from "@/types";
 
 type RangeChoice = "1m" | "3m" | "6m" | "custom";
-type WeekStatus = "free" | "partly" | "booked";
+export type WeekStatus = "free" | "partly" | "booked";
 
 const PRESET_WEEKS: Record<Exclude<RangeChoice, "custom">, number> = {
   "1m": 5,
@@ -27,7 +27,7 @@ const RANGE_TABS = [
 
 const PARTLY_COLOR = `color-mix(in srgb, ${colors.success} 45%, ${colors.surface})`;
 
-const STATUS_STYLES: Record<WeekStatus, { label: string; color: string }> = {
+export const STATUS_STYLES: Record<WeekStatus, { label: string; color: string }> = {
   free: { label: "Free", color: colors.success },
   partly: { label: "Partly booked", color: PARTLY_COLOR },
   booked: { label: "Booked", color: colors.track },
@@ -39,7 +39,11 @@ interface Week {
   free: number; // share of the contracted capacity left, 0–1
 }
 
-function summarizeWeek(start: string, segments: AvailabilitySegment[], capacity: number): Week {
+export function summarizeWeek(
+  start: string,
+  segments: AvailabilitySegment[],
+  capacity: number,
+): Week {
   const ratios = enumerateDays(start, addDays(start, 6)).map(
     (day) => segments.find((s) => s.start <= day && day <= s.end)?.ratio ?? 0,
   );
