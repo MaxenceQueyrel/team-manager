@@ -19,7 +19,9 @@ test("assigning a person to a project from their page lists the assignment", asy
   await expect(assignments.getByText("Not on any project right now")).toBeVisible();
 
   await page.getByRole("button", { name: "Assign to project" }).first().click();
-  await page.getByLabel("Project", { exact: true }).selectOption({ label: projectName });
+  await page
+    .getByRole("combobox", { name: "Project", exact: true })
+    .selectOption({ label: projectName });
   await page.getByLabel("Commitment").selectOption("half-time");
   await page.getByLabel("Start date", { exact: true }).fill("2030-01-07");
   await page.getByLabel("End date", { exact: true }).fill("2030-02-03");

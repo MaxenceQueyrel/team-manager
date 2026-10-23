@@ -7,7 +7,7 @@ test("creating a person adds them to the roster", async ({ page }) => {
 
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
-  await expect(page.getByRole("cell", { name })).toBeVisible();
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
 test("exporting people downloads a CSV file", async ({ page }) => {
@@ -45,7 +45,7 @@ test("importing a CSV adds new people and reports the result", async ({ page }) 
   });
 
   await expect(page.getByText(/Import complete — created 1\./)).toBeVisible();
-  await expect(page.getByRole("cell", { name })).toBeVisible();
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
 
 test("importing a CSV with unknown roles/skills adds them to the catalog", async ({ page }) => {

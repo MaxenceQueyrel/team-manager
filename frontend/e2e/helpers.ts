@@ -23,7 +23,7 @@ export async function createPerson(page: Page, name: string, roleId: string): Pr
 
   await page.getByRole("button", { name: "Add person", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByLabel("Role", { exact: false }).selectOption(roleId);
+  await page.getByRole("combobox", { name: /^Role/ }).selectOption(roleId);
   await page.getByRole("button", { name: "Save" }).click();
 }
 
