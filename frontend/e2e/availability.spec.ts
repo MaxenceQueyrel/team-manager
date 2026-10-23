@@ -19,7 +19,7 @@ test("assignment-driven reductions show up on the capacity timeline", async ({ p
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(page.getByText("0.5 / 1 FTE · partial")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("0.5 of 1 FTE");
 
   await page.goto("/people");
   await page.getByRole("link", { name: "Capacity" }).click();

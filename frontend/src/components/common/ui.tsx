@@ -1,4 +1,14 @@
-import { ChevronDown, Ellipsis, type LucideIcon, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  Ellipsis,
+  type LucideIcon,
+  Search,
+  Signal,
+  SignalHigh,
+  SignalLow,
+  SignalMedium,
+  X,
+} from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -264,6 +274,13 @@ export const priorityTones: Record<Priority, PillTone> = {
   medium: "primary",
   high: "warning",
   critical: "danger",
+};
+
+export const priorityIcons: Record<Priority, LucideIcon> = {
+  low: SignalLow,
+  medium: SignalMedium,
+  high: SignalHigh,
+  critical: Signal,
 };
 
 export const seniorityTones: Record<Seniority, PillTone> = {
@@ -964,11 +981,13 @@ export function Modal({
   onClose,
   children,
   footer,
+  maxWidth = 680,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  maxWidth?: number;
 }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -1001,7 +1020,7 @@ export function Modal({
           background: colors.surface,
           borderRadius: 14,
           width: "100%",
-          maxWidth: 680,
+          maxWidth,
           boxShadow: "var(--shadow-pop)",
         }}
       >

@@ -36,7 +36,7 @@ test("assigning a person from the project workspace shows the roster entry", asy
   await page.getByRole("link", { name: projectName }).click();
   await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();
 
-  const lane = page.getByRole("region", { name: "Whole project" });
+  const lane = page.getByRole("region", { name: "Staffing" });
   await lane.getByRole("button", { name: "Assign person to Whole project" }).click();
   await lane.getByLabel("Person").selectOption({ label: personName });
   await lane.getByLabel("Commitment").selectOption("half-time");
@@ -45,12 +45,16 @@ test("assigning a person from the project workspace shows the roster entry", asy
   await lane.getByRole("button", { name: "Assign", exact: true }).click();
 
   const rosterEntry = lane.getByRole("listitem").filter({ hasText: personName });
-  await expect(rosterEntry).toContainText("Half-time");
+  await expect(rosterEntry).toContainText("0.5 FTE");
   // Half-time on a 1-FTE project leaves half of it unstaffed.
-  await expect(lane.getByText("0.5 / 1 FTE · partial")).toBeVisible();
-  await expect(lane.getByText("1 person", { exact: true })).toBeVisible();
+  await expect(lane).toContainText("0.5 of 1 FTE");
+  await expect(lane.getByText("0.5 FTE still open")).toBeVisible();
+  await expect(lane.getByRole("listitem")).toHaveCount(1);
 
-  await page.getByRole("link", { name: "← Projects" }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: "Projects" })
+    .click();
   const row = projectRow(page, projectName);
   await expect(row).toContainText("0.5 / 1");
   await expect(row).toContainText(personName.split(" ")[0]);
@@ -101,7 +105,8 @@ test("assigning to a phase uses the phase dates and updates its fill", async ({ 
   await expect(design.getByLabel("Start date", { exact: true })).toHaveValue("2026-01-01");
   await expect(design.getByLabel("End date", { exact: true })).toHaveValue("2026-01-31");
   await design.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(design.getByText("1 / 1 FTE · complete")).toBeVisible();
+  await expect(design).toContainText("1 of 1 FTE");
+  await expect(design.getByText("Fully staffed")).toBeVisible();
   await expect(page.getByTitle("design: 2026-01-01 → 2026-01-31")).toContainText("1 / 1 FTE");
 
   // Full-time on both overlapping phases exceeds 1.0 FTE; the error stays in the lane.
@@ -113,8 +118,8 @@ test("assigning to a phase uses the phase dates and updates its fill", async ({ 
 
   await build.getByLabel("Start date", { exact: true }).fill("2026-02-01");
   await build.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(build.getByText("1 / 2 FTE · partial")).toBeVisible();
-  await expect(build.getByText("Missing skills: python ≥ 3")).toBeVisible();
+  await expect(build).toContainText("1 of 2 FTE");
+  await expect(build.getByText("Needs python ≥ 3")).toBeVisible();
   await expect(page.getByTitle("build: 2026-01-15 → 2026-02-28")).toContainText("1 / 2 FTE");
 });
 
@@ -140,7 +145,7 @@ test("three people at 30% leave a 3-FTE project incomplete", async ({ page }) =>
   await page.getByRole("link", { name: projectName }).click();
   await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();
 
-  const lane = page.getByRole("region", { name: "Whole project" });
+  const lane = page.getByRole("region", { name: "Staffing" });
   for (const personName of personNames) {
     await lane.getByRole("button", { name: "Assign person to Whole project" }).click();
     await lane.getByLabel("Person").selectOption({ label: personName });
@@ -152,10 +157,13 @@ test("three people at 30% leave a 3-FTE project incomplete", async ({ page }) =>
     await expect(lane.getByRole("listitem").filter({ hasText: personName })).toBeVisible();
   }
 
-  await expect(lane.getByText("0.9 / 3 FTE · partial")).toBeVisible();
-  await expect(lane.getByText("3 people", { exact: true })).toBeVisible();
+  await expect(lane).toContainText("0.9 of 3 FTE");
+  await expect(lane.getByRole("listitem")).toHaveCount(3);
 
-  await page.getByRole("link", { name: "← Projects" }).click();
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: "Projects" })
+    .click();
   const row = projectRow(page, projectName);
   await expect(row).toContainText("0.9 / 3");
   await expect(row).toContainText("Running");
