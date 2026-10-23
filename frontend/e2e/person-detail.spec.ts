@@ -8,7 +8,7 @@ test("assigning a person to a project from their page lists the assignment", asy
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
 
