@@ -2,7 +2,7 @@ import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
+import { Button, Card, colors, Pill, priorityTones } from "@/components/common/ui";
 import {
   OPTIMIZATION_PANEL_WIDTH,
   OptimizationPanel,
@@ -162,7 +162,7 @@ export default function ProjectWorkspacePage() {
         <div>
           <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
             <h1 style={{ margin: 0 }}>{project.name}</h1>
-            <Badge color={priorityColors[project.priority]}>{project.priority}</Badge>
+            <Pill tone={priorityTones[project.priority]}>{project.priority}</Pill>
           </div>
           {project.description && (
             <p style={{ margin: "0.4rem 0 0", color: colors.muted }}>{project.description}</p>

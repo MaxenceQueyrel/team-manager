@@ -1,8 +1,8 @@
-import { Badge, colors } from "@/components/common/ui";
+import { colors, Pill } from "@/components/common/ui";
 import {
   assignedFte,
-  fillColors,
   fillStatus,
+  fillTones,
   type StaffingLane,
 } from "@/components/projects/staffing";
 
@@ -94,9 +94,9 @@ export function PhaseTimeline({ lanes }: { lanes: StaffingLane[] }) {
                   }}
                 >
                   <strong>{lane.label}</strong>
-                  <Badge color={fillColors[status]}>
+                  <Pill tone={fillTones[status]}>
                     {assignedFte(lane)} / {lane.nSlots} FTE
-                  </Badge>
+                  </Pill>
                 </div>
               </div>
             );
@@ -129,9 +129,9 @@ export function PhaseTimeline({ lanes }: { lanes: StaffingLane[] }) {
           {undated.map((lane) => (
             <span key={lane.key} style={{ display: "inline-flex", gap: "0.3rem" }}>
               <strong>{lane.label}</strong>
-              <Badge color={fillColors[fillStatus(lane)]}>
+              <Pill tone={fillTones[fillStatus(lane)]}>
                 {assignedFte(lane)} / {lane.nSlots} FTE
-              </Badge>
+              </Pill>
             </span>
           ))}
         </div>

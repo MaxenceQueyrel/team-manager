@@ -4,13 +4,13 @@ import { Link, useParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { AvailabilityCalendar, AvailabilityLegend } from "@/components/common/AvailabilityCalendar";
 import {
-  Badge,
   Button,
   Card,
   colors,
   Field,
   inputStyle,
-  seniorityColors,
+  Pill,
+  seniorityTones,
 } from "@/components/common/ui";
 import { AvailabilityEditor } from "@/components/editors/listEditors";
 import { PersonForm } from "@/components/people/PersonForm";
@@ -199,7 +199,7 @@ export default function PersonDetailPage() {
             }}
           >
             <span>{person.role}</span>
-            <Badge color={seniorityColors[person.seniority]}>{person.seniority}</Badge>
+            <Pill tone={seniorityTones[person.seniority]}>{person.seniority}</Pill>
             <span>
               {person.working_days_per_week} days/week · {(person.base_capacity * 100).toFixed(0)}%
               FTE
@@ -341,9 +341,9 @@ export default function PersonDetailPage() {
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
             {person.skills.map((s) => (
-              <Badge key={s.id} color={colors.primary}>
+              <Pill key={s.id} tone="primary">
                 {s.id} · {s.level}
-              </Badge>
+              </Pill>
             ))}
           </div>
         )}

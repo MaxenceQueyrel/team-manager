@@ -53,7 +53,8 @@ test("a user can create multiple organizations and switch between them", async (
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByRole("heading", { name: `Members — ${orgTwoName}` })).toBeVisible();
 
-  await page.getByLabel("Organization").selectOption({ label: orgOneName });
+  await page.getByRole("button", { name: orgTwoName }).click();
+  await page.getByRole("menuitemradio", { name: orgOneName }).click();
   await expect(page.getByRole("heading", { name: `Members — ${orgOneName}` })).toBeVisible();
 });
 

@@ -1,4 +1,4 @@
-import { colors } from "@/components/common/ui";
+import type { FillTone } from "@/components/common/ui";
 import type {
   AssignedMember,
   Assignment,
@@ -10,10 +10,11 @@ import type {
 
 export type FillStatus = "complete" | "partial" | "empty";
 
-export const fillColors: Record<FillStatus, string> = {
-  complete: colors.success,
-  partial: "#fd7e14",
-  empty: colors.danger,
+/** Pill / fill-bar tone per fill status; an empty lane reads as a gap like a partial one. */
+export const fillTones: Record<FillStatus, FillTone> = {
+  complete: "success",
+  partial: "warning",
+  empty: "warning",
 };
 
 /** One staffing unit of a project: a phase, the whole (non-phased) project, or the

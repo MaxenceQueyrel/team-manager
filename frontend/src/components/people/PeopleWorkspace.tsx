@@ -44,7 +44,7 @@ export default function PeopleWorkspace() {
               fontSize: "0.875rem",
               textDecoration: "none",
               color: isActive ? colors.primary : colors.muted,
-              background: isActive ? "#fff" : "transparent",
+              background: isActive ? colors.surface : "transparent",
               boxShadow: isActive ? "0 1px 2px rgba(0, 0, 0, 0.08)" : "none",
               fontWeight: isActive ? 600 : 500,
             })}

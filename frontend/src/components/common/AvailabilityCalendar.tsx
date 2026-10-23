@@ -155,7 +155,7 @@ export function AvailabilityCalendar({
             gridRow: 1,
             position: "sticky",
             left: 0,
-            background: "#fff",
+            background: colors.surface,
             zIndex: 2,
           }}
         />
@@ -200,7 +200,7 @@ export function AvailabilityCalendar({
                   gridRow: rowIdx + 2,
                   position: "sticky",
                   left: 0,
-                  background: "#fff",
+                  background: colors.surface,
                   zIndex: 2,
                   display: "flex",
                   alignItems: "center",

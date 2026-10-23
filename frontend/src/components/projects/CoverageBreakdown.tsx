@@ -1,30 +1,6 @@
-import { Badge, colors } from "@/components/common/ui";
-import { fillColors, formatFte } from "@/components/projects/staffing";
+import { colors, FillBar, Pill } from "@/components/common/ui";
+import { formatFte } from "@/components/projects/staffing";
 import type { PhaseCoverage, SkillCoverage } from "@/types";
-
-function Bar({ ratio, met }: { ratio: number; met: boolean }) {
-  const percent = Math.min(Math.max(ratio, 0), 1) * 100;
-  return (
-    <div
-      aria-hidden
-      style={{
-        height: 6,
-        borderRadius: 3,
-        background: colors.border,
-        overflow: "hidden",
-        minWidth: 60,
-      }}
-    >
-      <div
-        style={{
-          width: `${percent}%`,
-          height: "100%",
-          background: met ? fillColors.complete : fillColors.partial,
-        }}
-      />
-    </div>
-  );
-}
 
 const hintStyle = { margin: "0.2rem 0 0", fontSize: "0.78rem", color: colors.muted } as const;
 const cellStyle = { padding: "0.2rem 0.5rem 0.2rem 0", verticalAlign: "top" } as const;
@@ -37,7 +13,11 @@ function SkillRow({ skill }: { skill: SkillCoverage }) {
         {skill.skill_id}
       </th>
       <td style={barCellStyle}>
-        <Bar ratio={skill.best_level / (skill.required_level || 1)} met={skill.met} />
+        <FillBar
+          value={skill.best_level / (skill.required_level || 1)}
+          tone={skill.met ? "success" : "warning"}
+          style={{ minWidth: 60 }}
+        />
       </td>
       <td style={cellStyle}>
         Level {formatFte(skill.best_level)} / {formatFte(skill.required_level)}
@@ -76,7 +56,11 @@ function PhaseTable({ phase }: { phase: PhaseCoverage }) {
             FTE
           </th>
           <td style={barCellStyle}>
-            <Bar ratio={phase.staffed_fte / phase.required_fte} met={phase.fte_met} />
+            <FillBar
+              value={phase.staffed_fte / phase.required_fte}
+              tone={phase.fte_met ? "success" : "warning"}
+              style={{ minWidth: 60 }}
+            />
           </td>
           <td style={cellStyle}>
             <span style={{ color: phase.fte_met ? colors.success : colors.danger }}>
@@ -117,11 +101,11 @@ export function CoverageBreakdown({
     <details open={!fullyCovered} style={{ margin: "0 0 0.75rem", fontSize: "0.85rem" }}>
       <summary style={{ cursor: "pointer" }}>
         {fullyCovered ? (
-          <Badge color={colors.success}>All requirements covered</Badge>
+          <Pill tone="success">All requirements covered</Pill>
         ) : (
-          <Badge color={colors.danger}>
+          <Pill tone="warning">
             {gaps} unmet {gaps === 1 ? "requirement" : "requirements"}
-          </Badge>
+          </Pill>
         )}{" "}
         <span style={{ color: colors.muted }}>Requirement coverage</span>
       </summary>

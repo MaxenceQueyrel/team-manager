@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { Badge, Button, Card, colors, priorityColors } from "@/components/common/ui";
+import { Button, Card, colors, Pill, priorityTones } from "@/components/common/ui";
 import { ProjectForm } from "@/components/projects/ProjectForm";
-import { buildLanes, fillColors, isFullyStaffed, staffedFte } from "@/components/projects/staffing";
+import { buildLanes, isFullyStaffed, staffedFte } from "@/components/projects/staffing";
 import { assignmentsApi, projectsApi } from "@/services/api";
 import { downloadBlob } from "@/services/download";
 import { knownSkillIds, useAppStore } from "@/store";
@@ -153,7 +153,7 @@ export default function ProjectsPage() {
                   >
                     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                       <h3 style={{ margin: 0 }}>{p.name}</h3>
-                      <Badge color={priorityColors[p.priority]}>{p.priority}</Badge>
+                      <Pill tone={priorityTones[p.priority]}>{p.priority}</Pill>
                     </div>
                     {p.description && (
                       <p style={{ margin: "0.5rem 0 0", color: colors.muted }}>{p.description}</p>
@@ -169,9 +169,9 @@ export default function ProjectsPage() {
                       }}
                     >
                       {staffed} / {total} FTE staffed
-                      <Badge color={complete ? fillColors.complete : fillColors.partial}>
+                      <Pill tone={complete ? "success" : "warning"}>
                         {complete ? "complete" : "incomplete"}
-                      </Badge>
+                      </Pill>
                     </div>
                   </Link>
                   <div style={{ whiteSpace: "nowrap" }}>

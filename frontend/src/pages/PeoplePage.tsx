@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { daysBetween, ratioColor } from "@/components/common/AvailabilityCalendar";
+import { daysBetween } from "@/components/common/AvailabilityCalendar";
 import {
-  Badge,
   Button,
   Card,
   colors,
   Field,
   inputStyle,
   Modal,
-  seniorityColors,
+  Pill,
+  seniorityTones,
 } from "@/components/common/ui";
 import { PersonForm } from "@/components/people/PersonForm";
 import { peopleApi } from "@/services/api";
@@ -231,7 +231,7 @@ export default function PeoplePage() {
                   </td>
                   <td style={{ padding: "0.5rem" }}>{p.role}</td>
                   <td style={{ padding: "0.5rem" }}>
-                    <Badge color={seniorityColors[p.seniority]}>{p.seniority}</Badge>
+                    <Pill tone={seniorityTones[p.seniority]}>{p.seniority}</Pill>
                   </td>
                   <td style={{ padding: "0.5rem" }}>{p.years_of_experience} yrs</td>
                   <td style={{ padding: "0.5rem" }}>{(p.base_capacity * 100).toFixed(0)}%</td>
@@ -239,7 +239,9 @@ export default function PeoplePage() {
                     {free === undefined ? (
                       "—"
                     ) : (
-                      <Badge color={ratioColor(free)}>{(free * 100).toFixed(0)}%</Badge>
+                      <Pill tone={free >= 1 ? "success" : free > 0 ? "warning" : "neutral"}>
+                        {(free * 100).toFixed(0)}%
+                      </Pill>
                     )}
                   </td>
                   <td style={{ padding: "0.5rem", fontSize: "0.8rem", color: colors.muted }}>
@@ -335,9 +337,9 @@ function CatalogCard({
           <span style={{ color: colors.muted, fontSize: "0.85rem" }}>None yet.</span>
         ) : (
           items.slice(0, 10).map((item) => (
-            <Badge key={item.id} color={colors.primary}>
+            <Pill key={item.id} tone="primary">
               {item.id}
-            </Badge>
+            </Pill>
           ))
         )}
       </div>

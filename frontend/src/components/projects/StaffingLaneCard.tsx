@@ -1,19 +1,11 @@
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Badge,
-  Button,
-  Card,
-  colors,
-  Field,
-  inputStyle,
-  selectStyle,
-} from "@/components/common/ui";
+import { Button, Card, colors, Field, inputStyle, Pill, selectStyle } from "@/components/common/ui";
 import {
   assignedCount,
   assignedFte,
-  fillColors,
   fillStatus,
+  fillTones,
   formatHeadcount,
   missingSkills,
   type StaffingLane,
@@ -97,9 +89,9 @@ export function StaffingLaneCard({
               <span style={{ fontSize: "0.8rem", color: colors.muted }}>
                 {formatHeadcount(assignedCount(lane))}
               </span>
-              <Badge color={fillColors[status]}>
+              <Pill tone={fillTones[status]}>
                 {assignedFte(lane)} / {lane.nSlots} FTE · {status}
-              </Badge>
+              </Pill>
             </div>
           )}
         </div>
@@ -166,7 +158,7 @@ export function StaffingLaneCard({
                     </Link>
                     {person?.role && <span style={{ color: colors.muted }}> ({person.role})</span>}
                     {" · "}
-                    <Badge color={colors.primary}>{commitmentForRatio(assignment.ratio)}</Badge>
+                    <Pill tone="primary">{commitmentForRatio(assignment.ratio)}</Pill>
                     <div style={{ fontSize: "0.8rem", color: colors.muted, marginTop: 2 }}>
                       {assignment.start} → {assignment.end}
                       {lane.nSlots === null && assignment.phase_id && ` · ${assignment.phase_id}`}

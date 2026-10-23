@@ -274,13 +274,13 @@ test("a partially covered proposal breaks down its unmet requirements", async ({
 });
 
 test("the retired Teams and Optimization pages redirect to projects", async ({ page }) => {
-  const nav = page.getByRole("navigation");
+  const nav = page.getByRole("navigation", { name: "Main" });
   await expect(nav.getByRole("link")).toHaveText([
     "Dashboard",
-    "People",
-    "Projects",
+    /^People\d*$/,
+    /^Projects\d*$/,
     "Organization",
-    "e2e-manager@example.com",
+    /e2e-manager@example\.com$/,
   ]);
 
   await page.goto("/teams");
