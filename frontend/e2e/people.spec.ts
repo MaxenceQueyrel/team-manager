@@ -160,7 +160,7 @@ test("an assigned person shows reduced availability on their detail page", async
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("link", { name: projectName }).click();

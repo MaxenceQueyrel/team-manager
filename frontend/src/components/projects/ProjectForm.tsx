@@ -25,6 +25,7 @@ function emptyDraft(): ProjectDraft {
     date_ranges: [],
     phases: [],
     priority: "medium",
+    completed_at: null,
   };
 }
 

@@ -1,16 +1,24 @@
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { createPerson, uniqueSuffix } from "./helpers";
+
+function projectRow(page: Page, name: string): Locator {
+  return page.getByRole("listitem").filter({ has: page.getByRole("link", { name, exact: true }) });
+}
 
 test("creating a project adds it to the list", async ({ page }) => {
   const name = `Website Revamp ${uniqueSuffix()}`;
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(page.getByRole("heading", { name })).toBeVisible();
-  await expect(page.getByRole("link", { name })).toContainText("0 / 1 FTE staffedincomplete");
+  const row = projectRow(page, name);
+  await expect(row).toContainText("0 / 1");
+  await expect(row).toContainText("Nobody assigned");
+  await expect(row).toContainText("Unstaffed");
 });
 
 test("assigning a person from the project workspace shows the roster entry", async ({ page }) => {
@@ -21,7 +29,7 @@ test("assigning a person from the project workspace shows the roster entry", asy
   await createPerson(page, personName, `platform-${suffix}`);
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
 
@@ -43,9 +51,10 @@ test("assigning a person from the project workspace shows the roster entry", asy
   await expect(lane.getByText("1 person", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "← Projects" }).click();
-  await expect(page.getByRole("link", { name: projectName })).toContainText(
-    "0.5 / 1 FTE staffedincomplete",
-  );
+  const row = projectRow(page, projectName);
+  await expect(row).toContainText("0.5 / 1");
+  await expect(row).toContainText(personName.split(" ")[0]);
+  await expect(row).toContainText("Running");
 });
 
 test("assigning to a phase uses the phase dates and updates its fill", async ({ page }) => {
@@ -147,9 +156,9 @@ test("three people at 30% leave a 3-FTE project incomplete", async ({ page }) =>
   await expect(lane.getByText("3 people", { exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "← Projects" }).click();
-  await expect(page.getByRole("link", { name: projectName })).toContainText(
-    "0.9 / 3 FTE staffedincomplete",
-  );
+  const row = projectRow(page, projectName);
+  await expect(row).toContainText("0.9 / 3");
+  await expect(row).toContainText("Running");
 });
 
 test("an unknown project id shows a not-found state", async ({ page }) => {
@@ -164,13 +173,13 @@ test("exporting projects downloads a CSV file", async ({ page }) => {
   const name = `Data Warehouse ${uniqueSuffix()}`;
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  await page.getByRole("button", { name: "Export" }).click();
   const download = await downloadPromise;
 
   expect(download.suggestedFilename()).toBe("projects.csv");

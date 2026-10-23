@@ -84,7 +84,7 @@ test("optimizing from the project workspace shows the best team", async ({ page 
   const name = `Optimization Smoke ${uniqueSuffix()}`;
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("link", { name }).click();
