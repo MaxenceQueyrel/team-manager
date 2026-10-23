@@ -9,7 +9,7 @@ test("assignment-driven reductions show up on the capacity timeline", async ({ p
   await createPerson(page, name, `availability-qa-${suffix}`);
 
   await page.goto("/projects");
-  await page.getByRole("button", { name: "+ Add project" }).click();
+  await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(projectName);
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("link", { name: projectName }).click();

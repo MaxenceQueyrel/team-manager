@@ -1,4 +1,4 @@
-import type { FillTone } from "@/components/common/ui";
+import type { FillTone, PillTone } from "@/components/common/ui";
 import type {
   AssignedMember,
   Assignment,
@@ -161,4 +161,82 @@ export function isFullyStaffed(lanes: StaffingLane[], people: Person[]): boolean
       lane.nSlots === null ||
       (fillStatus(lane) === "complete" && missingSkills(lane, people).length === 0),
   );
+}
+
+/** Lifecycle status shown as a pill on project lists and the project workspace. */
+export type ProjectStatus = "unstaffed" | "running" | "ended" | "complete";
+
+export const projectStatusLabels: Record<ProjectStatus, string> = {
+  unstaffed: "Unstaffed",
+  running: "Running",
+  ended: "Ended",
+  complete: "Complete",
+};
+
+export const projectStatusTones: Record<ProjectStatus, PillTone> = {
+  unstaffed: "warning",
+  running: "success",
+  ended: "neutral",
+  complete: "primary",
+};
+
+/** Today as a local `YYYY-MM-DD` date, comparable with the ISO dates on projects. */
+export function isoToday(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** First start to last end across the project's date ranges and phase dates; null if undated. */
+export function projectSpan(project: Project): DateRange | null {
+  const ranges = [
+    ...project.date_ranges,
+    ...project.phases.flatMap((phase) => (phase.date_range ? [phase.date_range] : [])),
+  ];
+  if (ranges.length === 0) return null;
+  let { start, end } = ranges[0];
+  for (const range of ranges) {
+    if (range.start < start) start = range.start;
+    if (range.end > end) end = range.end;
+  }
+  return { start, end };
+}
+
+/** Status of a project on `today` (`YYYY-MM-DD`), first match wins: `complete` once
+ * `completed_at` is set, `ended` when its last date is past, `unstaffed` when nobody is
+ * assigned, otherwise `running` (which includes staffed projects that have not started). */
+export function projectStatus(
+  project: Project,
+  lanes: StaffingLane[],
+  today: string,
+): ProjectStatus {
+  if (project.completed_at) return "complete";
+  const span = projectSpan(project);
+  if (span && span.end < today) return "ended";
+  return lanes.some((lane) => lane.assignments.length > 0) ? "running" : "unstaffed";
+}
+
+/** Whether a project that is not complete still has requested FTE left to fill, even if it ended. */
+export function needsStaffing(project: Project, lanes: StaffingLane[]): boolean {
+  if (project.completed_at) return false;
+  const { staffed, total } = staffedFte(lanes);
+  return staffed < total;
+}
+
+// Spelled out rather than via toLocaleDateString, whose en-GB short month for September
+// ("Sept") varies across ICU versions.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatDay(iso: string, withYear: boolean): string {
+  const [year, month, day] = iso.split("-");
+  const dayMonth = `${Number(day)} ${MONTHS[Number(month) - 1]}`;
+  return withYear ? `${dayMonth} ${year}` : dayMonth;
+}
+
+/** "1 Jul → 30 Sep"; years are shown only when the span leaves the year of `today`. */
+export function formatSpan(span: DateRange, today: string): string {
+  const year = today.slice(0, 4);
+  const withYear = !span.start.startsWith(year) || !span.end.startsWith(year);
+  return `${formatDay(span.start, withYear)} → ${formatDay(span.end, withYear)}`;
 }
