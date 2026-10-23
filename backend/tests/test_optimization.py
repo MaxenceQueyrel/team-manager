@@ -75,6 +75,7 @@ def test_solve_returns_best_team_and_requested_alternatives(
     body = response.json()
     assert body["best"]["id"]
     assert body["best"]["is_optimized"] is True
+    assert body["best"]["created_at"] is not None
     assert len(body["alternatives"]) == 2
     for alternative in body["alternatives"]:
         assert "id" not in alternative
