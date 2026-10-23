@@ -122,7 +122,9 @@ test("a skill nobody has shows as a coverage gap and is described on the Roles &
   await expect(page.getByRole("row", { name: skillId })).toContainText("Spotting staffing gaps");
 });
 
-test("editing an availability window on the detail page updates the timeline", async ({ page }) => {
+test("editing an availability window on the detail page updates the weekly strip", async ({
+  page,
+}) => {
   const suffix = uniqueSuffix();
   const name = `Katherine Johnson ${suffix}`;
   await createPerson(page, name, `qa-engineer-${suffix}`);
@@ -131,18 +133,23 @@ test("editing an availability window on the detail page updates the timeline", a
   await expect(page).toHaveURL(/\/people\/[^/]+$/);
   await expect(page.getByRole("heading", { name })).toBeVisible();
 
-  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
-  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
-  await expect(page.getByTitle("2026-01-04: 100%")).toBeVisible();
+  await page.getByRole("tab", { name: "Custom" }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-01-05");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-18");
+  await expect(page.getByTitle("Week of 2026-01-05: free", { exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Add time off" }).click();
   await page.getByRole("button", { name: "+ Add window" }).click();
-  await page.getByLabel("Window start").fill("2026-01-03");
-  await page.getByLabel("Window end").fill("2026-01-05");
+  await page.getByLabel("Window start").fill("2026-01-05");
+  await page.getByLabel("Window end").fill("2026-01-11");
   await page.getByLabel("Window ratio").fill("0.25");
-  await page.getByRole("button", { name: "Save windows" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(page.getByTitle("2026-01-04: 25%")).toBeVisible();
-  await expect(page.getByTitle("2026-01-06: 100%")).toBeVisible();
+  await expect(page.getByTitle("Week of 2026-01-05: partly booked, 25% free")).toBeVisible();
+  await expect(page.getByTitle("Week of 2026-01-12: free", { exact: true })).toBeVisible();
+  const timeOff = page.getByRole("region", { name: "Time off & exceptions" });
+  await expect(timeOff.getByText("5 Jan → 11 Jan 2026")).toBeVisible();
+  await expect(timeOff.getByText("0.25 FTE")).toBeVisible();
 
   await page.goBack();
   await expect(page).toHaveURL(/\/people$/);
@@ -166,31 +173,36 @@ test("working days per week derives the FTE shown on the roster and detail page"
 
   await expect(fteCell).toHaveText("0.8");
   await page.getByRole("link", { name }).click();
-  await expect(page.getByText("4 days/week · 80% FTE")).toBeVisible();
+  const contracted = page.getByText("Contracted", { exact: true }).locator("..");
+  await expect(contracted).toContainText("0.8");
+  await expect(contracted).toContainText("4 days/week");
 });
 
-test("marking vacation days on the detail page zeroes them on the timeline", async ({ page }) => {
+test("marking a week of vacation on the detail page books that week", async ({ page }) => {
   const suffix = uniqueSuffix();
   const name = `Mary Jackson ${suffix}`;
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   await page.getByRole("link", { name }).click();
-  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
-  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
-  await expect(page.getByTitle("2026-01-06: 100%")).toBeVisible();
+  await page.getByRole("tab", { name: "Custom" }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-01-05");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-18");
+  await expect(page.getByTitle("Week of 2026-01-05: free", { exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Add time off" }).click();
   await page.getByLabel("Vacation month").fill("2026-01");
   await page.getByRole("button", { name: "2026-01-05", exact: true }).click();
   await page
-    .getByRole("button", { name: "2026-01-07", exact: true })
+    .getByRole("button", { name: "2026-01-11", exact: true })
     .click({ modifiers: ["Shift"] });
-  await expect(page.getByText("2026-01-05 → 2026-01-07 (3 days)")).toBeVisible();
-  await page.getByRole("button", { name: "Save vacation" }).click();
+  await expect(page.getByText("2026-01-05 → 2026-01-11 (7 days)")).toBeVisible();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
-  await expect(page.getByTitle("2026-01-06: 0%")).toBeVisible();
-  await expect(page.getByTitle("2026-01-08: 100%")).toBeVisible();
+  await expect(page.getByTitle("Week of 2026-01-05: booked", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("Week of 2026-01-12: free", { exact: true })).toBeVisible();
 
   await page.reload();
+  await page.getByRole("button", { name: "Add time off" }).click();
   await page.getByLabel("Vacation month").fill("2026-01");
   await expect(page.getByRole("button", { name: "2026-01-06", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -219,12 +231,16 @@ test("an assigned person shows reduced availability on their detail page", async
 
   await page.goto("/people");
   await page.getByRole("link", { name }).click();
-  await page.getByLabel("From", { exact: true }).fill("2026-01-01");
-  await page.getByLabel("To", { exact: true }).fill("2026-01-10");
-  await expect(page.getByTitle("2026-01-01: 50%")).toBeVisible();
+  await page.getByRole("tab", { name: "Custom" }).click();
+  await page.getByLabel("From", { exact: true }).fill("2026-01-05");
+  await page.getByLabel("To", { exact: true }).fill("2026-01-11");
+  // Half-time from the 5th to the 10th, free on the 11th: (6 × 0.5 + 1) / 7.
+  await expect(page.getByTitle("Week of 2026-01-05: partly booked, 57% free")).toBeVisible();
 
-  await page.getByText("Past assignments (1)").click();
-  await page.getByRole("link", { name: projectName }).click();
+  const assignments = page.getByRole("region", { name: "Assignments" });
+  await expect(assignments.getByText("Not on any project right now")).toBeVisible();
+  await expect(assignments.getByText("1 Jan → 10 Jan 2026 · 10 days")).toBeVisible();
+  await assignments.getByRole("link", { name: projectName }).click();
   await expect(page).toHaveURL(/\/projects\/[^/]+$/);
   await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();
 });

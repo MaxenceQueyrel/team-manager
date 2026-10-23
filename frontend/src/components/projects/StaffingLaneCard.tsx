@@ -34,7 +34,7 @@ function defaultRange(lane: StaffingLane): { start: string; end: string } {
   return { start: toISODate(start), end: toISODate(end) };
 }
 
-function commitmentForRatio(ratio: number): string {
+export function commitmentForRatio(ratio: number): string {
   if (ratio === 1) return "Full-time";
   if (ratio === 0.5) return "Half-time";
   if (ratio === 0.2) return "One day/week";
@@ -220,18 +220,21 @@ export function StaffingLaneCard({
   );
 }
 
-function AssignForm({
+/** Inline form to assign a person to `lane`; `defaultPersonId` preselects the person. */
+export function AssignForm({
   lane,
   people,
+  defaultPersonId = "",
   onCancel,
   onSubmit,
 }: {
   lane: StaffingLane;
   people: Person[];
+  defaultPersonId?: string;
   onCancel: () => void;
   onSubmit: (data: Omit<Assignment, "id" | "project_id">) => Promise<void>;
 }) {
-  const [personId, setPersonId] = useState("");
+  const [personId, setPersonId] = useState(defaultPersonId);
   const [commitment, setCommitment] = useState<CommitmentValue>("full-time");
   const [ratio, setRatio] = useState(1);
   const [range, setRange] = useState(() => defaultRange(lane));
