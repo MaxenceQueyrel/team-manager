@@ -42,7 +42,7 @@ test("a fresh user sees the organization empty state and can create one", async 
 
   // The new organization becomes active immediately, lifting the empty-state redirect.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 });
 
 test("a user can create multiple organizations and switch between them", async ({
@@ -134,7 +134,7 @@ test("deleting the organization switches to the remaining one, then to the empty
   await page.getByLabel(`Type ${doomedName} to confirm`).fill(doomedName);
   await confirmDelete.click();
 
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(switcher(page, keptName)).toBeVisible();
 
   await page.getByRole("link", { name: "Organization", exact: true }).click();
