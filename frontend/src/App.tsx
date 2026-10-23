@@ -8,6 +8,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import PeopleCapacityView from "@/pages/PeopleCapacityView";
+import PeopleCatalogView from "@/pages/PeopleCatalogView";
 import PeoplePage from "@/pages/PeoplePage";
 import PersonDetailPage from "@/pages/PersonDetailPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="people" element={<PeopleWorkspace />}>
               <Route index element={<PeoplePage />} />
               <Route path="capacity" element={<PeopleCapacityView />} />
+              <Route path="catalog" element={<PeopleCatalogView />} />
             </Route>
             <Route path="people/:id" element={<PersonDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />

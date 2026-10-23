@@ -16,7 +16,7 @@ test("exporting people downloads a CSV file", async ({ page }) => {
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
   const download = await downloadPromise;
 
   expect(download.suggestedFilename()).toBe("people.csv");
@@ -29,7 +29,7 @@ test("importing a CSV adds new people and reports the result", async ({ page }) 
   const name = `Imported Person ${suffix}`;
 
   await page.goto("/people");
-  await page.getByRole("button", { name: "+ Add role" }).click();
+  await page.getByRole("button", { name: "Add role", exact: true }).click();
   await page.getByLabel("Role id").fill(roleId);
   await page.getByRole("button", { name: "Save" }).click();
 
@@ -74,8 +74,52 @@ test("importing a CSV with unknown roles/skills adds them to the catalog", async
     page.getByText(/Also added 1 new role and 1 new skill to the catalog\./),
   ).toBeVisible();
   const row = page.getByRole("row", { name });
-  await expect(row.getByRole("cell", { name: roleId })).toBeVisible();
-  await expect(row.getByText(`${skillId} (3)`)).toBeVisible();
+  await expect(row.getByText(roleId, { exact: true })).toBeVisible();
+  await expect(row.getByText(skillId)).toHaveText(`${skillId}3`);
+});
+
+test("filtering the directory narrows the roster and survives a reload", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const ada = `Ada Filter ${suffix}`;
+  const bob = `Bob Filter ${suffix}`;
+  const adaRole = `filter-a-${suffix}`;
+  await createPerson(page, ada, adaRole);
+  await createPerson(page, bob, `filter-b-${suffix}`);
+
+  await page.getByRole("button", { name: "Role", exact: true }).click();
+  await page.getByRole("checkbox", { name: adaRole }).check();
+  await expect(page.getByRole("link", { name: ada })).toBeVisible();
+  await expect(page.getByRole("link", { name: bob })).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`role=${adaRole}`));
+
+  await page.reload();
+  await expect(page.getByRole("link", { name: ada })).toBeVisible();
+  await expect(page.getByRole("link", { name: bob })).toHaveCount(0);
+
+  await page.getByRole("searchbox", { name: "Search by name, role or skill" }).fill(bob);
+  await expect(page.getByText("No one matches these filters.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByRole("link", { name: bob })).toBeVisible();
+});
+
+test("a skill nobody has shows as a coverage gap and is described on the Roles & skills tab", async ({
+  page,
+}) => {
+  const skillId = `gap-skill-${uniqueSuffix()}`;
+
+  await page.goto("/people");
+  await page.getByRole("button", { name: "Add skill", exact: true }).click();
+  await page.getByLabel("Skill id").fill(skillId);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText(skillId, { exact: true }).locator("..")).toContainText("Nobody yet");
+
+  await page.getByRole("link", { name: "Roles & skills" }).click();
+  await expect(page).toHaveURL(/\/people\/catalog$/);
+  await page.getByRole("button", { name: `Actions for skill ${skillId}` }).click();
+  await page.getByRole("menuitem", { name: "Edit description" }).click();
+  await page.getByLabel("Description").fill("Spotting staffing gaps");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: skillId })).toContainText("Spotting staffing gaps");
 });
 
 test("editing an availability window on the detail page updates the timeline", async ({ page }) => {
@@ -112,14 +156,15 @@ test("working days per week derives the FTE shown on the roster and detail page"
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   const row = page.getByRole("row", { name });
-  const fteCell = row.getByRole("cell").nth(4);
-  await expect(fteCell).toHaveText("100%");
+  const fteCell = row.getByRole("cell").nth(3);
+  await expect(fteCell).toHaveText("1.0");
 
-  await row.getByRole("button", { name: "Edit" }).click();
+  await row.getByRole("button", { name: `Actions for ${name}` }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
   await page.getByLabel("Working days per week").selectOption("4");
   await page.getByRole("button", { name: "Save" }).click();
 
-  await expect(fteCell).toHaveText("80%");
+  await expect(fteCell).toHaveText("0.8");
   await page.getByRole("link", { name }).click();
   await expect(page.getByText("4 days/week · 80% FTE")).toBeVisible();
 });
