@@ -50,6 +50,7 @@ _CSV_FIELDNAMES = (
     "description",
     "n_slots",
     "priority",
+    "completed_at",
     "skill_requirements",
     "excluded_person_ids",
     "included_person_ids",
@@ -66,6 +67,7 @@ def _row_values(**overrides):
         "description": "",
         "n_slots": "1",
         "priority": "medium",
+        "completed_at": "",
         "skill_requirements": "[]",
         "excluded_person_ids": "[]",
         "included_person_ids": "[]",
@@ -211,3 +213,63 @@ def test_export_and_import_are_org_scoped(client, org_headers):
 
     assert export_response.status_code == 200
     assert export_response.text.strip() == ",".join(_CSV_FIELDNAMES)
+
+
+def test_import_reads_completed_at(client, org_headers):
+    response = _upload_csv(client, org_headers, _csv_row(completed_at="2026-09-30"))
+
+    assert response.status_code == 200
+    project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
+    assert project["completed_at"] == "2026-09-30"
+
+
+def test_import_treats_empty_completed_at_as_open(client, org_headers):
+    response = _upload_csv(client, org_headers, _csv_row())
+
+    assert response.status_code == 200
+    project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
+    assert project["completed_at"] is None
+
+
+def test_import_accepts_legacy_csv_without_completed_at_column(client, org_headers):
+    legacy_fieldnames = [f for f in _CSV_FIELDNAMES if f != "completed_at"]
+    csv_text = (
+        f"{','.join(legacy_fieldnames)}\n"
+        "proj-1,Nova Redesign,,1,medium,[],[],[],[],[],[]\n"
+    )
+
+    response = _upload_csv(client, org_headers, csv_text)
+
+    assert response.status_code == 200
+    project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
+    assert project["completed_at"] is None
+
+
+def test_import_rejects_invalid_completed_at(client, org_headers):
+    response = _upload_csv(client, org_headers, _csv_row(completed_at="not-a-date"))
+
+    assert response.status_code == 400
+    assert "Row 2" in response.json()["detail"]
+
+
+def test_export_round_trips_completed_at(client, org_headers):
+    done = _create_project(
+        client, org_headers, name="Done Project", completed_at="2026-09-30"
+    )
+    open_project = _create_project(client, org_headers, name="Open Project")
+
+    csv_text = client.get("/api/v1/projects/export", headers=org_headers).text
+    other_org_headers = {
+        **org_headers,
+        "X-Organization-Id": create_org(client, org_headers, name="Other Org"),
+    }
+    assert _upload_csv(client, other_org_headers, csv_text).status_code == 200
+
+    imported_done = client.get(
+        f"/api/v1/projects/{done['id']}", headers=other_org_headers
+    ).json()
+    imported_open = client.get(
+        f"/api/v1/projects/{open_project['id']}", headers=other_org_headers
+    ).json()
+    assert imported_done["completed_at"] == "2026-09-30"
+    assert imported_open["completed_at"] is None

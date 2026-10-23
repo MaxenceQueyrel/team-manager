@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.core.deps import require_org_member
@@ -27,7 +29,10 @@ def get_team(team_id: str, organization_id: str = Depends(require_org_member)):
 
 @router.post("/", response_model=Team, status_code=201)
 def create_team(data: TeamCreate, organization_id: str = Depends(require_org_member)):
-    return repo.create({**data.model_dump(), "is_optimized": True}, organization_id)
+    return repo.create(
+        {**data.model_dump(), "is_optimized": True, "created_at": datetime.now(UTC)},
+        organization_id,
+    )
 
 
 def _resolve_assignments(team: Team, project: Project) -> list[AssignmentCreate]:
