@@ -77,6 +77,11 @@ export function errorMessage(e: unknown): string {
   if (isAxiosError(e) && typeof e.response?.data?.detail?.message === "string") {
     return e.response.data.detail.message;
   }
+  // Request validation (422) reports a list of errors; pydantic prefixes model-level
+  // validator messages with "Value error, ".
+  if (isAxiosError(e) && typeof e.response?.data?.detail?.[0]?.msg === "string") {
+    return e.response.data.detail[0].msg.replace(/^Value error, /, "");
+  }
   return e instanceof Error ? e.message : String(e);
 }
 
