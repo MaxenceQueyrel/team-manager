@@ -18,7 +18,7 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
-from optimizer.models import AvailabilityWindow, ProjectInput
+from optimizer.models import AvailabilityWindow, ProjectInput, StartCandidate
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
@@ -68,14 +68,27 @@ def solve_assignment(
 
     people_inputs = [p.to_person_input(committed.get(p.id, [])) for p in people]
 
+    start_candidates: list[StartCandidate] = []
     try:
-        pool = solver.solve_pool(
-            project_input,
-            people_inputs,
-            request.weights,
-            request.respect_exclusions,
-            n_alternatives=request.n_alternatives,
-        )
+        if project.start_window is None:
+            pool = solver.solve_pool(
+                project_input,
+                people_inputs,
+                request.weights,
+                request.respect_exclusions,
+                n_alternatives=request.n_alternatives,
+            )
+        else:
+            scan = solver.solve_pool_over_starts(
+                project_input,
+                people_inputs,
+                request.weights,
+                project.start_window,
+                request.respect_exclusions,
+                n_alternatives=request.n_alternatives,
+            )
+            pool = scan.pool
+            start_candidates = scan.candidates
     except InfeasibleAssignmentError as exc:
         raise HTTPException(
             status_code=409,
@@ -95,6 +108,7 @@ def solve_assignment(
             "coverage": [c.model_dump() for c in best.coverage],
             "fully_covered": best.fully_covered,
             "created_at": datetime.now(UTC),
+            "start_date": best.start_date,
         },
         organization_id,
     )
@@ -107,7 +121,9 @@ def solve_assignment(
                 optimization_max_score=alternative.max_score,
                 coverage=alternative.coverage,
                 fully_covered=alternative.fully_covered,
+                start_date=alternative.start_date,
             )
             for alternative in alternatives
         ],
+        start_candidates=start_candidates,
     )

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 from optimizer.models import (
@@ -6,12 +6,14 @@ from optimizer.models import (
     AssignmentWeights,
     PhaseConflict,
     PhaseCoverage,
+    StartCandidate,
 )
 
 
 # coverage/fully_covered default to empty/None for teams saved before the
 # optimizer reported coverage, and for teams created without a solver run.
 # created_at is None for teams saved before it was recorded.
+# start_date None means the team was found at the project's current dates.
 class Team(BaseModel):
     id: str
     organization_id: str
@@ -23,6 +25,7 @@ class Team(BaseModel):
     coverage: list[PhaseCoverage] = []
     fully_covered: bool | None = None
     created_at: datetime | None = None
+    start_date: date | None = None
 
 
 class TeamProposal(BaseModel):
@@ -31,6 +34,7 @@ class TeamProposal(BaseModel):
     optimization_max_score: float
     coverage: list[PhaseCoverage] = []
     fully_covered: bool | None = None
+    start_date: date | None = None
 
 
 class TeamCreate(TeamProposal):
@@ -47,6 +51,7 @@ class OptimizationRequest(BaseModel):
 class OptimizationResponse(BaseModel):
     best: Team
     alternatives: list[TeamProposal]
+    start_candidates: list[StartCandidate] = []
 
 
 class InfeasibilityDetail(BaseModel):

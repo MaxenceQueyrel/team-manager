@@ -324,3 +324,126 @@ def test_solve_returns_409_with_conflicts_when_no_team_is_feasible(client, org_h
         }
     ]
     assert client.get("/api/v1/teams/", headers=org_headers).json() == []
+
+
+WEEK_1 = {"start": "2026-01-05", "end": "2026-01-11"}
+WEEK_2 = {"start": "2026-01-12", "end": "2026-01-18"}
+WEEK_3 = {"start": "2026-01-19", "end": "2026-01-25"}
+WINDOW = {"start": WEEK_1["start"], "end": WEEK_3["start"]}
+
+
+def _create_person(client, headers, name, vacations=()):
+    return client.post(
+        "/api/v1/people/",
+        json={
+            "name": name,
+            "role": "Backend Developer",
+            "seniority": Seniority.SENIOR,
+            "years_of_experience": 5.0,
+            "vacations": list(vacations),
+        },
+        headers=headers,
+    ).json()["id"]
+
+
+def _oversized_squad(client, headers, vacations=()):
+    # Each selected person carries at least MIN_FTE_SHARE, so a squad bigger than
+    # 1 / MIN_FTE_SHARE can never fit a single FTE while all its members are free.
+    return {
+        "member_ids": [
+            _create_person(client, headers, f"Squad {i}", vacations)
+            for i in range(int(1 / MIN_FTE_SHARE) + 1)
+        ]
+    }
+
+
+def test_solve_without_window_reports_no_start(client, org_headers, project_id):
+    body = _solve(client, org_headers, project_id).json()
+
+    assert body["start_candidates"] == []
+    assert body["best"]["start_date"] is None
+    assert all(a["start_date"] is None for a in body["alternatives"])
+
+
+def test_solve_with_window_scans_weekly_starts(client, org_headers, project_id):
+    project = client.get(f"/api/v1/projects/{project_id}", headers=org_headers).json()
+    client.put(
+        f"/api/v1/projects/{project_id}",
+        json={**project, "date_ranges": [WEEK_1], "start_window": WINDOW},
+        headers=org_headers,
+    )
+
+    response = _solve(client, org_headers, project_id, n_alternatives=2)
+
+    assert response.status_code == 200
+    body = response.json()
+    candidates = body["start_candidates"]
+    assert [c["start"] for c in candidates] == [
+        WEEK_1["start"],
+        WEEK_2["start"],
+        WEEK_3["start"],
+    ]
+    assert all(c["feasible"] and c["fully_covered"] for c in candidates)
+    # Nobody's availability changes across the window, so the earliest start wins.
+    assert body["best"]["start_date"] == WEEK_1["start"]
+    assert len(body["alternatives"]) == 2
+    assert all(a["start_date"] == WEEK_1["start"] for a in body["alternatives"])
+    saved = client.get(f"/api/v1/teams/{body['best']['id']}", headers=org_headers)
+    assert saved.json()["start_date"] == WEEK_1["start"]
+
+
+def test_solve_with_window_skips_infeasible_starts(client, org_headers):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    squad = _oversized_squad(client, org_headers, vacations=[WEEK_3])
+    solo_id = _create_person(client, org_headers, "Solo", vacations=[WEEK_1])
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Project W",
+            "squads": [squad],
+            "date_ranges": [WEEK_1],
+            "start_window": WINDOW,
+        },
+        headers=org_headers,
+    ).json()["id"]
+
+    response = _solve(client, org_headers, project_id, n_alternatives=0)
+
+    assert response.status_code == 200
+    body = response.json()
+    first, second, third = body["start_candidates"]
+    assert first == {
+        "start": WEEK_1["start"],
+        "feasible": False,
+        "score": None,
+        "max_score": None,
+        "fully_covered": None,
+    }
+    assert second["feasible"] and third["feasible"]
+    assert body["best"]["start_date"] == WEEK_2["start"]
+    assert [m["person_id"] for m in body["best"]["members"]] == [solo_id]
+
+
+def test_solve_with_window_returns_409_when_every_start_is_infeasible(
+    client, org_headers
+):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    squad = _oversized_squad(client, org_headers)
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Project Z",
+            "squads": [squad],
+            "date_ranges": [WEEK_1],
+            "start_window": WINDOW,
+        },
+        headers=org_headers,
+    ).json()["id"]
+
+    response = _solve(client, org_headers, project_id)
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["project_id"] == project_id
+    assert [c["reason"] for c in detail["conflicts"]] == ["squad_conflict"]
+    assert client.get("/api/v1/teams/", headers=org_headers).json() == []

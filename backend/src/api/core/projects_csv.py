@@ -14,6 +14,7 @@ _JSON_FIELDS = (
     "squads",
     "date_ranges",
     "phases",
+    "start_window",
 )
 FIELDNAMES = (
     "id",
@@ -37,9 +38,10 @@ def encode_projects_csv(projects: list[Project]) -> str:
     """Encodes projects as CSV text.
 
     Scalar `ProjectBase` fields become plain columns; `skill_requirements`,
-    `excluded_person_ids`, `included_person_ids`, `squads`, `date_ranges`, and
-    `phases` are each JSON-encoded into a single cell. An open project's
-    `completed_at` is written as an empty cell.
+    `excluded_person_ids`, `included_person_ids`, `squads`, `date_ranges`,
+    `phases`, and `start_window` are each JSON-encoded into a single cell. An
+    open project's `completed_at` is written as an empty cell, and a project
+    without a start window gets `null` in `start_window`.
 
     Args:
         projects: Projects to encode.
@@ -68,8 +70,10 @@ def decode_projects_csv(content: str) -> list[tuple[str, ProjectCreate]]:
 
     Args:
         content: CSV text with the schema written by `encode_projects_csv`. The
-            `completed_at` column may be absent, as in exports made before it
-            existed; an empty or missing cell imports as an open project.
+            `completed_at` and `start_window` columns may be absent, as in
+            exports made before they existed; an empty or missing
+            `completed_at` imports as an open project, and an empty, `null` or
+            missing `start_window` as a project without a start window.
 
     Returns:
         A list of (project id, ProjectCreate) pairs, in row order.
@@ -87,8 +91,9 @@ def decode_projects_csv(content: str) -> list[tuple[str, ProjectCreate]]:
             data: dict[str, Any] = {
                 field: json.loads(row[field]) if field in _JSON_FIELDS else row[field]
                 for field in FIELDNAMES
-                if field not in ("id", "completed_at")
+                if field not in ("id", "completed_at", "start_window")
             }
+            data["start_window"] = json.loads(row.get("start_window") or "null")
         except KeyError as exc:
             raise ProjectCsvRowError(row_number, f"missing column {exc}") from exc
         except json.JSONDecodeError as exc:
