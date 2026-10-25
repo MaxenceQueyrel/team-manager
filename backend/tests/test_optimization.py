@@ -418,10 +418,55 @@ def test_solve_with_window_skips_infeasible_starts(client, org_headers):
         "score": None,
         "max_score": None,
         "fully_covered": None,
+        "team": None,
     }
     assert second["feasible"] and third["feasible"]
     assert body["best"]["start_date"] == WEEK_2["start"]
     assert [m["person_id"] for m in body["best"]["members"]] == [solo_id]
+    assert second["team"]["members"] == body["best"]["members"]
+    assert second["team"]["start_date"] == WEEK_2["start"]
+    assert third["team"]["start_date"] == WEEK_3["start"]
+    assert [m["person_id"] for m in third["team"]["members"]] == [solo_id]
+
+
+def test_start_candidates_carry_their_team_and_can_be_applied(client, org_headers):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    late_id = _create_person(client, org_headers, "Late", vacations=[WEEK_1, WEEK_2])
+    early_id = _create_person(client, org_headers, "Early", vacations=[WEEK_3])
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={"name": "Project V", "date_ranges": [WEEK_1], "start_window": WINDOW},
+        headers=org_headers,
+    ).json()["id"]
+
+    body = _solve(client, org_headers, project_id).json()
+    candidates = body["start_candidates"]
+
+    assert [c["team"]["start_date"] for c in candidates] == [
+        c["start"] for c in candidates
+    ]
+    assert all(c["team"]["optimization_score"] == c["score"] for c in candidates)
+    assert body["best"]["start_date"] == WEEK_1["start"]
+    assert [m["person_id"] for m in body["best"]["members"]] == [early_id]
+    later = candidates[2]["team"]
+    assert [m["person_id"] for m in later["members"]] == [late_id]
+    assert [
+        t["id"] for t in client.get("/api/v1/teams/", headers=org_headers).json()
+    ] == [body["best"]["id"]]
+
+    team_id = client.post(
+        "/api/v1/teams/",
+        json={"project_id": project_id, **later},
+        headers=org_headers,
+    ).json()["id"]
+    response = client.post(f"/api/v1/teams/{team_id}/apply", headers=org_headers)
+
+    assert response.status_code == 201
+    assert [(a["person_id"], a["start"]) for a in response.json()] == [
+        (late_id, WEEK_3["start"])
+    ]
+    project = client.get(f"/api/v1/projects/{project_id}", headers=org_headers).json()
+    assert project["date_ranges"] == [WEEK_3]
 
 
 def test_solve_with_window_returns_409_when_every_start_is_infeasible(

@@ -176,7 +176,7 @@ def test_infeasible_starts_are_flagged_and_skipped(solver):
 
     first, second, third = scan.candidates
     assert first.feasible is False
-    assert (first.score, first.max_score, first.fully_covered) == (None, None, None)
+    assert (first.score, first.max_score, first.fully_covered, first.team) == (None, None, None, None)
     assert second.feasible and third.feasible
     assert scan.best_start == WEEK_2.start
     assert [m.person_id for m in scan.pool[0].members] == ["solo"]
@@ -220,6 +220,25 @@ def test_pool_at_best_start_matches_solve_pool_on_the_shifted_project(solver):
     assert all(r.start_date == WEEK_2.start for r in scan.pool)
     assert [r.model_copy(update={"start_date": None}) for r in scan.pool] == expected
     assert scan.pool[0].score == scan.candidates[1].score
+
+
+def test_each_feasible_candidate_carries_its_optimum_at_that_start(solver):
+    people = [_person("star", python_level=5.0, vacations=[WEEK_1]), _person("weak", python_level=2.0)]
+    window = DateRange(start=WEEK_1.start, end=WEEK_3.start)
+
+    scan = solver.solve_pool_over_starts(_project(), people, AssignmentWeights(), window)
+
+    for candidate in scan.candidates:
+        assert candidate.team.start_date == candidate.start
+        assert (candidate.team.score, candidate.team.max_score, candidate.team.fully_covered) == (
+            candidate.score,
+            candidate.max_score,
+            candidate.fully_covered,
+        )
+    assert [m.person_id for m in scan.candidates[0].team.members] == ["weak"]
+    best = next(c for c in scan.candidates if c.start == scan.best_start)
+    assert best.team.members == scan.pool[0].members
+    assert best.team.score == scan.pool[0].score
 
 
 def test_plain_solve_pool_leaves_start_date_unset(solver):

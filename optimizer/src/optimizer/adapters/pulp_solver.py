@@ -169,6 +169,7 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
                         score=optimum.score,
                         max_score=optimum.max_score,
                         fully_covered=optimum.fully_covered,
+                        team=optimum.model_copy(update={"start_date": start}),
                     )
                 )
             start += START_STEP

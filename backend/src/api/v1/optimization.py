@@ -10,6 +10,7 @@ from api.models.team import (
     InfeasibilityDetail,
     OptimizationRequest,
     OptimizationResponse,
+    StartCandidateProposal,
     Team,
     TeamProposal,
 )
@@ -18,10 +19,26 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
-from optimizer.models import AvailabilityWindow, ProjectInput, StartCandidate
+from optimizer.models import (
+    AssignmentResult,
+    AvailabilityWindow,
+    ProjectInput,
+    StartCandidate,
+)
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
+
+
+def _proposal(result: AssignmentResult) -> TeamProposal:
+    return TeamProposal(
+        members=result.members,
+        optimization_score=result.score,
+        optimization_max_score=result.max_score,
+        coverage=result.coverage,
+        fully_covered=result.fully_covered,
+        start_date=result.start_date,
+    )
 
 
 @router.post(
@@ -114,16 +131,16 @@ def solve_assignment(
     )
     return OptimizationResponse(
         best=saved,
-        alternatives=[
-            TeamProposal(
-                members=alternative.members,
-                optimization_score=alternative.score,
-                optimization_max_score=alternative.max_score,
-                coverage=alternative.coverage,
-                fully_covered=alternative.fully_covered,
-                start_date=alternative.start_date,
+        alternatives=[_proposal(alternative) for alternative in alternatives],
+        start_candidates=[
+            StartCandidateProposal(
+                start=candidate.start,
+                feasible=candidate.feasible,
+                score=candidate.score,
+                max_score=candidate.max_score,
+                fully_covered=candidate.fully_covered,
+                team=_proposal(candidate.team) if candidate.team else None,
             )
-            for alternative in alternatives
+            for candidate in start_candidates
         ],
-        start_candidates=start_candidates,
     )

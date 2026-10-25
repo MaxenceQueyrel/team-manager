@@ -125,7 +125,9 @@ class AssignmentSolverPort(ABC):
         Returns:
             A StartDateScan with the best start, the ``solve_pool`` result of the project
             shifted to it (every result's ``start_date`` set to that start), and a summary
-            of every candidate in date order, infeasible ones flagged ``feasible=False``.
+            of every candidate in date order. Each feasible candidate carries its optimal
+            team (``start_date`` set to the candidate); infeasible ones are flagged
+            ``feasible=False`` with no team.
 
         Raises:
             ValueError: If the project has no date range to shift.

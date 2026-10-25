@@ -6,7 +6,6 @@ from optimizer.models import (
     AssignmentWeights,
     PhaseConflict,
     PhaseCoverage,
-    StartCandidate,
 )
 
 
@@ -48,10 +47,21 @@ class OptimizationRequest(BaseModel):
     n_alternatives: int = Field(default=2, ge=0, le=5)
 
 
+# The API counterpart of optimizer.models.StartCandidate: its team is a TeamProposal,
+# promoted like an alternative, and never persisted by the solve itself.
+class StartCandidateProposal(BaseModel):
+    start: date
+    feasible: bool
+    score: float | None = None
+    max_score: float | None = None
+    fully_covered: bool | None = None
+    team: TeamProposal | None = None
+
+
 class OptimizationResponse(BaseModel):
     best: Team
     alternatives: list[TeamProposal]
-    start_candidates: list[StartCandidate] = []
+    start_candidates: list[StartCandidateProposal] = []
 
 
 class InfeasibilityDetail(BaseModel):

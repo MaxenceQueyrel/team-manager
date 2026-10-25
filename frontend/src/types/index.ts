@@ -194,13 +194,15 @@ export interface InfeasibilityDetail {
   conflicts: PhaseConflict[];
 }
 
-// One weekly start tried inside a project's start_window; the score fields are null when infeasible.
+// One weekly start tried inside a project's start_window; the score fields and team are null
+// when infeasible. The team is not persisted: it is promoted like an alternative.
 export interface StartCandidate {
   start: string; // ISO date (YYYY-MM-DD)
   feasible: boolean;
   score: number | null;
   max_score: number | null;
   fully_covered: boolean | null;
+  team: TeamProposal | null; // its start_date equals start
 }
 
 export interface OptimizationResponse {

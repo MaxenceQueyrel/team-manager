@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { formatDay } from "@/components/common/dates";
 import { colors } from "@/components/common/ui";
 import type { StartCandidate } from "@/types";
@@ -7,16 +8,22 @@ function outcome(candidate: StartCandidate): string {
   return candidate.fully_covered ? "covered" : "partial";
 }
 
-/** Read-only row of the weekly starts the optimizer tried, with each start's score and
- * coverage; infeasible starts are greyed out and the `chosen` one is highlighted. */
+/** Row of the weekly starts the optimizer tried, with each start's score and coverage.
+ * The optimizer's `chosen` start is marked "chosen"; every feasible start is a toggle
+ * button that calls `onSelect` to show its team, and the `selected` one is pressed.
+ * Infeasible starts are greyed out and not interactive. */
 export function StartCandidatesStrip({
   candidates,
   chosen,
+  selected,
   today,
+  onSelect,
 }: {
   candidates: StartCandidate[];
   chosen: string | null;
+  selected: string | null;
   today: string;
+  onSelect: (start: string) => void;
 }) {
   return (
     <section aria-label="Start dates tried" style={{ marginBottom: "0.75rem" }}>
@@ -33,32 +40,35 @@ export function StartCandidatesStrip({
       >
         {candidates.map((candidate) => {
           const isChosen = candidate.start === chosen;
-          return (
-            <li
-              key={candidate.start}
-              aria-current={isChosen ? "true" : undefined}
-              style={{
-                minWidth: "5.5rem",
-                padding: "0.35rem 0.5rem",
-                borderRadius: "var(--radius-sm)",
-                border: `1px solid ${isChosen ? colors.primary : colors.border}`,
-                background: isChosen
-                  ? colors.primaryBg
-                  : candidate.feasible
-                    ? colors.surface
-                    : colors.neutralBg,
-                color: candidate.feasible ? colors.text : colors.subtle,
-                fontSize: "0.78rem",
-              }}
-            >
-              <div style={{ fontWeight: 600 }}>
+          const isSelected = candidate.start === selected;
+          const cellStyle: CSSProperties = {
+            display: "block",
+            minWidth: "5.5rem",
+            padding: "0.35rem 0.5rem",
+            borderRadius: "var(--radius-sm)",
+            border: `1px solid ${isChosen ? colors.primary : colors.border}`,
+            boxShadow: isSelected ? `0 0 0 2px ${colors.primary}` : undefined,
+            background: isSelected
+              ? colors.primaryBg
+              : candidate.feasible
+                ? colors.surface
+                : colors.neutralBg,
+            color: candidate.feasible ? colors.text : colors.subtle,
+            fontFamily: "inherit",
+            fontSize: "0.78rem",
+            textAlign: "left",
+          };
+          const content = (
+            <>
+              <span style={{ display: "block", fontWeight: 600 }}>
                 {formatDay(candidate.start, !candidate.start.startsWith(today.slice(0, 4)))}
-              </div>
-              <div className="mono">
+              </span>
+              <span className="mono" style={{ display: "block" }}>
                 {candidate.score != null ? candidate.score.toFixed(2) : "—"}
-              </div>
-              <div
+              </span>
+              <span
                 style={{
+                  display: "block",
                   color: candidate.fully_covered
                     ? colors.success
                     : candidate.feasible
@@ -68,7 +78,23 @@ export function StartCandidatesStrip({
               >
                 {outcome(candidate)}
                 {isChosen && " · chosen"}
-              </div>
+              </span>
+            </>
+          );
+          return (
+            <li key={candidate.start} aria-current={isChosen ? "true" : undefined}>
+              {candidate.team ? (
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => onSelect(candidate.start)}
+                  style={{ ...cellStyle, cursor: "pointer" }}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div style={cellStyle}>{content}</div>
+              )}
             </li>
           );
         })}

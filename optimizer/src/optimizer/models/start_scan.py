@@ -17,6 +17,9 @@ class StartCandidate(BaseModel):
     fully_covered: bool | None = Field(
         default=None, description="Whether the optimal team fully covers the project at this start; None if infeasible."
     )
+    team: AssignmentResult | None = Field(
+        default=None, description="Optimal team at this start, with start_date set to it; None if infeasible."
+    )
 
 
 class StartDateScan(BaseModel):

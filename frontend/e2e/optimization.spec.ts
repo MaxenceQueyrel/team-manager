@@ -187,6 +187,22 @@ test("a flexible start window picks the start where the team is free and applyin
   const best = page.getByRole("region", { name: "Best team" });
   await expect(best.getByText("Starts 5 Feb 2027 (+5 weeks vs planned)")).toBeVisible();
 
+  // Starting on 29 Jan only overlaps February, so the team is a partial one.
+  const chosenStart = strip.getByRole("button", { name: /5 Feb/ });
+  const earlierStart = strip.getByRole("button", { name: /29 Jan/ });
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "true");
+  await earlierStart.click();
+  await expect(earlierStart).toHaveAttribute("aria-pressed", "true");
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "false");
+  await expect(earlierStart).toContainText("partial");
+  const selected = page.getByRole("region", { name: "Team at selected start" });
+  await expect(selected.getByText("Starts 29 Jan 2027 (+4 weeks vs planned)")).toBeVisible();
+  await expect(selected.getByText(`Returning ${suffix}`)).toBeVisible();
+  await expect(best).toHaveCount(0);
+  await chosenStart.click();
+  await expect(selected).toHaveCount(0);
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "true");
+
   await best.getByRole("button", { name: "Apply to project" }).click();
   await expect(
     page.getByText(
