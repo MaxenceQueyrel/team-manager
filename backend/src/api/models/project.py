@@ -29,14 +29,14 @@ class ProjectBase(BaseModel):
         if window is None:
             return self
         if window.end < window.start:
-            raise ValueError("start_window end must not be before its start")
+            raise ValueError("Latest start must not be before earliest start")
         if not self.date_ranges and not any(p.date_range for p in self.phases):
             raise ValueError(
-                "start_window requires at least one project or phase date range"
+                "A flexible start needs at least one project or phase date range"
             )
         if (window.end - window.start).days // 7 + 1 > MAX_START_CANDIDATES:
             raise ValueError(
-                f"start_window allows at most {MAX_START_CANDIDATES} weekly start candidates"
+                f"A flexible start window can span at most {MAX_START_CANDIDATES} weekly starts"
             )
         return self
 

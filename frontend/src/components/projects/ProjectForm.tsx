@@ -61,6 +61,10 @@ export function ProjectForm({
   };
 
   const submit = async () => {
+    if (draft.start_window && (!draft.start_window.start || !draft.start_window.end)) {
+      setError("Fill in both earliest and latest start, or leave both empty.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -160,14 +164,20 @@ export function ProjectForm({
         />
       </Field>
 
-      <fieldset disabled={!hasDates} style={{ border: "none", padding: 0, margin: 0 }}>
+      {/* A saved window stays editable after its dates are removed so it can be cleared. */}
+      <fieldset
+        disabled={!hasDates && draft.start_window === null}
+        style={{ border: "none", padding: 0, margin: 0 }}
+      >
         <legend style={{ padding: 0, fontSize: "0.82rem", fontWeight: 600, marginBottom: 5 }}>
           Flexible start
         </legend>
         <div style={{ fontSize: "0.78rem", color: colors.muted, marginBottom: 5 }}>
           {hasDates
             ? "The optimizer tries a weekly start between these dates and moves the whole schedule with it. Leave both empty to keep the dates fixed."
-            : "Add a date range to the project or a phase before making its start flexible."}
+            : draft.start_window
+              ? "The project has no dates left to move. Clear the earliest and latest start, or add a date range back."
+              : "Add a date range to the project or a phase before making its start flexible."}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
           <Field label="Earliest start">

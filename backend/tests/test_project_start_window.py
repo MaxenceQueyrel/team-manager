@@ -58,7 +58,10 @@ def test_window_on_undated_project_is_rejected(client, org_headers):
     )
 
     assert response.status_code == 422
-    assert "at least one project or phase date range" in _error_message(response)
+    assert (
+        "A flexible start needs at least one project or phase date range"
+        in _error_message(response)
+    )
 
 
 def test_window_ending_before_it_starts_is_rejected(client, org_headers):
@@ -70,7 +73,7 @@ def test_window_ending_before_it_starts_is_rejected(client, org_headers):
     )
 
     assert response.status_code == 422
-    assert "must not be before its start" in _error_message(response)
+    assert "Latest start must not be before earliest start" in _error_message(response)
 
 
 @pytest.mark.parametrize(
@@ -89,7 +92,7 @@ def test_window_is_capped_at_52_weekly_candidates(client, org_headers, end, stat
 
     assert response.status_code == status
     if status == 422:
-        assert "at most 52 weekly start candidates" in _error_message(response)
+        assert "at most 52 weekly starts" in _error_message(response)
 
 
 def test_update_validates_the_window(client, org_headers):

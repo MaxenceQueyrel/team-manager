@@ -165,9 +165,15 @@ test("a flexible start window picks the start where the team is free and applyin
 
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByLabel("Earliest start").fill("2027-02-05");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Fill in both earliest and latest start, or leave both empty.",
+  );
   await page.getByLabel("Latest start").fill("2027-01-01");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("alert")).toHaveText("start_window end must not be before its start");
+  await expect(page.getByRole("alert")).toHaveText(
+    "Latest start must not be before earliest start",
+  );
   await page.getByLabel("Earliest start").fill("2027-01-01");
   await page.getByLabel("Latest start").fill("2027-02-05");
   await page.getByRole("button", { name: "Save" }).click();
