@@ -434,3 +434,74 @@ def test_team_without_start_date_leaves_project_dates_alone(client, org_headers)
 
     assert _apply(client, org_headers, team_id).status_code == 201
     assert _get_project(client, org_headers, project_id) == before
+
+
+def test_shifted_team_moves_the_project_assignments_of_uncovered_phases(
+    client, org_headers
+):
+    project_id = _create_project(client, org_headers, start_window=WINDOW)
+    build_team = _create_team(
+        client,
+        org_headers,
+        project_id,
+        [{"person_id": "bob", "fte_allocation": 1.0, "phase_id": "build"}],
+    )
+    assert _apply(client, org_headers, build_team).status_code == 201
+    design_team = _create_team(
+        client,
+        org_headers,
+        project_id,
+        [{"person_id": "alice", "fte_allocation": 1.0, "phase_id": "design"}],
+        start_date="2026-01-15",
+    )
+
+    assert _apply(client, org_headers, design_team).status_code == 201
+
+    assert {
+        (a["person_id"], a["phase_id"], a["start"], a["end"])
+        for a in _list_assignments(client, org_headers)
+    } == {
+        ("alice", "design", "2026-01-15", "2026-02-14"),
+        ("bob", "build", "2026-02-15", "2026-04-14"),
+    }
+
+
+def test_shift_that_over_allocates_a_moved_assignment_writes_nothing(
+    client, org_headers
+):
+    project_id = _create_project(client, org_headers, start_window=WINDOW)
+    build_team = _create_team(
+        client,
+        org_headers,
+        project_id,
+        [{"person_id": "bob", "fte_allocation": 1.0, "phase_id": "build"}],
+    )
+    assert _apply(client, org_headers, build_team).status_code == 201
+    # Bob is free after the planned build phase but booked once it is shifted.
+    client.post(
+        "/api/v1/assignments/",
+        json={
+            "person_id": "bob",
+            "project_id": "other-project",
+            "ratio": 1.0,
+            "start": "2026-04-05",
+            "end": "2026-04-10",
+        },
+        headers=org_headers,
+    )
+    before_project = _get_project(client, org_headers, project_id)
+    before_assignments = _list_assignments(client, org_headers)
+    design_team = _create_team(
+        client,
+        org_headers,
+        project_id,
+        [{"person_id": "alice", "fte_allocation": 1.0, "phase_id": "design"}],
+        start_date="2026-01-15",
+    )
+
+    response = _apply(client, org_headers, design_team)
+
+    assert response.status_code == 400
+    assert "bob" in response.json()["detail"]
+    assert _get_project(client, org_headers, project_id) == before_project
+    assert _list_assignments(client, org_headers) == before_assignments

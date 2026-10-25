@@ -1,9 +1,9 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.core.deps import require_org_member
-from api.models.assignment import Assignment, AssignmentCreate
+from api.models.assignment import Assignment, AssignmentBase, AssignmentCreate
 from api.models.project import Project
 from api.models.team import Team, TeamCreate
 from api.repositories.file_repository import FileRepository
@@ -37,16 +37,23 @@ def create_team(data: TeamCreate, organization_id: str = Depends(require_org_mem
     )
 
 
-def _shift_to_start(project: Project, start: date) -> Project:
-    schedule = ProjectInput(
+def _schedule(project: Project) -> ProjectInput:
+    return ProjectInput(
         id=project.id, date_ranges=project.date_ranges, phases=project.phases
     )
-    anchor = schedule_anchor(schedule)
+
+
+def _start_offset(project: Project, start: date) -> timedelta:
+    anchor = schedule_anchor(_schedule(project))
     # A project without dates has nothing to shift; resolving its assignments
     # rejects the team afterwards.
-    if anchor is None or anchor == start:
-        return project
-    shifted = shift_project(schedule, start - anchor)
+    if anchor is None:
+        return timedelta(0)
+    return start - anchor
+
+
+def _shift_schedule(project: Project, offset: timedelta) -> Project:
+    shifted = shift_project(_schedule(project), offset)
     return project.model_copy(
         update={"date_ranges": shifted.date_ranges, "phases": shifted.phases}
     )
@@ -85,11 +92,11 @@ def _resolve_assignments(team: Team, project: Project) -> list[AssignmentCreate]
 
 
 def _over_allocated_person_ids(
-    new_assignments: list[AssignmentCreate], kept: list[Assignment]
+    candidates: list[AssignmentBase], kept: list[Assignment]
 ) -> list[str]:
     over_allocated: list[str] = []
-    for i, candidate in enumerate(new_assignments):
-        others = [*kept, *new_assignments[:i], *new_assignments[i + 1 :]]
+    for i, candidate in enumerate(candidates):
+        others = [*kept, *candidates[:i], *candidates[i + 1 :]]
         overlapping_ratio = sum(
             other.ratio
             for other in others
@@ -113,9 +120,10 @@ def apply_team(team_id: str, organization_id: str = Depends(require_org_member))
     Existing project assignments for those phases (or the unphased ones, for a
     non-phased team) are replaced. A team found at a shifted start
     (`team.start_date`) first moves the project's whole schedule so it starts
-    on that date; `start_window` is kept. Nothing is written, neither
-    assignments nor project dates, if any date cannot be resolved or any
-    person would exceed 1.0 FTE.
+    on that date, and the project's other assignments move with it;
+    `start_window` is kept. Nothing is written, neither assignments nor
+    project dates, if any date cannot be resolved or any person would exceed
+    1.0 FTE.
 
     Args:
         team_id: The team to apply.
@@ -136,22 +144,35 @@ def apply_team(team_id: str, organization_id: str = Depends(require_org_member))
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    scheduled = project
+    offset = timedelta(0)
     if team.start_date is not None:
-        scheduled = _shift_to_start(project, team.start_date)
+        offset = _start_offset(project, team.start_date)
+    scheduled = _shift_schedule(project, offset) if offset else project
 
     new_assignments = _resolve_assignments(team, scheduled)
 
     covered_phase_ids = {member.phase_id for member in team.members}
     replaced: list[Assignment] = []
+    moved: list[Assignment] = []
     kept: list[Assignment] = []
     for existing in assignments_module.repo.list(organization_id):
-        if existing.project_id == project.id and existing.phase_id in covered_phase_ids:
+        if existing.project_id != project.id:
+            kept.append(existing)
+        elif existing.phase_id in covered_phase_ids:
             replaced.append(existing)
+        elif offset:
+            moved.append(
+                existing.model_copy(
+                    update={
+                        "start": existing.start + offset,
+                        "end": existing.end + offset,
+                    }
+                )
+            )
         else:
             kept.append(existing)
 
-    over_allocated = _over_allocated_person_ids(new_assignments, kept)
+    over_allocated = _over_allocated_person_ids([*new_assignments, *moved], kept)
     if over_allocated:
         raise HTTPException(
             status_code=400,
@@ -161,10 +182,16 @@ def apply_team(team_id: str, organization_id: str = Depends(require_org_member))
             ),
         )
 
-    if scheduled != project:
+    if offset:
         projects_module.repo.update(
             project.id,
             scheduled.model_dump(exclude={"id", "organization_id"}),
+            organization_id,
+        )
+    for assignment in moved:
+        assignments_module.repo.update(
+            assignment.id,
+            assignment.model_dump(exclude={"id", "organization_id"}),
             organization_id,
         )
     for existing in replaced:
