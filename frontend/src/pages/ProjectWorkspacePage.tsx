@@ -35,6 +35,7 @@ import { ProjectForm } from "@/components/projects/ProjectForm";
 import { ProposalCard } from "@/components/projects/ProposalCard";
 import { ProposalsCard } from "@/components/projects/ProposalsCard";
 import { StaffingLaneCard } from "@/components/projects/StaffingLaneCard";
+import { StartCandidatesStrip } from "@/components/projects/StartCandidatesStrip";
 import {
   buildLanes,
   formatFte,
@@ -147,9 +148,15 @@ export default function ProjectWorkspacePage() {
   const reviewIndex = proposals.findIndex((t) => t.id === reviewingId);
   const reviewed = reviewIndex === -1 ? null : proposals[reviewIndex];
 
+  // Applying a team found at another start moves the project's dates, so both are refetched.
   const applyTeam = async (teamId: string) => {
     await teamsApi.apply(teamId);
-    setAssignments(await assignmentsApi.list({ project_id: project.id }));
+    const [applied, appliedAssignments] = await Promise.all([
+      projectsApi.get(project.id),
+      assignmentsApi.list({ project_id: project.id }),
+    ]);
+    setProject(applied);
+    setAssignments(appliedAssignments);
   };
 
   const applyAlternative = async (proposal: TeamProposal, index: number) => {
@@ -311,6 +318,13 @@ export default function ProjectWorkspacePage() {
                 </div>
                 <IconButton icon={X} ariaLabel="Dismiss result" onClick={() => setResult(null)} />
               </div>
+              {result.start_candidates.length > 0 && (
+                <StartCandidatesStrip
+                  candidates={result.start_candidates}
+                  chosen={result.best.start_date}
+                  today={today}
+                />
+              )}
               <ProposalCard
                 title="Best team"
                 members={result.best.members}
@@ -320,6 +334,8 @@ export default function ProjectWorkspacePage() {
                 fullyCovered={result.best.fully_covered}
                 people={people}
                 baseline={staffingBaseline(assignments, result.best.members)}
+                startDate={result.best.start_date}
+                plannedStart={span?.start ?? null}
                 onApply={() => applyTeam(result.best.id)}
               />
               {result.alternatives.length > 0 && (
@@ -354,6 +370,8 @@ export default function ProjectWorkspacePage() {
                           scoreNote={deltaVsBest(proposal, result.best)}
                           people={people}
                           baseline={staffingBaseline(assignments, proposal.members)}
+                          startDate={proposal.start_date}
+                          plannedStart={span?.start ?? null}
                           onApply={() => applyAlternative(proposal, i)}
                         />
                       ))}
@@ -374,6 +392,8 @@ export default function ProjectWorkspacePage() {
               fullyCovered={reviewed.fully_covered}
               people={people}
               baseline={staffingBaseline(assignments, reviewed.members)}
+              startDate={reviewed.start_date}
+              plannedStart={span?.start ?? null}
               onApply={() => applyTeam(reviewed.id)}
               onDelete={
                 canDeleteTeams
