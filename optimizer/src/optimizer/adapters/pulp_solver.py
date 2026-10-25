@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pulp
 
 from optimizer.models import (
@@ -8,14 +10,18 @@ from optimizer.models import (
     AssignmentResult,
     InfeasibilityReason,
     PhaseConflict,
+    DateRange,
     ProjectPhase,
     Squad,
+    StartCandidate,
+    StartDateScan,
 )
 from optimizer.objectives import compute_person_scores
 from optimizer.constraints import feasible_people
 from optimizer.availability import effective_availability
 from optimizer.coverage import compute_coverage
 from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
+from optimizer.schedule import schedule_anchor, shift_project
 
 MAX_AFFINITY = 5.0  # matches the documented bound on PersonInput.affinities
 MIN_FTE_SHARE = 0.1  # smallest share a selected person carries, so nobody is staffed at ~0 FTE
@@ -23,6 +29,7 @@ MIN_FTE_SHARE = 0.1  # smallest share a selected person carries, so nobody is st
 # per-person cost breaks the tie towards fewer, fuller allocations. Kept well below
 # any meaningful score difference so it never overrides quality.
 HEADCOUNT_PENALTY = 1e-3
+START_STEP = timedelta(weeks=1)
 
 
 class PuLPTeamAssignmentSolver(AssignmentSolverPort):
@@ -127,6 +134,62 @@ class PuLPTeamAssignmentSolver(AssignmentSolverPort):
             model += pulp.lpSum(selected_vars) <= len(selected_vars) - min(min_difference, len(selected_vars))
 
         return pool
+
+    def solve_pool_over_starts(
+        self,
+        project: ProjectInput,
+        people: list[PersonInput],
+        weights: AssignmentWeights,
+        start_window: DateRange,
+        respect_exclusions: bool = True,
+        n_alternatives: int = 2,
+        min_difference: int = 2,
+    ) -> StartDateScan:
+        anchor = schedule_anchor(project)
+        if anchor is None:
+            raise ValueError(f"Project '{project.id}' has no date range to shift within a start window.")
+
+        candidates = []
+        optima = []
+        errors = []
+        start = start_window.start
+        while start <= start_window.end:
+            # Only the optimum is needed to rank a start; the pool is built once, at the winner.
+            try:
+                optimum = self.solve(shift_project(project, start - anchor), people, weights, respect_exclusions)
+            except InfeasibleAssignmentError as exc:
+                errors.append(exc)
+                candidates.append(StartCandidate(start=start, feasible=False))
+            else:
+                optima.append((start, optimum))
+                candidates.append(
+                    StartCandidate(
+                        start=start,
+                        feasible=True,
+                        score=optimum.score,
+                        max_score=optimum.max_score,
+                        fully_covered=optimum.fully_covered,
+                    )
+                )
+            start += START_STEP
+
+        if not optima:
+            raise errors[0]
+        best_start, _ = min(optima, key=lambda pair: (not pair[1].fully_covered, -pair[1].score, pair[0]))
+
+        pool = self.solve_pool(
+            shift_project(project, best_start - anchor),
+            people,
+            weights,
+            respect_exclusions,
+            n_alternatives=n_alternatives,
+            min_difference=min_difference,
+        )
+        return StartDateScan(
+            best_start=best_start,
+            pool=[result.model_copy(update={"start_date": best_start}) for result in pool],
+            candidates=candidates,
+        )
 
     def _result(
         self, project_id: str, phases: list, members: list[AssignedMember], score: float, max_score: float
