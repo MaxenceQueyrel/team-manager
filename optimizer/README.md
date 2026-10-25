@@ -39,10 +39,12 @@ optimizer/
 │   │   ├── skill.py          Skill, SkillLevel, SkillRequirement
 │   │   ├── date_range.py     DateRange, AvailabilityWindow
 │   │   ├── seniority.py      Seniority
-│   │   └── assignment.py     AssignmentWeights, AssignedMember, AssignmentResult
+│   │   ├── assignment.py     AssignmentWeights, AssignedMember, AssignmentResult
+│   │   └── start_scan.py     StartCandidate, StartDateScan (flexible start window)
 │   ├── objectives.py       Per-person scoring (skill, growth, cost)
 │   ├── constraints.py     Feasibility filter (exclusions, availability)
 │   ├── availability.py    Day-weighted FTE availability over a date range
+│   ├── schedule.py        Schedule anchor and rigid shift of a project's dates
 │   ├── domain/
 │   │   └── solver.py        AssignmentSolverPort — abstract interface callers depend on
 │   └── adapters/
@@ -66,6 +68,16 @@ optimizer/
 5. **Phased projects** — if the project defines `phases`, either solved independently per phase (`handover` weight = 0) or jointly in a single MILP with a retention bonus across consecutive phases (`handover` weight > 0).
 
 See the root README for the full formulation of each term.
+
+### Flexible start window
+
+`solve_pool_over_starts()` picks the start date as well as the team, inside an explicit `start_window: DateRange` (passed as an argument, not stored on `ProjectInput`).
+
+- **Rigid shift** (`schedule.shift_project`): every top-level `date_range` and every phase `date_range` moves by the same offset, so durations and gaps are kept. The **anchor** (`schedule.schedule_anchor`) is the earliest date across all of these ranges; the backend uses the same function to shift a project's dates when a team is applied.
+- **Candidates**: weekly starts `start_window.start + 7k` while `≤ start_window.end`. The window bounds the start only; the project may end after it. No cap is enforced here (the API caps it at 52).
+- **Per candidate**: the project is shifted so its anchor lands on the candidate and solved for the optimum only. Since dates act only through availability, this reuses the MILP unchanged.
+- **Ranking**: fully covered first, then highest score, then earliest start.
+- **Result**: a `StartDateScan` with `best_start`, the full `solve_pool` at that start (each `AssignmentResult.start_date` set to it; it stays `None` from plain `solve_pool`), and one `StartCandidate` per start. Infeasible starts are kept with `feasible=False`; if every start is infeasible, the earliest one's `InfeasibleAssignmentError` is raised.
 
 ---
 
