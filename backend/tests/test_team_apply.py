@@ -43,12 +43,13 @@ def _create_project(client, headers, **overrides) -> str:
     return response.json()["id"]
 
 
-def _create_team(client, headers, project_id, members) -> str:
+def _create_team(client, headers, project_id, members, start_date=None) -> str:
     payload = {
         "project_id": project_id,
         "members": members,
         "optimization_score": 1.0,
         "optimization_max_score": 1.0,
+        "start_date": start_date,
     }
     response = client.post("/api/v1/teams/", json=payload, headers=headers)
     assert response.status_code == 201
@@ -323,3 +324,113 @@ def test_apply_team_from_another_organization_returns_404(client, org_headers):
 
     assert response.status_code == 404
     assert _list_assignments(client, org_headers) == []
+
+
+WINDOW = {"start": "2026-01-01", "end": "2026-03-01"}
+SHIFTED_TEAM = [
+    {"person_id": "alice", "fte_allocation": 1.0, "phase_id": "design"},
+    {"person_id": "bob", "fte_allocation": 0.5, "phase_id": "build"},
+]
+
+
+def _get_project(client, headers, project_id):
+    return client.get(f"/api/v1/projects/{project_id}", headers=headers).json()
+
+
+def test_shifted_team_moves_project_dates_and_writes_shifted_assignments(
+    client, org_headers
+):
+    project_id = _create_project(
+        client,
+        org_headers,
+        date_ranges=[{"start": "2026-01-10", "end": "2026-03-31"}],
+        start_window=WINDOW,
+    )
+    team_id = _create_team(
+        client, org_headers, project_id, SHIFTED_TEAM, start_date="2026-01-15"
+    )
+
+    response = _apply(client, org_headers, team_id)
+
+    assert response.status_code == 201
+    assert {(a["person_id"], a["start"], a["end"]) for a in response.json()} == {
+        ("alice", "2026-01-15", "2026-02-14"),
+        ("bob", "2026-02-15", "2026-04-14"),
+    }
+    project = _get_project(client, org_headers, project_id)
+    assert project["date_ranges"] == [{"start": "2026-01-24", "end": "2026-04-14"}]
+    assert project["phases"] == [
+        {
+            "id": "design",
+            "n_slots": 1,
+            "skill_requirements": [],
+            "date_range": {"start": "2026-01-15", "end": "2026-02-14"},
+        },
+        {
+            "id": "build",
+            "n_slots": 1,
+            "skill_requirements": [],
+            "date_range": {"start": "2026-02-15", "end": "2026-04-14"},
+        },
+        {"id": "undated", "n_slots": 1, "skill_requirements": [], "date_range": None},
+    ]
+    assert project["start_window"] == WINDOW
+
+
+def test_shifted_team_that_over_allocates_writes_nothing(client, org_headers):
+    # Bob is free during the planned design phase but booked once it is shifted.
+    client.post(
+        "/api/v1/assignments/",
+        json={
+            "person_id": "bob",
+            "project_id": "other-project",
+            "ratio": 1.0,
+            "start": "2026-02-05",
+            "end": "2026-02-10",
+        },
+        headers=org_headers,
+    )
+    project_id = _create_project(client, org_headers, start_window=WINDOW)
+    before = _get_project(client, org_headers, project_id)
+    team_id = _create_team(
+        client,
+        org_headers,
+        project_id,
+        [{"person_id": "bob", "fte_allocation": 0.5, "phase_id": "design"}],
+        start_date="2026-01-15",
+    )
+
+    response = _apply(client, org_headers, team_id)
+
+    assert response.status_code == 400
+    assert "bob" in response.json()["detail"]
+    assert _get_project(client, org_headers, project_id) == before
+    assert [a["project_id"] for a in _list_assignments(client, org_headers)] == [
+        "other-project"
+    ]
+
+
+def test_team_at_the_current_start_leaves_project_dates_alone(client, org_headers):
+    project_id = _create_project(client, org_headers, start_window=WINDOW)
+    before = _get_project(client, org_headers, project_id)
+    team_id = _create_team(
+        client, org_headers, project_id, SHIFTED_TEAM, start_date="2026-01-01"
+    )
+
+    response = _apply(client, org_headers, team_id)
+
+    assert response.status_code == 201
+    assert {(a["person_id"], a["start"]) for a in response.json()} == {
+        ("alice", "2026-01-01"),
+        ("bob", "2026-02-01"),
+    }
+    assert _get_project(client, org_headers, project_id) == before
+
+
+def test_team_without_start_date_leaves_project_dates_alone(client, org_headers):
+    project_id = _create_project(client, org_headers, start_window=WINDOW)
+    before = _get_project(client, org_headers, project_id)
+    team_id = _create_team(client, org_headers, project_id, SHIFTED_TEAM)
+
+    assert _apply(client, org_headers, team_id).status_code == 201
+    assert _get_project(client, org_headers, project_id) == before
