@@ -12,8 +12,9 @@ class InfeasibilityReason(StrEnum):
         FORCED_MEMBER_CONFLICT: Un-forcing the listed included members makes the phase solvable.
         SQUAD_AND_FORCED_MEMBER_CONFLICT: Only dropping the listed squads and un-forcing the
             listed members together makes the phase solvable.
-        FTE_NOT_REACHABLE: Even without squads or forced members, no combination of the pool's
-            allocations adds up to the FTE need (e.g. everyone is available below the minimum share).
+        FTE_NOT_REACHABLE: No relaxation of squads or forced members makes the phase solvable.
+            The need is sized to what the pool can staff on the allocation grid, so this
+            is not expected to occur.
     """
 
     SQUAD_CONFLICT = "squad_conflict"
@@ -25,9 +26,13 @@ class InfeasibilityReason(StrEnum):
 class PhaseConflict(BaseModel):
     phase_id: str | None = Field(description="Identifier of the phase, or None for a project without phases.")
     reason: InfeasibilityReason = Field(description="Which constraints make the phase unsolvable.")
-    required_fte: float = Field(description="FTE the phase (or project) asks to staff, i.e. its n_slots.")
+    required_fte: float = Field(
+        description="FTE the phase (or project) asks to staff, i.e. the sum of its skill requirements' fte."
+    )
     need_fte: float = Field(
-        description="FTE the solver had to staff exactly, after capping by pool capacity and fitting forced members."
+        description=(
+            "FTE the solver had to staff exactly: each skill's fte capped by what its qualified people can supply."
+        )
     )
     squad_indices: list[int] = Field(
         default=[], description="Positions in ProjectInput.squads of the squads involved in the conflict."

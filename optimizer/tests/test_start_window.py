@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
-from optimizer.adapters.pulp_solver import MIN_FTE_SHARE, PuLPTeamAssignmentSolver
+from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import InfeasibleAssignmentError
 from optimizer.models import (
     AssignmentWeights,
@@ -44,7 +44,7 @@ def _person(person_id, python_level=4.0, years=5.0, react_level=None, vacations=
 def _project(**update):
     return ProjectInput(
         id="proj-test",
-        skill_requirements=[SkillRequirement(id="python", min_level=4)],
+        skill_requirements=[SkillRequirement(id="python", min_level=4, fte=1.0)],
         date_ranges=[WEEK_1],
     ).model_copy(update=update)
 
@@ -133,15 +133,18 @@ def test_scan_waits_for_the_key_person(solver, blocked):
 
 
 def test_fully_covered_start_beats_a_higher_scoring_partial_one(solver):
-    # "fresh" scores higher (no experience cost) but lacks react; "veteran" covers both
-    # skills at a lower score. Each is away during the other's week.
+    # "fresh" scores higher (no experience cost) but can't fill react; "veteran" covers
+    # both skills at a lower score. Each is away during the other's week.
     weights = AssignmentWeights(performance=0.5, chemistry=0.0, growth=0.0, cost=0.5)
     people = [
         _person("fresh", python_level=5.0, react_level=2.9, years=0.0, vacations=[WEEK_2]),
         _person("veteran", python_level=4.0, react_level=3.0, years=20.0, vacations=[WEEK_1]),
     ]
     project = _project(
-        skill_requirements=[SkillRequirement(id="python", min_level=4), SkillRequirement(id="react", min_level=3)]
+        skill_requirements=[
+            SkillRequirement(id="python", min_level=4, fte=0.4),
+            SkillRequirement(id="react", min_level=3, fte=0.6),
+        ]
     )
 
     scan = solver.solve_pool_over_starts(project, people, weights, DateRange(start=WEEK_1.start, end=WEEK_2.start))
@@ -160,9 +163,8 @@ def test_equal_scores_pick_the_earliest_start(solver):
 
 
 def _oversized_squad(prefix, vacation):
-    # An unforced squad whose minimum shares exceed the 1-FTE need can't be seated.
-    size = int(1 / MIN_FTE_SHARE) + 1
-    members = [_person(f"{prefix}{i}", vacations=[vacation]) for i in range(size)]
+    # A squad of two can't be seated on a 1-FTE need, which seats a single person.
+    members = [_person(f"{prefix}{i}", vacations=[vacation]) for i in range(2)]
     return Squad(member_ids=[p.id for p in members]), members
 
 
@@ -203,8 +205,7 @@ def test_pool_at_best_start_matches_solve_pool_on_the_shifted_project(solver):
     people = [_person(f"py{level}", python_level=level) for level in (5.0, 4.5, 4.0, 3.5, 3.0)]
     people[0] = _person("py5.0", python_level=5.0, vacations=[WEEK_1])
     project = _project(
-        n_slots=2,
-        skill_requirements=[SkillRequirement(id="python", min_level=5)],
+        skill_requirements=[SkillRequirement(id="python", min_level=3, fte=2.0)],
         date_ranges=[DateRange(start=date(2025, 12, 1), end=date(2025, 12, 7))],
     )
     weights = AssignmentWeights()
@@ -223,7 +224,7 @@ def test_pool_at_best_start_matches_solve_pool_on_the_shifted_project(solver):
 
 
 def test_each_feasible_candidate_carries_its_optimum_at_that_start(solver):
-    people = [_person("star", python_level=5.0, vacations=[WEEK_1]), _person("weak", python_level=2.0)]
+    people = [_person("star", python_level=5.0, vacations=[WEEK_1]), _person("weak", python_level=4.0)]
     window = DateRange(start=WEEK_1.start, end=WEEK_3.start)
 
     scan = solver.solve_pool_over_starts(_project(), people, AssignmentWeights(), window)
