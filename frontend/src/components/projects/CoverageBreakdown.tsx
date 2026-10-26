@@ -7,6 +7,7 @@ const cellStyle = { padding: "0.2rem 0.5rem 0.2rem 0", verticalAlign: "top" } as
 const barCellStyle = { ...cellStyle, width: "30%", verticalAlign: "middle" } as const;
 
 function SkillRow({ skill }: { skill: SkillCoverage }) {
+  const level = formatFte(skill.required_level);
   return (
     <tr>
       <th scope="row" style={{ ...cellStyle, fontWeight: 400, textAlign: "left" }}>
@@ -14,26 +15,20 @@ function SkillRow({ skill }: { skill: SkillCoverage }) {
       </th>
       <td style={barCellStyle}>
         <FillBar
-          value={skill.best_level / (skill.required_level || 1)}
+          value={skill.covered_fte / skill.required_fte}
           tone={skill.met ? "success" : "warning"}
           style={{ minWidth: 60 }}
         />
       </td>
       <td style={cellStyle}>
-        Level {formatFte(skill.best_level)} / {formatFte(skill.required_level)}
-        {skill.met ? (
-          <span style={{ color: colors.success }}>
-            {" "}
-            · covered ({formatFte(skill.covered_fte)} FTE)
-          </span>
-        ) : (
-          <>
-            <span style={{ color: colors.danger }}> · not covered</span>
-            <p style={hintStyle}>
-              Add a candidate with {skill.skill_id} ≥ {formatFte(skill.required_level)}, or lower
-              the required level.
-            </p>
-          </>
+        <span style={{ color: skill.met ? colors.success : colors.danger }}>
+          {formatFte(skill.covered_fte)} / {formatFte(skill.required_fte)} FTE covered
+        </span>
+        <span style={{ color: colors.muted }}> · level ≥ {level}</span>
+        {!skill.met && (
+          <p style={hintStyle}>
+            Add a candidate with {skill.skill_id} ≥ {level}, or lower its FTE or level.
+          </p>
         )}
       </td>
     </tr>
@@ -68,8 +63,9 @@ function PhaseTable({ phase }: { phase: PhaseCoverage }) {
             </span>
             {!phase.fte_met && (
               <p style={hintStyle}>
-                Only {formatFte(phase.available_fte)} FTE is available from eligible people — add
-                candidates or reduce the required FTE.
+                {phase.available_fte < phase.required_fte
+                  ? `Only ${formatFte(phase.available_fte)} FTE is available from eligible people — add candidates or reduce the required FTE.`
+                  : "Qualified people can't fill every skill need below — add qualified candidates or lower the requirements."}
               </p>
             )}
           </td>

@@ -18,7 +18,6 @@ function emptyDraft(): ProjectDraft {
   return {
     name: "",
     description: "",
-    n_slots: 1,
     skill_requirements: [],
     excluded_person_ids: [],
     included_person_ids: [],
@@ -61,6 +60,21 @@ export function ProjectForm({
   };
 
   const submit = async () => {
+    const scopes = usesPhases
+      ? draft.phases.map((phase) => phase.skill_requirements)
+      : [draft.skill_requirements];
+    if (scopes.some((requirements) => requirements.length === 0)) {
+      setError(
+        usesPhases
+          ? "Add at least one skill requirement to every phase."
+          : "Add at least one skill requirement.",
+      );
+      return;
+    }
+    if (scopes.some((requirements) => requirements.some((req) => !req.id.trim()))) {
+      setError("Pick a skill for every skill requirement.");
+      return;
+    }
     if (draft.start_window && (!draft.start_window.start || !draft.start_window.end)) {
       setError("Fill in both earliest and latest start, or leave both empty.");
       return;
@@ -123,19 +137,10 @@ export function ProjectForm({
 
       {!usesPhases && (
         <>
-          <Field label="FTE needed" hint="1 = one full-time person">
-            <input
-              type="number"
-              min={1}
-              value={draft.n_slots}
-              onChange={(e) =>
-                set("n_slots", Math.max(1, Math.round(parseFloat(e.target.value) || 1)))
-              }
-              style={{ ...inputStyle, maxWidth: 120 }}
-            />
-          </Field>
-
-          <Field label="Skill requirements" hint="Minimum proficiency required, 0 to 5">
+          <Field
+            label="Skill requirements"
+            hint="Per skill: the minimum level (0–5) to fill it, the FTE to staff (1 = one full-time person, 0.2 = one day per week) and the most people to split it across."
+          >
             <SkillReqsEditor
               value={draft.skill_requirements}
               onChange={(v) => set("skill_requirements", v)}
@@ -153,7 +158,7 @@ export function ProjectForm({
         label="Phases"
         hint={
           usesPhases
-            ? "Per-stage staffing overrides the project-level FTE, skills and date ranges above."
+            ? "Per-stage staffing overrides the project-level skills and date ranges above."
             : "Add phases for multi-stage staffing (e.g. design → build → handover). Leave empty for a single team."
         }
       >

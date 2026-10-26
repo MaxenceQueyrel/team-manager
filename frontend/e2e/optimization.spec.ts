@@ -1,9 +1,15 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { createPerson, MANAGER_EMAIL, MANAGER_PASSWORD, uniqueSuffix } from "./helpers";
+import {
+  createPerson,
+  createProject,
+  MANAGER_EMAIL,
+  MANAGER_PASSWORD,
+  uniqueSuffix,
+} from "./helpers";
 
 const PROJECT_CSV_HEADER =
-  "id,name,description,n_slots,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases";
+  "id,name,description,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases";
 
 const PEOPLE_CSV_HEADER =
   "id,name,role,seniority,years_of_experience,working_days_per_week,manager_id,skills,vacations,availability_windows,preferences,growth_targets,affinities";
@@ -43,22 +49,21 @@ async function everyoneElse(page: Page, keepIds: string[]): Promise<string[]> {
   return people.map((p) => p.id).filter((id) => !keepIds.includes(id));
 }
 
-/** Imports a non-phased project spanning January 2027 (one slot by default), then opens its workspace. */
+/** Imports a non-phased project spanning January 2027, then opens its workspace. By default it
+ * needs 1 FTE of a skill anyone can fill. */
 async function importDatedProject(
   page: Page,
   {
     id,
     name,
-    nSlots = 1,
-    skillRequirements = [],
+    skillRequirements = [{ id: "general", min_level: 0, fte: 1 }],
     excludedPersonIds = [],
     includedPersonIds = [],
     squads = [],
   }: {
     id: string;
     name: string;
-    nSlots?: number;
-    skillRequirements?: { id: string; min_level: number }[];
+    skillRequirements?: { id: string; min_level: number; fte: number; max_people?: number }[];
     excludedPersonIds?: string[];
     includedPersonIds?: string[];
     squads?: { member_ids: string[] }[];
@@ -67,7 +72,7 @@ async function importDatedProject(
   const dateRanges = [{ start: "2027-01-01", end: "2027-01-31" }];
   const csv = [
     PROJECT_CSV_HEADER,
-    `${id},${name},,${nSlots},high,${quote(skillRequirements)},${quote(excludedPersonIds)},${quote(includedPersonIds)},${quote(squads)},${quote(dateRanges)},[]`,
+    `${id},${name},,high,${quote(skillRequirements)},${quote(excludedPersonIds)},${quote(includedPersonIds)},${quote(squads)},${quote(dateRanges)},[]`,
   ].join("\n");
   await page.goto("/projects");
   await page.locator('input[type="file"]').setInputFiles({
@@ -89,10 +94,7 @@ async function runOptimization(page: Page): Promise<void> {
 test("optimizing from the project workspace shows the best team", async ({ page }) => {
   const name = `Optimization Smoke ${uniqueSuffix()}`;
 
-  await page.goto("/projects");
-  await page.getByRole("button", { name: "New project" }).click();
-  await page.getByLabel("Name", { exact: true }).fill(name);
-  await page.getByRole("button", { name: "Save" }).click();
+  await createProject(page, name);
   await page.getByRole("link", { name }).click();
 
   await runOptimization(page);
@@ -107,7 +109,7 @@ test("alternative teams are collapsed by default and show their delta vs best", 
   const suffix = uniqueSuffix();
   const projectName = `Optimization Alternatives ${suffix}`;
 
-  // A one-slot project needs three eligible people to yield the best team plus the
+  // A 1-FTE project needs three eligible people to yield the best team plus the
   // default two alternatives.
   for (const i of [1, 2, 3]) {
     await createPerson(page, `Candidate ${i} ${suffix}`, `candidate-${i}-${suffix}`);
@@ -294,9 +296,9 @@ test("applying a stale proposal reports the FTE conflict by name", async ({ page
 test("an infeasible squad is explained in the optimization panel", async ({ page }) => {
   const suffix = uniqueSuffix();
   const projectName = `Optimization Infeasible ${suffix}`;
-  // Every selected person carries at least 0.1 FTE, so eleven people co-selected as a
+  // Every selected person carries at least 0.2 FTE, so six people co-selected as a
   // squad can never fit a one-FTE project once nobody else can be picked instead.
-  const members = Array.from({ length: 11 }, (_, i) => ({
+  const members = Array.from({ length: 6 }, (_, i) => ({
     id: `squad-${i + 1}-${suffix}`,
     name: `Squad Member ${i + 1} ${suffix}`,
   }));
@@ -316,9 +318,11 @@ test("an infeasible squad is explained in the optimization panel", async ({ page
   const alert = panel.getByRole("alert");
   await expect(alert).toContainText("No feasible team for these constraints");
   await expect(alert).toContainText(
-    `Squad of Squad Member 1 ${suffix}, Squad Member 2 ${suffix}, Squad Member 3 ${suffix} and 8 more (11 people) must be staffed together at 0.1 FTE or more each, which doesn't fit the 1 FTE the project needs.`,
+    `Squad of Squad Member 1 ${suffix}, Squad Member 2 ${suffix}, Squad Member 3 ${suffix} and 3 more (6 people) must be staffed together at 0.2 FTE or more each, which doesn't fit the 1 FTE the project needs.`,
   );
-  await expect(alert).toContainText("Drop or shrink the squad, or raise the required FTE.");
+  await expect(alert).toContainText(
+    "Drop or shrink the squad, or raise the required FTE or max people.",
+  );
   await expect(alert).not.toContainText("status code 409");
   await expect(page.getByRole("heading", { name: "Optimization result" })).toHaveCount(0);
 });
@@ -327,17 +331,17 @@ test("a partially covered proposal breaks down its unmet requirements", async ({
   const suffix = uniqueSuffix();
   const projectName = `Optimization Partial ${suffix}`;
   const skillId = `rare-skill-${suffix}`;
-  const noviceId = `novice-${suffix}`;
+  const expertId = `expert-${suffix}`;
+  const expertName = `Expert ${suffix}`;
   await importPeople(page, [
-    { id: noviceId, name: `Novice ${suffix}`, skills: [{ id: skillId, level: 2 }] },
+    { id: expertId, name: expertName, skills: [{ id: skillId, level: 4 }] },
   ]);
   // A single full-time candidate can staff only half of two FTE.
   await importDatedProject(page, {
     id: `partial-${suffix}`,
     name: projectName,
-    nSlots: 2,
-    skillRequirements: [{ id: skillId, min_level: 4 }],
-    excludedPersonIds: await everyoneElse(page, [noviceId]),
+    skillRequirements: [{ id: skillId, min_level: 4, fte: 2 }],
+    excludedPersonIds: await everyoneElse(page, [expertId]),
   });
 
   await page.getByRole("button", { name: "Optimize staffing" }).click();
@@ -355,8 +359,11 @@ test("a partially covered proposal breaks down its unmet requirements", async ({
     "Only 1 FTE is available from eligible people — add candidates or reduce the required FTE.",
   );
   const skillRow = coverage.getByRole("row", { name: new RegExp(`^${skillId}`) });
-  await expect(skillRow).toContainText("Level 2 / 4 · not covered");
+  await expect(skillRow).toContainText("1 / 2 FTE covered · level ≥ 4");
   await expect(skillRow).toContainText(`Add a candidate with ${skillId} ≥ 4`);
+  await expect(
+    best.getByText(`${expertName} (${expertId}) — 100% FTE (${skillId} 100%)`),
+  ).toBeVisible();
 
   // The breakdown is saved with the proposal, so it survives a reload.
   await page.reload();
@@ -412,7 +419,10 @@ test("a user without optimization:run sees no Optimize button", async ({ page })
   ).json();
   const project = await (
     await page.request.post("/api/v1/projects/", {
-      data: { name: projectName },
+      data: {
+        name: projectName,
+        skill_requirements: [{ id: "general", min_level: 0, fte: 1 }],
+      },
       headers: { ...authorization, "X-Organization-Id": organization.id },
     })
   ).json();

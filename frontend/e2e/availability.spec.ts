@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { createPerson, uniqueSuffix } from "./helpers";
+import { createPerson, createProject, uniqueSuffix } from "./helpers";
 
 test("assignment-driven reductions show up on the capacity timeline", async ({ page }) => {
   const suffix = uniqueSuffix();
@@ -8,25 +8,22 @@ test("assignment-driven reductions show up on the capacity timeline", async ({ p
 
   await createPerson(page, name, `availability-qa-${suffix}`);
 
-  await page.goto("/projects");
-  await page.getByRole("button", { name: "New project" }).click();
-  await page.getByLabel("Name", { exact: true }).fill(projectName);
-  await page.getByRole("button", { name: "Save" }).click();
+  await createProject(page, projectName);
   await page.getByRole("link", { name: projectName }).click();
   await page.getByRole("button", { name: "Assign person to Whole project" }).click();
   await page.getByLabel("Person").selectOption({ label: name });
-  await page.getByLabel("Commitment").selectOption("half-time");
+  await page.getByLabel("Commitment").selectOption("0.6");
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("0.5 of 1 FTE");
+  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("0.6 of 1 FTE");
 
   await page.goto("/people");
   await page.getByRole("link", { name: "Capacity" }).click();
   await page.getByLabel("From", { exact: true }).fill("2026-01-01");
   await page.getByLabel("To", { exact: true }).fill("2026-01-10");
 
-  await expect(page.getByTitle("2026-01-01: 50%")).toBeVisible();
+  await expect(page.getByTitle("2026-01-01: 40%")).toBeVisible();
 
   await page.getByRole("link", { name }).click();
   await expect(page).toHaveURL(/\/people\/[^/]+$/);

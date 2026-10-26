@@ -21,18 +21,22 @@ import {
   fteByPerson,
   missingSkills,
   type StaffingLane,
+  skillLevel,
 } from "@/components/projects/staffing";
 import { errorMessage } from "@/services/api";
 import type { Assignment, Person, SkillRequirement } from "@/types";
 
-const COMMITMENTS = [
-  { value: "full-time", label: "Full-time", ratio: 1 },
-  { value: "half-time", label: "Half-time", ratio: 0.5 },
-  { value: "one-day-week", label: "One day/week", ratio: 0.2 },
-  { value: "custom", label: "Custom ratio", ratio: 1 },
-] as const;
+// Allocations are whole days per week: the backend rejects ratios off the 20% grid.
+const COMMITMENTS = [1, 0.8, 0.6, 0.4, 0.2].map((ratio) => ({
+  ratio,
+  label:
+    ratio === 1 ? "Full-time (5 days/week)" : `${daysPerWeek(ratio)} (${Math.round(ratio * 100)}%)`,
+}));
 
-type CommitmentValue = (typeof COMMITMENTS)[number]["value"];
+function daysPerWeek(ratio: number): string {
+  const days = Math.round(ratio * 5);
+  return `${days} ${days === 1 ? "day" : "days"}/week`;
+}
 
 function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -47,10 +51,7 @@ function defaultRange(lane: StaffingLane): { start: string; end: string } {
 }
 
 export function commitmentForRatio(ratio: number): string {
-  if (ratio === 1) return "Full-time";
-  if (ratio === 0.5) return "Half-time";
-  if (ratio === 0.2) return "One day/week";
-  return `${Math.round(ratio * 100)}% FTE`;
+  return ratio === 1 ? "Full-time" : daysPerWeek(ratio);
 }
 
 const rowPadding = "0.95rem 1.5rem";
@@ -87,7 +88,7 @@ export function StaffingLaneCard({
   const nameOf = (personId: string) => peopleById.get(personId)?.name ?? personId;
   const missing = missingSkills(lane, people);
   const fte = assignedFte(lane);
-  const open = lane.nSlots === null ? 0 : Math.max(lane.nSlots - fte, 0);
+  const open = lane.requiredFte === null ? 0 : Math.max(lane.requiredFte - fte, 0);
   const roster = [...lane.assignments].sort((a, b) => a.start.localeCompare(b.start));
   const segments = [...fteByPerson(lane)].map(([personId, value]) => ({
     key: personId,
@@ -146,17 +147,17 @@ export function StaffingLaneCard({
               >
                 {formatFte(fte)}
               </span>{" "}
-              {lane.nSlots === null ? "FTE" : `of ${lane.nSlots} FTE`}
+              {lane.requiredFte === null ? "FTE" : `of ${lane.requiredFte} FTE`}
             </div>
           </div>
 
-          {lane.nSlots === null ? (
+          {lane.requiredFte === null ? (
             <p style={{ margin: "0.4rem 0 0", fontSize: "0.85rem", color: colors.muted }}>
               Assignments not tied to any current phase.
             </p>
           ) : (
             <div style={{ marginTop: "1rem" }}>
-              <StackedFillBar segments={segments} total={lane.nSlots} legend />
+              <StackedFillBar segments={segments} total={lane.requiredFte} legend />
             </div>
           )}
 
@@ -175,7 +176,10 @@ export function StaffingLaneCard({
               <span>Requires</span>
               {lane.skillRequirements.map((req) => (
                 <Pill key={req.id} tone="outline">
-                  {req.id} <span className="mono">≥ {req.min_level}</span>
+                  {req.id}{" "}
+                  <span className="mono">
+                    ≥ {req.min_level} · {formatFte(req.fte)} FTE
+                  </span>
                 </Pill>
               ))}
             </div>
@@ -190,7 +194,7 @@ export function StaffingLaneCard({
               const details = [
                 person?.role,
                 person && seniorityLabels[person.seniority],
-                lane.nSlots === null && assignment.phase_id,
+                lane.requiredFte === null && assignment.phase_id,
               ].filter(Boolean);
               return (
                 <li key={assignment.id} style={rowStyle}>
@@ -235,7 +239,7 @@ export function StaffingLaneCard({
           </ul>
         )}
 
-        {lane.nSlots !== null && (
+        {lane.requiredFte !== null && (
           <div
             style={{
               ...rowStyle,
@@ -352,10 +356,10 @@ export function StaffingLaneCard({
 
 function SkillMatch({ person, requirement }: { person: Person; requirement: SkillRequirement }) {
   const level = person.skills.find((s) => s.id === requirement.id)?.level;
-  if (level !== undefined && level >= requirement.min_level) {
+  if (skillLevel(person, requirement.id) >= requirement.min_level) {
     return (
       <Pill tone="success" icon={Check}>
-        {requirement.id} <span className="mono">{level}</span>
+        {requirement.id} <span className="mono">{level ?? 0}</span>
       </Pill>
     );
   }
@@ -387,7 +391,6 @@ export function AssignForm({
   onSubmit: (data: Omit<Assignment, "id" | "project_id">) => Promise<void>;
 }) {
   const [personId, setPersonId] = useState(defaultPersonId);
-  const [commitment, setCommitment] = useState<CommitmentValue>("full-time");
   const [ratio, setRatio] = useState(1);
   const [range, setRange] = useState(() => defaultRange(lane));
   const [saving, setSaving] = useState(false);
@@ -426,17 +429,12 @@ export function AssignForm({
         </Field>
         <Field label="Commitment">
           <select
-            value={commitment}
-            onChange={(e) => {
-              const next = e.target.value as CommitmentValue;
-              setCommitment(next);
-              const preset = COMMITMENTS.find((item) => item.value === next);
-              if (preset && next !== "custom") setRatio(preset.ratio);
-            }}
+            value={ratio}
+            onChange={(e) => setRatio(Number(e.target.value))}
             style={selectStyle}
           >
             {COMMITMENTS.map((item) => (
-              <option key={item.value} value={item.value}>
+              <option key={item.ratio} value={item.ratio}>
                 {item.label}
               </option>
             ))}
@@ -459,19 +457,6 @@ export function AssignForm({
           />
         </Field>
       </div>
-      {commitment === "custom" && (
-        <Field label="Custom ratio" hint="Fraction of FTE to reserve.">
-          <input
-            type="number"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ratio}
-            onChange={(e) => setRatio(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
-            style={{ ...inputStyle, maxWidth: 120 }}
-          />
-        </Field>
-      )}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
         <Button onClick={onCancel}>Cancel</Button>
         <Button

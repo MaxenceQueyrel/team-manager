@@ -12,10 +12,13 @@ export interface SkillLevel {
   level: number; // 0–5 proficiency
 }
 
+// One skill need of a project or phase; the scope's total FTE is the sum of its needs' fte.
 export interface SkillRequirement {
   id: string;
   description?: string;
-  min_level: number; // 0–5 minimum proficiency
+  min_level: number; // 0–5; only people at or above it can fill the need
+  fte: number; // 0.2–5, a multiple of 0.2 (one day per week)
+  max_people: number; // most people the fte may be split across, ceil(fte) to fte / 0.2
 }
 
 export interface DateRange {
@@ -72,7 +75,6 @@ export interface Squad {
 
 export interface ProjectPhase {
   id: string;
-  n_slots: number;
   skill_requirements: SkillRequirement[];
   date_range: DateRange | null;
 }
@@ -81,7 +83,6 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  n_slots: number;
   skill_requirements: SkillRequirement[];
   excluded_person_ids: string[];
   included_person_ids: string[];
@@ -104,9 +105,15 @@ export interface Assignment {
   phase_id: string | null;
 }
 
+export interface SkillAllocation {
+  skill_id: string; // the SkillRequirement id
+  fte: number; // a multiple of 0.2
+}
+
 export interface AssignedMember {
   person_id: string;
-  fte_allocation: number; // 0–1
+  fte_allocation: number; // 0.2–1, the sum of skill_allocations
+  skill_allocations: SkillAllocation[]; // shares > 0 in requirement order; empty for current staffing
   phase_id: string | null;
 }
 
@@ -153,12 +160,13 @@ export interface TeamProposal {
   start_date: string | null;
 }
 
-// skill_id is the SkillRequirement id; met means some staffed member reaches required_level.
+// skill_id is the SkillRequirement id; met means covered_fte reaches required_fte.
 export interface SkillCoverage {
   skill_id: string;
   required_level: number;
+  required_fte: number;
   best_level: number; // 0 when no staffed member has the skill
-  covered_fte: number; // FTE staffed by members at or above required_level
+  covered_fte: number; // FTE members give to this skill
   met: boolean;
 }
 
@@ -181,7 +189,7 @@ export type InfeasibilityReason =
 export interface PhaseConflict {
   phase_id: string | null;
   reason: InfeasibilityReason;
-  required_fte: number; // the phase's n_slots
+  required_fte: number; // the sum of the phase's skill FTE
   need_fte: number; // FTE the solver had to staff exactly, after capping by pool capacity
   squad_indices: number[]; // positions in project.squads
   forced_person_ids: string[]; // subset of project.included_person_ids
