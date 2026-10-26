@@ -7,6 +7,7 @@ from api.main import app
 from api.models.project import Project
 from api.repositories.file_repository import FileRepository
 from api.v1 import projects as projects_module
+from tests.conftest import ONE_FTE_NEED
 
 
 @pytest.fixture
@@ -19,6 +20,7 @@ def client(tmp_path, monkeypatch):
 def _create_project(client, headers) -> dict:
     payload = {
         "name": "Atlas Migration",
+        "skill_requirements": [ONE_FTE_NEED],
         "date_ranges": [{"start": "2026-07-01", "end": "2026-09-30"}],
     }
     response = client.post("/api/v1/projects/", json=payload, headers=headers)
@@ -81,8 +83,7 @@ def test_legacy_project_without_completed_at_loads_as_open(
         "organization_id": organization_id,
         "name": "Legacy",
         "description": "",
-        "n_slots": 1,
-        "skill_requirements": [],
+        "skill_requirements": [ONE_FTE_NEED],
         "excluded_person_ids": [],
         "included_person_ids": [],
         "squads": [],
