@@ -26,12 +26,20 @@ class AssignmentWeights(BaseModel):
     )
 
 
+class SkillAllocation(BaseModel):
+    skill_id: str = Field(description="Identifier of the skill requirement the share fills.")
+    fte: float = Field(gt=0, le=1, description="FTE the person gives to this skill, a multiple of 0.2.")
+
+
 class AssignedMember(BaseModel):
     person_id: str = Field(description="Identifier of the assigned person.")
     fte_allocation: float = Field(
         ge=0,
         le=1,
-        description="Fraction of full-time equivalent allocated to the project.",
+        description="Fraction of full-time equivalent allocated to the project, i.e. the sum of skill_allocations.",
+    )
+    skill_allocations: list[SkillAllocation] = Field(
+        default=[], description="Breakdown of fte_allocation per skill requirement, in requirement order."
     )
     phase_id: str | None = Field(
         default=None, description="Identifier of the phase this assignment belongs to, if the project uses phases."

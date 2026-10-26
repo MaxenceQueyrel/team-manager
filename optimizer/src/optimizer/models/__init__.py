@@ -1,4 +1,4 @@
-from optimizer.models.assignment import AssignedMember, AssignmentResult, AssignmentWeights
+from optimizer.models.assignment import AssignedMember, AssignmentResult, AssignmentWeights, SkillAllocation
 from optimizer.models.coverage import PhaseCoverage, SkillCoverage
 from optimizer.models.date_range import AvailabilityWindow, DateRange
 from optimizer.models.infeasibility import InfeasibilityReason, PhaseConflict
@@ -27,6 +27,7 @@ __all__ = [
     "StartCandidate",
     "StartDateScan",
     "Skill",
+    "SkillAllocation",
     "SkillLevel",
     "SkillRequirement",
 ]
