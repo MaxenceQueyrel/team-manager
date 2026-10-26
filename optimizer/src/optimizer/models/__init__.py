@@ -7,6 +7,7 @@ from optimizer.models.project import ProjectInput, ProjectPhase
 from optimizer.models.seniority import Seniority
 from optimizer.models.skill import Skill, SkillLevel, SkillRequirement
 from optimizer.models.squad import Squad
+from optimizer.models.start_scan import StartCandidate, StartDateScan
 
 __all__ = [
     "AssignedMember",
@@ -23,6 +24,8 @@ __all__ = [
     "Seniority",
     "SkillCoverage",
     "Squad",
+    "StartCandidate",
+    "StartDateScan",
     "Skill",
     "SkillLevel",
     "SkillRequirement",

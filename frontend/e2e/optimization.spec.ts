@@ -13,10 +13,16 @@ const quote = (value: unknown) => `"${JSON.stringify(value).replace(/"/g, '""')}
 /** Imports full-time mid-level people through the People page CSV upload. */
 async function importPeople(
   page: Page,
-  people: { id: string; name: string; skills?: { id: string; level: number }[] }[],
+  people: {
+    id: string;
+    name: string;
+    skills?: { id: string; level: number }[];
+    vacations?: { start: string; end: string }[];
+  }[],
 ): Promise<void> {
   const rows = people.map(
-    ({ id, name, skills = [] }) => `${id},${name},${id},mid,3,5,,${quote(skills)},[],[],[],[],{}`,
+    ({ id, name, skills = [], vacations = [] }) =>
+      `${id},${name},${id},mid,3,5,,${quote(skills)},${quote(vacations)},[],[],[],{}`,
   );
   await page.goto("/people");
   await page.locator('input[type="file"]').setInputFiles({
@@ -123,6 +129,93 @@ test("alternative teams are collapsed by default and show their delta vs best", 
   await page.getByRole("button", { name: "Show 2 alternative teams" }).click();
   await expect(alternativeHeadings).toHaveCount(2);
   await expect(page.getByText(/vs best|same score as best/)).toHaveCount(2);
+
+  // Without a start window the result has no per-start strip and no start label.
+  await expect(page.getByRole("region", { name: "Start dates tried" })).toHaveCount(0);
+  await expect(page.getByText(/^Starts /)).toHaveCount(0);
+});
+
+test("a flexible start window picks the start where the team is free and applying moves the dates", async ({
+  page,
+}) => {
+  const suffix = uniqueSuffix();
+  const projectName = `Optimization Window ${suffix}`;
+  const personId = `returning-${suffix}`;
+
+  await page.goto("/projects");
+  await page.getByRole("button", { name: "New project" }).click();
+  await expect(page.getByLabel("Earliest start")).toBeDisabled();
+  await expect(page.getByLabel("Latest start")).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  // The only candidate is away for the planned month, so the first start after the
+  // vacation is the only one the team fully covers.
+  await importPeople(page, [
+    {
+      id: personId,
+      name: `Returning ${suffix}`,
+      vacations: [{ start: "2027-01-01", end: "2027-01-31" }],
+    },
+  ]);
+  await importDatedProject(page, {
+    id: `window-${suffix}`,
+    name: projectName,
+    excludedPersonIds: await everyoneElse(page, [personId]),
+  });
+
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Earliest start").fill("2027-02-05");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Fill in both earliest and latest start, or leave both empty.",
+  );
+  await page.getByLabel("Latest start").fill("2027-01-01");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Latest start must not be before earliest start",
+  );
+  await page.getByLabel("Earliest start").fill("2027-01-01");
+  await page.getByLabel("Latest start").fill("2027-02-05");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByLabel("Earliest start")).toHaveCount(0);
+
+  await runOptimization(page);
+  const strip = page.getByRole("region", { name: "Start dates tried" });
+  await expect(strip.getByRole("listitem")).toHaveCount(6);
+  await expect(strip.locator('[aria-current="true"]')).toContainText("5 Feb");
+  await expect(strip.locator('[aria-current="true"]')).toContainText("covered · chosen");
+  const best = page.getByRole("region", { name: "Best team" });
+  await expect(best.getByText("Starts 5 Feb 2027 (+5 weeks vs planned)")).toBeVisible();
+
+  // Starting on 29 Jan only overlaps February, so the team is a partial one.
+  const chosenStart = strip.getByRole("button", { name: /5 Feb/ });
+  const earlierStart = strip.getByRole("button", { name: /29 Jan/ });
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "true");
+  await earlierStart.click();
+  await expect(earlierStart).toHaveAttribute("aria-pressed", "true");
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "false");
+  await expect(earlierStart).toContainText("partial");
+  const selected = page.getByRole("region", { name: "Team at selected start" });
+  await expect(selected.getByText("Starts 29 Jan 2027 (+4 weeks vs planned)")).toBeVisible();
+  await expect(selected.getByText(`Returning ${suffix}`)).toBeVisible();
+  await expect(best).toHaveCount(0);
+  await chosenStart.click();
+  await expect(selected).toHaveCount(0);
+  await expect(chosenStart).toHaveAttribute("aria-pressed", "true");
+
+  await best.getByRole("button", { name: "Apply to project" }).click();
+  await expect(
+    page.getByText(
+      "It also moves the project's dates so that it starts 5 Feb 2027 (+5 weeks vs planned).",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+
+  const timeline = page.getByRole("region", { name: "Timeline" });
+  await expect(timeline).toContainText("5 Feb 2027");
+  await expect(timeline).toContainText("7 Mar 2027");
+  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("1 of 1 FTE");
+  await expect(best.getByText(/^Starts /)).toHaveCount(0);
 });
 
 test("applying proposals replaces the project's staffing", async ({ page }) => {

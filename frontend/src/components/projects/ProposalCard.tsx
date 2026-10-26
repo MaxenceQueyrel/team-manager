@@ -1,5 +1,6 @@
 import { Check, Trash2, X } from "lucide-react";
 import { useId, useState } from "react";
+import { daysBetween, formatDay } from "@/components/common/dates";
 import { TeamMembers } from "@/components/common/TeamMembers";
 import { Button, Card, colors, IconButton, Modal } from "@/components/common/ui";
 import { CoverageBreakdown } from "@/components/projects/CoverageBreakdown";
@@ -13,8 +14,18 @@ function replacedScope(members: AssignedMember[]): string {
   return `${names.length === 1 ? "phase" : "phases"} ${names.join(", ")}`;
 }
 
+// Candidate starts step weekly from the window's start, which need not be a whole number
+// of weeks away from the planned start.
+function weeksShift(plannedStart: string, startDate: string): string {
+  const weeks = daysBetween(plannedStart, startDate) / 7;
+  const amount = Number.isInteger(weeks) ? String(Math.abs(weeks)) : Math.abs(weeks).toFixed(1);
+  return `${weeks < 0 ? "−" : "+"}${amount} ${amount === "1" ? "week" : "weeks"}`;
+}
+
 /** A team proposal diffed against current staffing, with its requirement coverage and an
- * "Apply to project" action. `onClose` adds a close button (a proposal opened for review). */
+ * "Apply to project" action. `onClose` adds a close button (a proposal opened for review).
+ * A `startDate` other than `plannedStart` (the project's earliest date) is labelled, and the
+ * apply confirmation warns that the project's dates will move to it. */
 export function ProposalCard({
   title,
   members,
@@ -25,6 +36,8 @@ export function ProposalCard({
   fullyCovered,
   people,
   baseline,
+  startDate,
+  plannedStart,
   onApply,
   onDelete,
   onClose,
@@ -38,6 +51,8 @@ export function ProposalCard({
   fullyCovered: boolean | null;
   people: Person[];
   baseline: AssignedMember[];
+  startDate: string | null;
+  plannedStart: string | null;
   onApply: () => Promise<void>;
   onDelete?: () => void;
   onClose?: () => void;
@@ -46,6 +61,10 @@ export function ProposalCard({
   const [confirming, setConfirming] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const shift =
+    startDate && plannedStart && startDate !== plannedStart
+      ? `${formatDay(startDate, true)} (${weeksShift(plannedStart, startDate)} vs planned)`
+      : null;
 
   const closeDialog = () => {
     setConfirming(false);
@@ -109,6 +128,11 @@ export function ProposalCard({
           </strong>
           {scoreNote && <span style={{ color: colors.muted }}> · {scoreNote}</span>}
         </p>
+        {shift && (
+          <p style={{ margin: "-0.4rem 0 0.75rem", fontSize: "0.875rem" }}>
+            <strong>Starts {shift}</strong>
+          </p>
+        )}
         <CoverageBreakdown coverage={coverage} fullyCovered={fullyCovered} />
         {members.length === 0 ? (
           <p style={{ color: colors.muted, margin: 0 }}>
@@ -135,6 +159,11 @@ export function ProposalCard({
           <p style={{ marginTop: 0 }}>
             This replaces current staffing for {replacedScope(members)}.
           </p>
+          {shift && (
+            <p style={{ color: colors.warningText }}>
+              It also moves the project's dates so that it starts {shift}.
+            </p>
+          )}
           {error && (
             <p role="alert" style={{ color: colors.danger, marginBottom: 0 }}>
               {error}

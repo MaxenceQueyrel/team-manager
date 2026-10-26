@@ -5,7 +5,9 @@ from optimizer.models import (
     PersonInput,
     AssignmentWeights,
     AssignmentResult,
+    DateRange,
     PhaseConflict,
+    StartDateScan,
 )
 
 
@@ -89,4 +91,46 @@ class AssignmentSolverPort(ABC):
 
         Raises:
             InfeasibleAssignmentError: If no feasible assignment exists at all.
+        """
+
+    @abstractmethod
+    def solve_pool_over_starts(
+        self,
+        project: ProjectInput,
+        people: list[PersonInput],
+        weights: AssignmentWeights,
+        start_window: DateRange,
+        respect_exclusions: bool = True,
+        n_alternatives: int = 2,
+        min_difference: int = 2,
+    ) -> StartDateScan:
+        """Finds the start date inside a window that admits the best team, and its pool.
+
+        Candidate starts are weekly from ``start_window.start`` up to ``start_window.end``;
+        the window bounds the start only, so the project may end after it. At each
+        candidate the whole schedule is shifted rigidly (see ``optimizer.schedule``) so
+        its anchor lands on the candidate, and the optimal team is scored there.
+        Candidates rank fully covered first, then by highest score, then earliest start.
+
+        Args:
+            project: The project requirements and constraints, with at least one date range.
+            people: Pool of candidate people to assign.
+            weights: Relative weights for performance, chemistry, growth and cost.
+            start_window: Earliest and latest allowed start dates, both inclusive.
+            respect_exclusions: Whether to honour project.excluded_person_ids.
+            n_alternatives: Maximum number of alternatives to return at the best start.
+            min_difference: Minimum number of members each alternative must swap out
+                relative to every earlier team; clamped to the team size.
+
+        Returns:
+            A StartDateScan with the best start, the ``solve_pool`` result of the project
+            shifted to it (every result's ``start_date`` set to that start), and a summary
+            of every candidate in date order. Each feasible candidate carries its optimal
+            team (``start_date`` set to the candidate); infeasible ones are flagged
+            ``feasible=False`` with no team.
+
+        Raises:
+            ValueError: If the project has no date range to shift.
+            InfeasibleAssignmentError: If every candidate start is infeasible; carries the
+                conflicts of the earliest candidate.
         """

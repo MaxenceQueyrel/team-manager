@@ -88,6 +88,8 @@ export interface Project {
   squads: Squad[];
   date_ranges: DateRange[];
   phases: ProjectPhase[];
+  // Earliest and latest allowed start; the optimizer shifts the whole schedule within it.
+  start_window: DateRange | null;
   priority: Priority;
   completed_at: string | null; // ISO date the project was marked complete
 }
@@ -118,6 +120,7 @@ export interface Team {
   coverage: PhaseCoverage[]; // empty for teams saved before coverage was tracked
   fully_covered: boolean | null;
   created_at: string | null; // ISO-8601 datetime; null for teams saved before it was tracked
+  start_date: string | null; // ISO date the team was found at; null = the project's current dates
 }
 
 export interface Skill {
@@ -147,6 +150,7 @@ export interface TeamProposal {
   optimization_max_score: number;
   coverage: PhaseCoverage[];
   fully_covered: boolean | null;
+  start_date: string | null;
 }
 
 // skill_id is the SkillRequirement id; met means some staffed member reaches required_level.
@@ -190,9 +194,21 @@ export interface InfeasibilityDetail {
   conflicts: PhaseConflict[];
 }
 
+// One weekly start tried inside a project's start_window; the score fields and team are null
+// when infeasible. The team is not persisted: it is promoted like an alternative.
+export interface StartCandidate {
+  start: string; // ISO date (YYYY-MM-DD)
+  feasible: boolean;
+  score: number | null;
+  max_score: number | null;
+  fully_covered: boolean | null;
+  team: TeamProposal | null; // its start_date equals start
+}
+
 export interface OptimizationResponse {
   best: Team;
   alternatives: TeamProposal[];
+  start_candidates: StartCandidate[]; // empty when the project has no start_window
 }
 
 export interface User {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, inputStyle, Modal, selectStyle } from "@/components/common/ui";
+import { Button, colors, Field, inputStyle, Modal, selectStyle } from "@/components/common/ui";
 import {
   DateRangesEditor,
   PersonMultiSelect,
@@ -7,7 +7,8 @@ import {
   SkillReqsEditor,
   SquadsEditor,
 } from "@/components/editors/listEditors";
-import type { Person, Priority, Project } from "@/types";
+import { errorMessage } from "@/services/api";
+import type { DateRange, Person, Priority, Project } from "@/types";
 
 const PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
 
@@ -24,6 +25,7 @@ function emptyDraft(): ProjectDraft {
     squads: [],
     date_ranges: [],
     phases: [],
+    start_window: null,
     priority: "medium",
     completed_at: null,
   };
@@ -47,14 +49,28 @@ export function ProjectForm({
     project ? { ...emptyDraft(), ...project } : emptyDraft(),
   );
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const usesPhases = draft.phases.length > 0;
+  const hasDates =
+    draft.date_ranges.length > 0 || draft.phases.some((phase) => phase.date_range !== null);
   const set = <K extends keyof ProjectDraft>(key: K, val: ProjectDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: val }));
+  const setStartWindow = (patch: Partial<DateRange>) => {
+    const next = { ...(draft.start_window ?? { start: "", end: "" }), ...patch };
+    set("start_window", next.start || next.end ? next : null);
+  };
 
   const submit = async () => {
+    if (draft.start_window && (!draft.start_window.start || !draft.start_window.end)) {
+      setError("Fill in both earliest and latest start, or leave both empty.");
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
       await onSave(draft, project?.id);
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -148,6 +164,41 @@ export function ProjectForm({
         />
       </Field>
 
+      {/* A saved window stays editable after its dates are removed so it can be cleared. */}
+      <fieldset
+        disabled={!hasDates && draft.start_window === null}
+        style={{ border: "none", padding: 0, margin: 0 }}
+      >
+        <legend style={{ padding: 0, fontSize: "0.82rem", fontWeight: 600, marginBottom: 5 }}>
+          Flexible start
+        </legend>
+        <div style={{ fontSize: "0.78rem", color: colors.muted, marginBottom: 5 }}>
+          {hasDates
+            ? "The optimizer tries a weekly start between these dates and moves the whole schedule with it. Leave both empty to keep the dates fixed."
+            : draft.start_window
+              ? "The project has no dates left to move. Clear the earliest and latest start, or add a date range back."
+              : "Add a date range to the project or a phase before making its start flexible."}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
+          <Field label="Earliest start">
+            <input
+              type="date"
+              value={draft.start_window?.start ?? ""}
+              onChange={(e) => setStartWindow({ start: e.target.value })}
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Latest start">
+            <input
+              type="date"
+              value={draft.start_window?.end ?? ""}
+              onChange={(e) => setStartWindow({ end: e.target.value })}
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+      </fieldset>
+
       <Field label="Must include" hint="People that must be on the team">
         <PersonMultiSelect
           value={draft.included_person_ids}
@@ -170,6 +221,12 @@ export function ProjectForm({
       <Field label="Squads" hint="Groups co-selected all-or-nothing">
         <SquadsEditor value={draft.squads} onChange={(v) => set("squads", v)} people={people} />
       </Field>
+
+      {error && (
+        <p role="alert" style={{ color: colors.danger, margin: 0 }}>
+          {error}
+        </p>
+      )}
     </Modal>
   );
 }

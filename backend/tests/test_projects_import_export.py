@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -57,6 +59,7 @@ _CSV_FIELDNAMES = (
     "squads",
     "date_ranges",
     "phases",
+    "start_window",
 )
 
 
@@ -74,6 +77,7 @@ def _row_values(**overrides):
         "squads": "[]",
         "date_ranges": "[]",
         "phases": "[]",
+        "start_window": "",
         **overrides,
     }
 
@@ -232,7 +236,9 @@ def test_import_treats_empty_completed_at_as_open(client, org_headers):
 
 
 def test_import_accepts_legacy_csv_without_completed_at_column(client, org_headers):
-    legacy_fieldnames = [f for f in _CSV_FIELDNAMES if f != "completed_at"]
+    legacy_fieldnames = [
+        f for f in _CSV_FIELDNAMES if f not in ("completed_at", "start_window")
+    ]
     csv_text = (
         f"{','.join(legacy_fieldnames)}\n"
         "proj-1,Nova Redesign,,1,medium,[],[],[],[],[],[]\n"
@@ -243,6 +249,7 @@ def test_import_accepts_legacy_csv_without_completed_at_column(client, org_heade
     assert response.status_code == 200
     project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
     assert project["completed_at"] is None
+    assert project["start_window"] is None
 
 
 def test_import_rejects_invalid_completed_at(client, org_headers):
@@ -273,3 +280,47 @@ def test_export_round_trips_completed_at(client, org_headers):
     ).json()
     assert imported_done["completed_at"] == "2026-09-30"
     assert imported_open["completed_at"] is None
+
+
+WINDOW = {"start": "2026-06-01", "end": "2026-07-31"}
+
+
+@pytest.mark.parametrize("cell", ["", "null"])
+def test_import_treats_empty_or_null_start_window_as_none(client, org_headers, cell):
+    response = _upload_csv(client, org_headers, _csv_row(start_window=cell))
+
+    assert response.status_code == 200
+    project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
+    assert project["start_window"] is None
+
+
+def test_import_rejects_start_window_on_undated_project(client, org_headers):
+    response = _upload_csv(
+        client, org_headers, _csv_row(start_window=json.dumps(WINDOW))
+    )
+
+    assert response.status_code == 400
+    assert "Row 2" in response.json()["detail"]
+
+
+def test_export_round_trips_start_window(client, org_headers):
+    flexible = _create_project(
+        client, org_headers, name="Flexible", start_window=WINDOW
+    )
+    fixed = _create_project(client, org_headers, name="Fixed")
+
+    csv_text = client.get("/api/v1/projects/export", headers=org_headers).text
+    other_org_headers = {
+        **org_headers,
+        "X-Organization-Id": create_org(client, org_headers, name="Other Org"),
+    }
+    assert _upload_csv(client, other_org_headers, csv_text).status_code == 200
+
+    imported_flexible = client.get(
+        f"/api/v1/projects/{flexible['id']}", headers=other_org_headers
+    ).json()
+    imported_fixed = client.get(
+        f"/api/v1/projects/{fixed['id']}", headers=other_org_headers
+    ).json()
+    assert imported_flexible["start_window"] == WINDOW
+    assert imported_fixed["start_window"] is None

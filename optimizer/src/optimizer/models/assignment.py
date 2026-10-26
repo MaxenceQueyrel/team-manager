@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, Field
 
 from optimizer.models.coverage import PhaseCoverage
@@ -47,3 +49,7 @@ class AssignmentResult(BaseModel):
         description="FTE and skill coverage of each phase (a single phase_id=None entry for unphased projects)."
     )
     fully_covered: bool = Field(description="Whether every phase is fully staffed and every skill requirement met.")
+    start_date: date | None = Field(
+        default=None,
+        description="Start date the project's schedule was shifted to for this team; None when solved at its planned dates.",
+    )

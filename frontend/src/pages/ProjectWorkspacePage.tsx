@@ -35,6 +35,7 @@ import { ProjectForm } from "@/components/projects/ProjectForm";
 import { ProposalCard } from "@/components/projects/ProposalCard";
 import { ProposalsCard } from "@/components/projects/ProposalsCard";
 import { StaffingLaneCard } from "@/components/projects/StaffingLaneCard";
+import { StartCandidatesStrip } from "@/components/projects/StartCandidatesStrip";
 import {
   buildLanes,
   formatFte,
@@ -52,12 +53,14 @@ import type { Assignment, OptimizationResponse, Project, Team, TeamProposal } fr
 
 // Expressed as a share of max_score rather than of the best score: the best score can be
 // zero or negative (negative affinities), while max_score is shared by the whole pool.
+// A team at another start can outscore the best when the best wins on coverage instead.
 function deltaVsBest(proposal: TeamProposal, best: Team): string {
   const maxScore = proposal.optimization_max_score;
   const loss =
     maxScore > 0 ? ((best.optimization_score ?? 0) - proposal.optimization_score) / maxScore : 0;
-  const percent = (loss * 100).toFixed(1);
-  return percent === "0.0" ? "same score as best" : `−${percent}% vs best`;
+  const percent = (Math.abs(loss) * 100).toFixed(1);
+  if (percent === "0.0") return "same score as best";
+  return `${loss > 0 ? "−" : "+"}${percent}% vs best`;
 }
 
 export default function ProjectWorkspacePage() {
@@ -87,9 +90,11 @@ export default function ProjectWorkspacePage() {
   const [optimizing, setOptimizing] = useState(false);
   const [result, setResult] = useState<OptimizationResponse | null>(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
-  // Alternatives are only persisted when applied; remembering the saved id keeps a
-  // retried apply (e.g. after an FTE conflict) from saving the same proposal twice.
-  const [savedAlternativeIds, setSavedAlternativeIds] = useState<Record<number, string>>({});
+  // A start picked in the strip other than the optimizer's; null shows the best team.
+  const [selectedStart, setSelectedStart] = useState<string | null>(null);
+  // Alternatives and other starts' teams are only persisted when applied; remembering the
+  // saved id keeps a retried apply (e.g. after an FTE conflict) from saving one twice.
+  const [savedProposalIds, setSavedProposalIds] = useState<Record<string, string>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [savingCompletion, setSavingCompletion] = useState(false);
 
@@ -147,20 +152,29 @@ export default function ProjectWorkspacePage() {
   const reviewIndex = proposals.findIndex((t) => t.id === reviewingId);
   const reviewed = reviewIndex === -1 ? null : proposals[reviewIndex];
 
+  // Applying a team found at another start moves the project's dates, so both are refetched.
   const applyTeam = async (teamId: string) => {
     await teamsApi.apply(teamId);
-    setAssignments(await assignmentsApi.list({ project_id: project.id }));
+    const [applied, appliedAssignments] = await Promise.all([
+      projectsApi.get(project.id),
+      assignmentsApi.list({ project_id: project.id }),
+    ]);
+    setProject(applied);
+    setAssignments(appliedAssignments);
   };
 
-  const applyAlternative = async (proposal: TeamProposal, index: number) => {
-    let teamId = savedAlternativeIds[index];
+  const applyProposal = async (proposal: TeamProposal, key: string) => {
+    let teamId = savedProposalIds[key];
     if (!teamId) {
       teamId = (await teamsApi.create({ project_id: project.id, ...proposal })).id;
-      setSavedAlternativeIds((current) => ({ ...current, [index]: teamId }));
+      setSavedProposalIds((current) => ({ ...current, [key]: teamId }));
       fetchTeams();
     }
     await applyTeam(teamId);
   };
+
+  const selectedTeam =
+    result?.start_candidates.find((c) => c.start === selectedStart)?.team ?? null;
 
   // PUT replaces the whole project, so completion is saved with the full payload.
   const setCompletedAt = async (completedAt: string | null) => {
@@ -311,55 +325,90 @@ export default function ProjectWorkspacePage() {
                 </div>
                 <IconButton icon={X} ariaLabel="Dismiss result" onClick={() => setResult(null)} />
               </div>
-              <ProposalCard
-                title="Best team"
-                members={result.best.members}
-                score={result.best.optimization_score}
-                maxScore={result.best.optimization_max_score}
-                coverage={result.best.coverage}
-                fullyCovered={result.best.fully_covered}
-                people={people}
-                baseline={staffingBaseline(assignments, result.best.members)}
-                onApply={() => applyTeam(result.best.id)}
-              />
-              {result.alternatives.length > 0 && (
-                <div style={{ marginTop: "0.75rem" }}>
-                  <Button
-                    variant="ghost"
-                    icon={showAlternatives ? ChevronDown : ChevronRight}
-                    onClick={() => setShowAlternatives(!showAlternatives)}
-                  >
-                    {showAlternatives
-                      ? "Hide alternatives"
-                      : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"}`}
-                  </Button>
-                  {showAlternatives && (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "1rem",
-                        marginTop: "0.75rem",
-                      }}
-                    >
-                      {result.alternatives.map((proposal, i) => (
-                        <ProposalCard
-                          key={i}
-                          title={`Alternative ${i + 1}`}
-                          members={proposal.members}
-                          score={proposal.optimization_score}
-                          maxScore={proposal.optimization_max_score}
-                          coverage={proposal.coverage}
-                          fullyCovered={proposal.fully_covered}
-                          scoreNote={deltaVsBest(proposal, result.best)}
-                          people={people}
-                          baseline={staffingBaseline(assignments, proposal.members)}
-                          onApply={() => applyAlternative(proposal, i)}
-                        />
-                      ))}
+              {result.start_candidates.length > 0 && (
+                <StartCandidatesStrip
+                  candidates={result.start_candidates}
+                  chosen={result.best.start_date}
+                  selected={selectedStart ?? result.best.start_date}
+                  today={today}
+                  onSelect={(start) =>
+                    setSelectedStart(start === result.best.start_date ? null : start)
+                  }
+                />
+              )}
+              {selectedStart && selectedTeam ? (
+                <ProposalCard
+                  title="Team at selected start"
+                  members={selectedTeam.members}
+                  score={selectedTeam.optimization_score}
+                  maxScore={selectedTeam.optimization_max_score}
+                  coverage={selectedTeam.coverage}
+                  fullyCovered={selectedTeam.fully_covered}
+                  scoreNote={deltaVsBest(selectedTeam, result.best)}
+                  people={people}
+                  baseline={staffingBaseline(assignments, selectedTeam.members)}
+                  startDate={selectedTeam.start_date}
+                  plannedStart={span?.start ?? null}
+                  onApply={() => applyProposal(selectedTeam, `start-${selectedStart}`)}
+                  onClose={() => setSelectedStart(null)}
+                />
+              ) : (
+                <>
+                  <ProposalCard
+                    title="Best team"
+                    members={result.best.members}
+                    score={result.best.optimization_score}
+                    maxScore={result.best.optimization_max_score}
+                    coverage={result.best.coverage}
+                    fullyCovered={result.best.fully_covered}
+                    people={people}
+                    baseline={staffingBaseline(assignments, result.best.members)}
+                    startDate={result.best.start_date}
+                    plannedStart={span?.start ?? null}
+                    onApply={() => applyTeam(result.best.id)}
+                  />
+                  {result.alternatives.length > 0 && (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <Button
+                        variant="ghost"
+                        icon={showAlternatives ? ChevronDown : ChevronRight}
+                        onClick={() => setShowAlternatives(!showAlternatives)}
+                      >
+                        {showAlternatives
+                          ? "Hide alternatives"
+                          : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"}`}
+                      </Button>
+                      {showAlternatives && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "1rem",
+                            marginTop: "0.75rem",
+                          }}
+                        >
+                          {result.alternatives.map((proposal, i) => (
+                            <ProposalCard
+                              key={i}
+                              title={`Alternative ${i + 1}`}
+                              members={proposal.members}
+                              score={proposal.optimization_score}
+                              maxScore={proposal.optimization_max_score}
+                              coverage={proposal.coverage}
+                              fullyCovered={proposal.fully_covered}
+                              scoreNote={deltaVsBest(proposal, result.best)}
+                              people={people}
+                              baseline={staffingBaseline(assignments, proposal.members)}
+                              startDate={proposal.start_date}
+                              plannedStart={span?.start ?? null}
+                              onApply={() => applyProposal(proposal, `alternative-${i}`)}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </section>
           )}
@@ -374,6 +423,8 @@ export default function ProjectWorkspacePage() {
               fullyCovered={reviewed.fully_covered}
               people={people}
               baseline={staffingBaseline(assignments, reviewed.members)}
+              startDate={reviewed.start_date}
+              plannedStart={span?.start ?? null}
               onApply={() => applyTeam(reviewed.id)}
               onDelete={
                 canDeleteTeams
@@ -439,7 +490,8 @@ export default function ProjectWorkspacePage() {
           onResult={(response) => {
             setResult(response);
             setShowAlternatives(false);
-            setSavedAlternativeIds({});
+            setSelectedStart(null);
+            setSavedProposalIds({});
             fetchTeams();
           }}
           onClose={() => setOptimizing(false)}

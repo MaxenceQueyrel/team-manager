@@ -10,6 +10,7 @@ from api.models.team import (
     InfeasibilityDetail,
     OptimizationRequest,
     OptimizationResponse,
+    StartCandidateProposal,
     Team,
     TeamProposal,
 )
@@ -18,10 +19,26 @@ from api.repositories.file_repository import FileRepository
 
 from optimizer.adapters.pulp_solver import PuLPTeamAssignmentSolver
 from optimizer.domain.solver import AssignmentSolverPort, InfeasibleAssignmentError
-from optimizer.models import AvailabilityWindow, ProjectInput
+from optimizer.models import (
+    AssignmentResult,
+    AvailabilityWindow,
+    ProjectInput,
+    StartCandidate,
+)
 
 router = APIRouter()
 solver: AssignmentSolverPort = PuLPTeamAssignmentSolver()
+
+
+def _proposal(result: AssignmentResult) -> TeamProposal:
+    return TeamProposal(
+        members=result.members,
+        optimization_score=result.score,
+        optimization_max_score=result.max_score,
+        coverage=result.coverage,
+        fully_covered=result.fully_covered,
+        start_date=result.start_date,
+    )
 
 
 @router.post(
@@ -68,14 +85,27 @@ def solve_assignment(
 
     people_inputs = [p.to_person_input(committed.get(p.id, [])) for p in people]
 
+    start_candidates: list[StartCandidate] = []
     try:
-        pool = solver.solve_pool(
-            project_input,
-            people_inputs,
-            request.weights,
-            request.respect_exclusions,
-            n_alternatives=request.n_alternatives,
-        )
+        if project.start_window is None:
+            pool = solver.solve_pool(
+                project_input,
+                people_inputs,
+                request.weights,
+                request.respect_exclusions,
+                n_alternatives=request.n_alternatives,
+            )
+        else:
+            scan = solver.solve_pool_over_starts(
+                project_input,
+                people_inputs,
+                request.weights,
+                project.start_window,
+                request.respect_exclusions,
+                n_alternatives=request.n_alternatives,
+            )
+            pool = scan.pool
+            start_candidates = scan.candidates
     except InfeasibleAssignmentError as exc:
         raise HTTPException(
             status_code=409,
@@ -95,19 +125,22 @@ def solve_assignment(
             "coverage": [c.model_dump() for c in best.coverage],
             "fully_covered": best.fully_covered,
             "created_at": datetime.now(UTC),
+            "start_date": best.start_date,
         },
         organization_id,
     )
     return OptimizationResponse(
         best=saved,
-        alternatives=[
-            TeamProposal(
-                members=alternative.members,
-                optimization_score=alternative.score,
-                optimization_max_score=alternative.max_score,
-                coverage=alternative.coverage,
-                fully_covered=alternative.fully_covered,
+        alternatives=[_proposal(alternative) for alternative in alternatives],
+        start_candidates=[
+            StartCandidateProposal(
+                start=candidate.start,
+                feasible=candidate.feasible,
+                score=candidate.score,
+                max_score=candidate.max_score,
+                fully_covered=candidate.fully_covered,
+                team=_proposal(candidate.team) if candidate.team else None,
             )
-            for alternative in alternatives
+            for candidate in start_candidates
         ],
     )
