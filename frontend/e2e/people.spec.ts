@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { createPerson, uniqueSuffix } from "./helpers";
+import { createPerson, createProject, uniqueSuffix } from "./helpers";
 
 test("creating a person adds them to the roster", async ({ page }) => {
   const suffix = uniqueSuffix();
@@ -217,26 +217,23 @@ test("an assigned person shows reduced availability on their detail page", async
   const projectName = `Fortran ${suffix}`;
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
-  await page.goto("/projects");
-  await page.getByRole("button", { name: "New project" }).click();
-  await page.getByLabel("Name", { exact: true }).fill(projectName);
-  await page.getByRole("button", { name: "Save" }).click();
+  await createProject(page, projectName);
   await page.getByRole("link", { name: projectName }).click();
   await page.getByRole("button", { name: "Assign person to Whole project" }).click();
   await page.getByLabel("Person").selectOption({ label: name });
-  await page.getByLabel("Commitment").selectOption("half-time");
+  await page.getByLabel("Commitment").selectOption("0.6");
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-01-10");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("0.5 of 1 FTE");
+  await expect(page.getByRole("region", { name: "Staffing" })).toContainText("0.6 of 1 FTE");
 
   await page.goto("/people");
   await page.getByRole("link", { name }).click();
   await page.getByRole("tab", { name: "Custom" }).click();
   await page.getByLabel("From", { exact: true }).fill("2026-01-05");
   await page.getByLabel("To", { exact: true }).fill("2026-01-11");
-  // Half-time from the 5th to the 10th, free on the 11th: (6 × 0.5 + 1) / 7.
-  await expect(page.getByTitle("Week of 2026-01-05: partly booked, 57% free")).toBeVisible();
+  // Booked 3 days/week from the 5th to the 10th, free on the 11th: (6 × 0.4 + 1) / 7.
+  await expect(page.getByTitle("Week of 2026-01-05: partly booked, 49% free")).toBeVisible();
 
   const assignments = page.getByRole("region", { name: "Assignments" });
   await expect(assignments.getByText("Not on any project right now")).toBeVisible();

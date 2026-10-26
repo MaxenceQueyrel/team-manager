@@ -5,6 +5,7 @@ import type {
   DateRange,
   Person,
   Project,
+  SkillAllocation,
   SkillRequirement,
 } from "@/types";
 
@@ -29,7 +30,7 @@ export interface StaffingLane {
   key: string;
   label: string;
   phaseId: string | null; // sent as `phase_id` when assigning from this lane
-  nSlots: number | null; // FTE needed; null for the unphased lane, which has no requirements
+  requiredFte: number | null; // sum of the skill FTE; null for the unphased lane, which has no requirements
   skillRequirements: SkillRequirement[];
   dateRanges: DateRange[];
   assignments: Assignment[];
@@ -44,7 +45,7 @@ export function buildLanes(project: Project, assignments: Assignment[]): Staffin
         key: "whole-project",
         label: "Whole project",
         phaseId: null,
-        nSlots: project.n_slots,
+        requiredFte: requiredFte(project.skill_requirements),
         skillRequirements: project.skill_requirements,
         dateRanges: project.date_ranges,
         assignments: own,
@@ -60,7 +61,7 @@ export function buildLanes(project: Project, assignments: Assignment[]): Staffin
     key: `phase-${phase.id}`,
     label: phase.id,
     phaseId: phase.id,
-    nSlots: phase.n_slots,
+    requiredFte: requiredFte(phase.skill_requirements),
     skillRequirements: phase.skill_requirements,
     dateRanges: phase.date_range ? [phase.date_range] : [],
     assignments: own.filter((a) => a.phase_id === phase.id),
@@ -75,7 +76,7 @@ export function buildLanes(project: Project, assignments: Assignment[]): Staffin
       key: "unphased",
       label: "Unphased",
       phaseId: null,
-      nSlots: null,
+      requiredFte: null,
       skillRequirements: [],
       dateRanges: [],
       assignments: unphased,
@@ -109,6 +110,16 @@ export function formatFte(fte: number): string {
   return String(roundFte(fte));
 }
 
+/** FTE a project or phase needs: the sum of its skill needs. */
+export function requiredFte(requirements: SkillRequirement[]): number {
+  return roundFte(requirements.reduce((sum, req) => sum + req.fte, 0));
+}
+
+/** A member's per-skill shares, e.g. "python 40% · react 40%". */
+export function formatSkillAllocations(allocations: SkillAllocation[]): string {
+  return allocations.map((a) => `${a.skill_id} ${Math.round(a.fte * 100)}%`).join(" · ");
+}
+
 export function formatHeadcount(count: number): string {
   return `${count} ${count === 1 ? "person" : "people"}`;
 }
@@ -116,7 +127,12 @@ export function formatHeadcount(count: number): string {
 function fillStatus(lane: StaffingLane): FillStatus {
   const fte = assignedFte(lane);
   if (fte === 0) return "empty";
-  return fte >= (lane.nSlots ?? 0) ? "complete" : "partial";
+  return fte >= (lane.requiredFte ?? 0) ? "complete" : "partial";
+}
+
+/** A person's level in a skill; like the optimizer, a skill they lack counts as level 0. */
+export function skillLevel(person: Person, skillId: string): number {
+  return person.skills.find((s) => s.id === skillId)?.level ?? 0;
 }
 
 /** Requirements of the lane that no assigned person meets at the required level. */
@@ -124,8 +140,7 @@ export function missingSkills(lane: StaffingLane, people: Person[]): SkillRequir
   const assignedIds = new Set(lane.assignments.map((a) => a.person_id));
   const assigned = people.filter((p) => assignedIds.has(p.id));
   return lane.skillRequirements.filter(
-    (req) =>
-      !assigned.some((p) => p.skills.some((s) => s.id === req.id && s.level >= req.min_level)),
+    (req) => !assigned.some((p) => skillLevel(p, req.id) >= req.min_level),
   );
 }
 
@@ -134,11 +149,11 @@ export function staffedFte(lanes: StaffingLane[]): { staffed: number; total: num
   let staffed = 0;
   let total = 0;
   for (const lane of lanes) {
-    if (lane.nSlots === null) continue;
-    staffed += Math.min(assignedFte(lane), lane.nSlots);
-    total += lane.nSlots;
+    if (lane.requiredFte === null) continue;
+    staffed += Math.min(assignedFte(lane), lane.requiredFte);
+    total += lane.requiredFte;
   }
-  return { staffed: roundFte(staffed), total };
+  return { staffed: roundFte(staffed), total: roundFte(total) };
 }
 
 /** Current staffing as team members, limited to the phases `proposed` covers: applying a
@@ -155,6 +170,7 @@ export function staffingBaseline(
     byKey.set(`${a.person_id}|${a.phase_id}`, {
       person_id: a.person_id,
       fte_allocation: a.ratio,
+      skill_allocations: [],
       phase_id: a.phase_id,
     });
   }
@@ -165,7 +181,7 @@ export function staffingBaseline(
 export function isFullyStaffed(lanes: StaffingLane[], people: Person[]): boolean {
   return lanes.every(
     (lane) =>
-      lane.nSlots === null ||
+      lane.requiredFte === null ||
       (fillStatus(lane) === "complete" && missingSkills(lane, people).length === 0),
   );
 }

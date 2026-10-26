@@ -1,4 +1,5 @@
 import { colors } from "@/components/common/ui";
+import { formatSkillAllocations } from "@/components/projects/staffing";
 import type { AssignedMember, Person } from "@/types";
 
 type MemberStatus = "added" | "dropped" | null;
@@ -51,7 +52,13 @@ export function TeamMembers({
           <span style={{ color: colors.muted }}> ({roleOf(m.person_id)})</span>
         )}
         {" — "}
-        {(m.fte_allocation * 100).toFixed(0)}% FTE
+        {Math.round(m.fte_allocation * 100)}% FTE
+        {m.skill_allocations.length > 0 && (
+          <span style={{ color: colors.muted }}>
+            {" "}
+            ({formatSkillAllocations(m.skill_allocations)})
+          </span>
+        )}
       </span>
       {status && (
         <span

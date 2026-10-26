@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { createPerson, uniqueSuffix } from "./helpers";
+import { createPerson, createProject, uniqueSuffix } from "./helpers";
 
 test("assigning a person to a project from their page lists the assignment", async ({ page }) => {
   const suffix = uniqueSuffix();
@@ -7,10 +7,7 @@ test("assigning a person to a project from their page lists the assignment", asy
   const projectName = `Apollo ${suffix}`;
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
-  await page.goto("/projects");
-  await page.getByRole("button", { name: "New project" }).click();
-  await page.getByLabel("Name", { exact: true }).fill(projectName);
-  await page.getByRole("button", { name: "Save" }).click();
+  await createProject(page, projectName);
 
   await page.goto("/people");
   await page.getByRole("link", { name }).click();
@@ -22,13 +19,13 @@ test("assigning a person to a project from their page lists the assignment", asy
   await page
     .getByRole("combobox", { name: "Project", exact: true })
     .selectOption({ label: projectName });
-  await page.getByLabel("Commitment").selectOption("half-time");
+  await page.getByLabel("Commitment").selectOption("0.6");
   await page.getByLabel("Start date", { exact: true }).fill("2030-01-07");
   await page.getByLabel("End date", { exact: true }).fill("2030-02-03");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
 
   const row = assignments.getByRole("link", { name: projectName });
   await expect(row).toContainText("7 Jan 2030 → 3 Feb 2030 · 4 weeks");
-  await expect(row).toContainText("Half-time");
+  await expect(row).toContainText("3 days/week");
   await expect(assignments.getByText("Not on any project right now")).toHaveCount(0);
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Combobox } from "@/components/common/Combobox";
 import { Button, colors, inputStyle, selectStyle } from "@/components/common/ui";
+import { requiredFte } from "@/components/projects/staffing";
 import type {
   AvailabilityWindow,
   DateRange,
@@ -86,6 +87,17 @@ export function SkillsEditor({
   );
 }
 
+const FTE_OPTIONS = Array.from({ length: 25 }, (_, i) => (i + 1) / 5);
+
+// From as few people as the FTE allows (full-time each) to one day per week each.
+function peopleRange(fte: number): number[] {
+  const steps = Math.round(fte * 5);
+  const min = Math.ceil(steps / 5);
+  return Array.from({ length: steps - min + 1 }, (_, i) => min + i);
+}
+
+const reqColumns = { level: 70, fte: 76, maxPeople: 76 } as const;
+
 export function SkillReqsEditor({
   value,
   onChange,
@@ -97,9 +109,29 @@ export function SkillReqsEditor({
 }) {
   const update = (i: number, patch: Partial<SkillRequirement>) =>
     onChange(value.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const setFte = (i: number, fte: number) => {
+    const allowed = peopleRange(fte);
+    const maxPeople = Math.min(
+      Math.max(value[i].max_people, allowed[0]),
+      allowed[allowed.length - 1],
+    );
+    update(i, { fte, max_people: maxPeople });
+  };
 
   return (
     <div>
+      {value.length > 0 && (
+        <div
+          aria-hidden
+          style={{ ...rowStyle, marginBottom: 2, fontSize: "0.72rem", color: colors.muted }}
+        >
+          <span style={{ flex: 1 }}>Skill</span>
+          <span style={{ width: reqColumns.level }}>Min level</span>
+          <span style={{ width: reqColumns.fte }}>FTE</span>
+          <span style={{ width: reqColumns.maxPeople }}>Max people</span>
+          <span style={{ width: 30 }} />
+        </div>
+      )}
       {value.map((s, i) => (
         <div key={i} style={rowStyle}>
           <Combobox
@@ -114,17 +146,53 @@ export function SkillReqsEditor({
             min={0}
             max={5}
             step={0.5}
-            title="Minimum level (0–5)"
+            title="Minimum level (0–5): only people at or above it can fill this need"
+            aria-label="Minimum level"
             value={s.min_level}
             onChange={(e) => update(i, { min_level: num(e.target.value) })}
-            style={{ ...inputStyle, width: 90 }}
+            style={{ ...inputStyle, width: reqColumns.level }}
           />
+          <select
+            title="FTE to staff on this skill (1 = one full-time person, 0.2 = one day per week)"
+            aria-label="FTE"
+            value={s.fte}
+            onChange={(e) => setFte(i, Number(e.target.value))}
+            style={{ ...selectStyle, width: reqColumns.fte }}
+          >
+            {FTE_OPTIONS.map((fte) => (
+              <option key={fte} value={fte}>
+                {fte}
+              </option>
+            ))}
+          </select>
+          <select
+            title="Most people this FTE may be split across"
+            aria-label="Max people"
+            value={s.max_people}
+            onChange={(e) => update(i, { max_people: Number(e.target.value) })}
+            style={{ ...selectStyle, width: reqColumns.maxPeople }}
+          >
+            {peopleRange(s.fte).map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </select>
           <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
         </div>
       ))}
-      <Button onClick={() => onChange([...value, { id: "", min_level: 3 }])}>
-        + Add requirement
-      </Button>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+        <Button
+          onClick={() => onChange([...value, { id: "", min_level: 3, fte: 1, max_people: 1 }])}
+        >
+          + Add requirement
+        </Button>
+        {value.length > 0 && (
+          <span className="mono" style={{ fontSize: "0.82rem", color: colors.muted }}>
+            Total {requiredFte(value)} FTE
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -476,14 +544,6 @@ export function PhasesEditor({
               onChange={(e) => update(i, { id: e.target.value })}
               style={{ ...inputStyle, flex: 1 }}
             />
-            <input
-              type="number"
-              min={1}
-              title="FTE needed for this phase (1 = one full-time person)"
-              value={phase.n_slots}
-              onChange={(e) => update(i, { n_slots: Math.max(1, Math.round(num(e.target.value))) })}
-              style={{ ...inputStyle, width: 80 }}
-            />
             <RemoveButton onClick={() => onChange(value.filter((_, idx) => idx !== i))} />
           </div>
 
@@ -538,9 +598,7 @@ export function PhasesEditor({
         </div>
       ))}
       <Button
-        onClick={() =>
-          onChange([...value, { id: "", n_slots: 1, skill_requirements: [], date_range: null }])
-        }
+        onClick={() => onChange([...value, { id: "", skill_requirements: [], date_range: null }])}
       >
         + Add phase
       </Button>

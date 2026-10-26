@@ -32,7 +32,7 @@ function monthTicks(firstDay: number, lastDay: number): { day: number; label: st
 /** Date ranges and phases as bars on a month axis with a today marker, followed by the
  * project's first and last dates, its duration and its phase count. */
 export function PhaseTimeline({ lanes, today }: { lanes: StaffingLane[]; today: string }) {
-  const staffable = lanes.filter((lane) => lane.nSlots !== null);
+  const staffable = lanes.filter((lane) => lane.requiredFte !== null);
   const phased = staffable.some((lane) => lane.phaseId !== null);
   const dated = staffable.filter((lane) => lane.dateRanges.length > 0);
   const undated = staffable.filter((lane) => lane.dateRanges.length === 0);
@@ -106,10 +106,10 @@ export function PhaseTimeline({ lanes, today }: { lanes: StaffingLane[]; today: 
                   <span
                     className="mono"
                     style={{
-                      color: fte >= (lane.nSlots ?? 0) ? colors.success : colors.warningText,
+                      color: fte >= (lane.requiredFte ?? 0) ? colors.success : colors.warningText,
                     }}
                   >
-                    {fte} / {lane.nSlots} FTE
+                    {fte} / {lane.requiredFte} FTE
                   </span>
                 </div>
               )}
@@ -180,7 +180,7 @@ export function PhaseTimeline({ lanes, today }: { lanes: StaffingLane[]; today: 
                 [
                   "Undated",
                   undated
-                    .map((lane) => `${lane.label} (${assignedFte(lane)} / ${lane.nSlots} FTE)`)
+                    .map((lane) => `${lane.label} (${assignedFte(lane)} / ${lane.requiredFte} FTE)`)
                     .join(", "),
                 ] as [string, string],
               ]
