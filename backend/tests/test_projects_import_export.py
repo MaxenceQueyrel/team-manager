@@ -7,7 +7,7 @@ from api.main import app
 from api.models.project import Project
 from api.repositories.file_repository import FileRepository
 from api.v1 import projects as projects_module
-from tests.conftest import create_org
+from tests.conftest import ONE_FTE_NEED, create_org
 
 
 @pytest.fixture
@@ -21,10 +21,16 @@ def _create_project(client, headers, **overrides):
     payload = {
         "name": "Atlas Migration",
         "description": "Migrate legacy billing to Atlas",
-        "n_slots": 3,
         "priority": "high",
         "skill_requirements": [
-            {"id": "python", "description": "Python", "min_level": 3.0}
+            {
+                "id": "python",
+                "description": "Python",
+                "min_level": 3.0,
+                "fte": 1.6,
+                "max_people": 3,
+            },
+            {"id": "sql", "description": "SQL", "min_level": 2.5, "fte": 1.0},
         ],
         "excluded_person_ids": ["p-carol"],
         "included_person_ids": ["p-alice"],
@@ -50,7 +56,6 @@ _CSV_FIELDNAMES = (
     "id",
     "name",
     "description",
-    "n_slots",
     "priority",
     "completed_at",
     "skill_requirements",
@@ -68,10 +73,9 @@ def _row_values(**overrides):
         "id": "proj-1",
         "name": "Nova Redesign",
         "description": "",
-        "n_slots": "1",
         "priority": "medium",
         "completed_at": "",
-        "skill_requirements": "[]",
+        "skill_requirements": json.dumps([ONE_FTE_NEED]),
         "excluded_person_ids": "[]",
         "included_person_ids": "[]",
         "squads": "[]",
@@ -107,7 +111,10 @@ def test_import_creates_new_projects(client, org_headers):
 
     project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
     assert project["name"] == "Nova Redesign"
-    assert project["n_slots"] == 1
+    assert "n_slots" not in project
+    assert project["skill_requirements"] == [
+        {**ONE_FTE_NEED, "description": "", "max_people": 1}
+    ]
     assert project["priority"] == "medium"
 
 
@@ -145,8 +152,17 @@ def test_import_rejects_malformed_json_cell(client, org_headers):
     assert "Row 2" in response.json()["detail"]
 
 
-def test_import_rejects_invalid_field_value(client, org_headers):
-    csv_text = _csv_row(n_slots="0")
+@pytest.mark.parametrize(
+    "skill_requirements",
+    [
+        [],
+        [{"id": "python", "min_level": 2.0, "fte": 0.5}],
+        [{"id": "python", "min_level": 2.0, "fte": 1.0, "max_people": 6}],
+    ],
+    ids=["no-skill", "off-grid-fte", "max-people-out-of-range"],
+)
+def test_import_rejects_invalid_field_value(client, org_headers, skill_requirements):
+    csv_text = _csv_row(skill_requirements=json.dumps(skill_requirements))
 
     response = _upload_csv(client, org_headers, csv_text)
 
@@ -156,7 +172,7 @@ def test_import_rejects_invalid_field_value(client, org_headers):
 
 
 def test_import_fails_closed_on_partial_bad_row(client, org_headers):
-    csv_text = _csv_rows({"id": "good"}, {"id": "bad", "n_slots": "0"})
+    csv_text = _csv_rows({"id": "good"}, {"id": "bad", "skill_requirements": "[]"})
 
     response = _upload_csv(client, org_headers, csv_text)
 
@@ -167,7 +183,7 @@ def test_import_fails_closed_on_partial_bad_row(client, org_headers):
 def test_import_does_not_validate_skill_or_person_ids(client, org_headers):
     """Unlike People import, referenced skill/person ids are stored as-is."""
     csv_text = _csv_row(
-        skill_requirements='[{"id": "ghost-skill", "min_level": 2.0}]',
+        skill_requirements='[{"id": "ghost-skill", "min_level": 2.0, "fte": 1.0}]',
         excluded_person_ids='["ghost-person"]',
     )
 
@@ -181,7 +197,21 @@ def test_import_does_not_validate_skill_or_person_ids(client, org_headers):
 
 def test_export_round_trips_through_import(client, org_headers):
     atlas = _create_project(client, org_headers, name="Atlas Migration")
-    nova = _create_project(client, org_headers, name="Nova Redesign", n_slots=1)
+    nova = _create_project(
+        client,
+        org_headers,
+        name="Nova Redesign",
+        skill_requirements=[],
+        phases=[
+            {
+                "id": "design",
+                "skill_requirements": [
+                    {"id": "figma", "min_level": 2.0, "fte": 0.6, "max_people": 2}
+                ],
+                "date_range": {"start": "2026-08-01", "end": "2026-08-31"},
+            }
+        ],
+    )
 
     export_response = client.get("/api/v1/projects/export", headers=org_headers)
     assert export_response.status_code == 200
@@ -204,6 +234,11 @@ def test_export_round_trips_through_import(client, org_headers):
     ).json()
     assert imported_atlas["name"] == "Atlas Migration"
     assert imported_atlas["squads"] == [{"member_ids": ["p-alice", "p-bob"]}]
+    assert imported_atlas["skill_requirements"] == atlas["skill_requirements"]
+    imported_nova = client.get(
+        f"/api/v1/projects/{nova['id']}", headers=other_org_headers
+    ).json()
+    assert imported_nova["phases"] == nova["phases"]
 
 
 def test_export_and_import_are_org_scoped(client, org_headers):
@@ -239,9 +274,10 @@ def test_import_accepts_legacy_csv_without_completed_at_column(client, org_heade
     legacy_fieldnames = [
         f for f in _CSV_FIELDNAMES if f not in ("completed_at", "start_window")
     ]
+    skills_cell = '"[{""id"": ""general"", ""min_level"": 0, ""fte"": 1}]"'
     csv_text = (
         f"{','.join(legacy_fieldnames)}\n"
-        "proj-1,Nova Redesign,,1,medium,[],[],[],[],[],[]\n"
+        f"proj-1,Nova Redesign,,medium,{skills_cell},[],[],[],[],[]\n"
     )
 
     response = _upload_csv(client, org_headers, csv_text)
@@ -324,3 +360,14 @@ def test_export_round_trips_start_window(client, org_headers):
     ).json()
     assert imported_flexible["start_window"] == WINDOW
     assert imported_fixed["start_window"] is None
+
+
+def test_import_ignores_a_legacy_n_slots_column(client, org_headers):
+    header = ",".join([*_CSV_FIELDNAMES, "n_slots"])
+    csv_text = f"{header}\n{_row_values()},3\n"
+
+    response = _upload_csv(client, org_headers, csv_text)
+
+    assert response.status_code == 200
+    project = client.get("/api/v1/projects/proj-1", headers=org_headers).json()
+    assert "n_slots" not in project

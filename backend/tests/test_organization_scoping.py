@@ -16,7 +16,7 @@ from api.v1 import roles as roles_module
 from api.v1 import skills as skills_module
 from api.v1 import teams as teams_module
 from optimizer.models import Seniority
-from tests.conftest import create_org, register_and_login
+from tests.conftest import ONE_FTE_NEED, create_org, register_and_login
 
 
 @pytest.fixture
@@ -166,7 +166,11 @@ def test_role_ids_can_collide_across_organizations(client, two_orgs):
 
 
 def test_project_created_in_one_org_is_invisible_from_another(client, two_orgs):
-    client.post("/api/v1/projects/", json={"name": "Project X"}, headers=two_orgs["a"])
+    client.post(
+        "/api/v1/projects/",
+        json={"name": "Project X", "skill_requirements": [ONE_FTE_NEED]},
+        headers=two_orgs["a"],
+    )
 
     response = client.get("/api/v1/projects/", headers=two_orgs["b"])
 
@@ -195,7 +199,9 @@ def test_assignment_created_in_one_org_is_invisible_from_another(client, two_org
 
 def test_optimization_solve_cannot_see_another_orgs_project(client, two_orgs):
     project = client.post(
-        "/api/v1/projects/", json={"name": "Project X"}, headers=two_orgs["a"]
+        "/api/v1/projects/",
+        json={"name": "Project X", "skill_requirements": [ONE_FTE_NEED]},
+        headers=two_orgs["a"],
     ).json()
 
     response = client.post(
@@ -213,7 +219,7 @@ def test_optimization_solve_only_draws_people_from_the_active_organization(
     client.post("/api/v1/people/", json=_person_payload(), headers=two_orgs["b"])
     project = client.post(
         "/api/v1/projects/",
-        json={"name": "Project X", "n_slots": 1},
+        json={"name": "Project X", "skill_requirements": [ONE_FTE_NEED]},
         headers=two_orgs["a"],
     ).json()
 

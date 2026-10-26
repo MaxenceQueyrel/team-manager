@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.core.deps import require_org_member
 from api.models.assignment import Assignment, AssignmentCreate
 from api.repositories.file_repository import FileRepository
+from optimizer.grid import GRID_TOLERANCE
 
 router = APIRouter()
 repo: FileRepository[Assignment] = FileRepository("assignments", Assignment)
@@ -22,7 +23,7 @@ def _validate_fte(
         and existing.id != exclude_id
         and _overlaps(existing.start, existing.end, data.start, data.end)
     )
-    if overlapping_ratio + data.ratio > 1.0:
+    if overlapping_ratio + data.ratio > 1.0 + GRID_TOLERANCE:
         raise HTTPException(
             status_code=400,
             detail="Overlapping assignments for this person would exceed 1.0 FTE",

@@ -9,7 +9,7 @@ from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
 from api.v1 import projects as projects_module
 from api.v1 import teams as teams_module
-from tests.conftest import create_org, register_and_login
+from tests.conftest import ONE_FTE_NEED, create_org, register_and_login
 
 
 @pytest.fixture
@@ -26,18 +26,25 @@ def client(tmp_path, monkeypatch):
 PHASES = [
     {
         "id": "design",
+        "skill_requirements": [ONE_FTE_NEED],
         "date_range": {"start": "2026-01-01", "end": "2026-01-31"},
     },
     {
         "id": "build",
+        "skill_requirements": [ONE_FTE_NEED],
         "date_range": {"start": "2026-02-01", "end": "2026-03-31"},
     },
-    {"id": "undated"},
+    {"id": "undated", "skill_requirements": [ONE_FTE_NEED]},
 ]
 
 
 def _create_project(client, headers, **overrides) -> str:
-    payload = {"name": "Apollo", "phases": PHASES, **overrides}
+    payload = {
+        "name": "Apollo",
+        "skill_requirements": [ONE_FTE_NEED],
+        "phases": PHASES,
+        **overrides,
+    }
     response = client.post("/api/v1/projects/", json=payload, headers=headers)
     assert response.status_code == 201
     return response.json()["id"]
@@ -73,7 +80,7 @@ def test_phased_team_creates_one_assignment_per_member_with_phase_dates(
         org_headers,
         project_id,
         [
-            {"person_id": "alice", "fte_allocation": 0.5, "phase_id": "build"},
+            {"person_id": "alice", "fte_allocation": 0.6, "phase_id": "build"},
             {"person_id": "bob", "fte_allocation": 1.0, "phase_id": "build"},
         ],
     )
@@ -83,7 +90,7 @@ def test_phased_team_creates_one_assignment_per_member_with_phase_dates(
     assert response.status_code == 201
     created = sorted(response.json(), key=lambda a: a["person_id"])
     assert [(a["person_id"], a["ratio"]) for a in created] == [
-        ("alice", 0.5),
+        ("alice", 0.6),
         ("bob", 1.0),
     ]
     for assignment in created:
@@ -111,8 +118,8 @@ def test_non_phased_team_creates_one_assignment_per_project_date_range(
         org_headers,
         project_id,
         [
-            {"person_id": "alice", "fte_allocation": 0.5},
-            {"person_id": "bob", "fte_allocation": 0.5},
+            {"person_id": "alice", "fte_allocation": 0.6},
+            {"person_id": "bob", "fte_allocation": 0.4},
         ],
     )
 
@@ -184,7 +191,7 @@ def test_member_already_fully_allocated_elsewhere_returns_400_and_writes_nothing
         project_id,
         [
             {"person_id": "alice", "fte_allocation": 1.0, "phase_id": "design"},
-            {"person_id": "bob", "fte_allocation": 0.5, "phase_id": "design"},
+            {"person_id": "bob", "fte_allocation": 0.4, "phase_id": "design"},
         ],
     )
 
@@ -241,7 +248,7 @@ def test_reapplying_replaces_assignments_for_that_phase_only(client, org_headers
         org_headers,
         project_id,
         [
-            {"person_id": "alice", "fte_allocation": 0.5, "phase_id": "design"},
+            {"person_id": "alice", "fte_allocation": 0.4, "phase_id": "design"},
             {"person_id": "bob", "fte_allocation": 1.0, "phase_id": "design"},
         ],
     )
@@ -253,7 +260,7 @@ def test_reapplying_replaces_assignments_for_that_phase_only(client, org_headers
         for a in _list_assignments(client, org_headers)
     }
     assert remaining == {
-        ("alice", "design", 0.5),
+        ("alice", "design", 0.4),
         ("bob", "design", 1.0),
         ("alice", "build", 1.0),
     }
@@ -265,7 +272,7 @@ def test_reapplying_keeps_assignments_of_other_projects(client, org_headers):
         json={
             "person_id": "carol",
             "project_id": "other-project",
-            "ratio": 0.5,
+            "ratio": 0.4,
             "start": "2026-01-01",
             "end": "2026-01-31",
             "phase_id": "design",
@@ -284,6 +291,32 @@ def test_reapplying_keeps_assignments_of_other_projects(client, org_headers):
 
     ids = {a["id"] for a in _list_assignments(client, org_headers)}
     assert other["id"] in ids
+
+
+@pytest.mark.parametrize("fte_allocation", [0.5, 0.12, 0.0])
+def test_team_with_off_grid_allocation_is_rejected(client, org_headers, fte_allocation):
+    project_id = _create_project(client, org_headers)
+
+    response = client.post(
+        "/api/v1/teams/",
+        json={
+            "project_id": project_id,
+            "members": [
+                {
+                    "person_id": "alice",
+                    "fte_allocation": fte_allocation,
+                    "phase_id": "design",
+                }
+            ],
+            "optimization_score": 1.0,
+            "optimization_max_score": 1.0,
+        },
+        headers=org_headers,
+    )
+
+    assert response.status_code == 422
+    assert "multiple of 20%" in response.json()["detail"][0]["msg"]
+    assert client.get("/api/v1/teams/", headers=org_headers).json() == []
 
 
 def test_apply_missing_team_returns_404(client, org_headers):
@@ -329,7 +362,7 @@ def test_apply_team_from_another_organization_returns_404(client, org_headers):
 WINDOW = {"start": "2026-01-01", "end": "2026-03-01"}
 SHIFTED_TEAM = [
     {"person_id": "alice", "fte_allocation": 1.0, "phase_id": "design"},
-    {"person_id": "bob", "fte_allocation": 0.5, "phase_id": "build"},
+    {"person_id": "bob", "fte_allocation": 0.6, "phase_id": "build"},
 ]
 
 
@@ -359,20 +392,19 @@ def test_shifted_team_moves_project_dates_and_writes_shifted_assignments(
     }
     project = _get_project(client, org_headers, project_id)
     assert project["date_ranges"] == [{"start": "2026-01-24", "end": "2026-04-14"}]
+    stored_need = {**ONE_FTE_NEED, "description": "", "max_people": 1}
     assert project["phases"] == [
         {
             "id": "design",
-            "n_slots": 1,
-            "skill_requirements": [],
+            "skill_requirements": [stored_need],
             "date_range": {"start": "2026-01-15", "end": "2026-02-14"},
         },
         {
             "id": "build",
-            "n_slots": 1,
-            "skill_requirements": [],
+            "skill_requirements": [stored_need],
             "date_range": {"start": "2026-02-15", "end": "2026-04-14"},
         },
-        {"id": "undated", "n_slots": 1, "skill_requirements": [], "date_range": None},
+        {"id": "undated", "skill_requirements": [stored_need], "date_range": None},
     ]
     assert project["start_window"] == WINDOW
 
@@ -396,7 +428,7 @@ def test_shifted_team_that_over_allocates_writes_nothing(client, org_headers):
         client,
         org_headers,
         project_id,
-        [{"person_id": "bob", "fte_allocation": 0.5, "phase_id": "design"}],
+        [{"person_id": "bob", "fte_allocation": 0.6, "phase_id": "design"}],
         start_date="2026-01-15",
     )
 

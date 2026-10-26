@@ -20,7 +20,6 @@ FIELDNAMES = (
     "id",
     "name",
     "description",
-    "n_slots",
     "priority",
     "completed_at",
     *_JSON_FIELDS,
@@ -39,7 +38,8 @@ def encode_projects_csv(projects: list[Project]) -> str:
 
     Scalar `ProjectBase` fields become plain columns; `skill_requirements`,
     `excluded_person_ids`, `included_person_ids`, `squads`, `date_ranges`,
-    `phases`, and `start_window` are each JSON-encoded into a single cell. An
+    `phases`, and `start_window` are each JSON-encoded into a single cell, so
+    skill requirements carry their `min_level`, `fte` and `max_people`. An
     open project's `completed_at` is written as an empty cell, and a project
     without a start window gets `null` in `start_window`.
 
@@ -80,8 +80,8 @@ def decode_projects_csv(content: str) -> list[tuple[str, ProjectCreate]]:
 
     Raises:
         ProjectCsvRowError: If a row is missing a column, has a malformed JSON
-            cell, or fails `ProjectCreate` validation (e.g. `n_slots < 1`, bad
-            `DateRange`).
+            cell, or fails `ProjectCreate` validation (e.g. a scope without
+            skill requirements, an off-grid `fte`, bad `DateRange`).
     """
     reader = csv.DictReader(io.StringIO(content))
     projects: list[tuple[str, ProjectCreate]] = []

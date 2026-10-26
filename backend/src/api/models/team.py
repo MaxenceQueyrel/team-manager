@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from optimizer.grid import ALLOCATION_STEP, GRID_TOLERANCE, is_on_grid
 from optimizer.models import (
     AssignedMember,
     AssignmentWeights,
@@ -38,6 +39,22 @@ class TeamProposal(BaseModel):
 
 class TeamCreate(TeamProposal):
     project_id: str
+
+    # Applying the team turns each member's fte_allocation into an assignment ratio,
+    # which must be on the allocation grid.
+    @field_validator("members")
+    @classmethod
+    def _check_allocations_on_grid(
+        cls, members: list[AssignedMember]
+    ) -> list[AssignedMember]:
+        for member in members:
+            ratio = member.fte_allocation
+            if ratio < ALLOCATION_STEP - GRID_TOLERANCE or not is_on_grid(ratio):
+                raise ValueError(
+                    f"Member '{member.person_id}' has an allocation of {ratio}; "
+                    "it must be a multiple of 20% (one day per week), from 20% to 100%"
+                )
+        return members
 
 
 class OptimizationRequest(BaseModel):
