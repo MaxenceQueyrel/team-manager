@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { uniqueSuffix } from "./helpers";
+import { addSkillRequirement, uniqueSuffix } from "./helpers";
 
 /** The "Needs your attention" row whose title is `title`, expanding the list if it is capped. */
 async function attentionRow(page: Page, title: string): Promise<Locator> {
@@ -23,6 +23,7 @@ test("a project created from the overview shows up as unstaffed", async ({ page 
   await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
   await page.getByRole("button", { name: "New project" }).click();
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await addSkillRequirement(page, { id: "general" });
   await page.getByRole("button", { name: "Save" }).click();
 
   const row = await attentionRow(page, `${name} has nobody assigned`);
@@ -35,10 +36,11 @@ test("a project whose dates are past but is not complete asks for a review", asy
   const suffix = uniqueSuffix();
   const projectId = `atlas-${suffix}`;
   const projectName = `Atlas Migration ${suffix}`;
+  const requirements = JSON.stringify([{ id: "general", min_level: 0, fte: 1 }]);
   const dateRanges = JSON.stringify([{ start: "2025-07-01", end: "2025-09-30" }]);
   const csv = [
-    "id,name,description,n_slots,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases",
-    `${projectId},${projectName},,1,high,[],[],[],[],"${dateRanges.replace(/"/g, '""')}",[]`,
+    "id,name,description,priority,skill_requirements,excluded_person_ids,included_person_ids,squads,date_ranges,phases",
+    `${projectId},${projectName},,high,"${requirements.replace(/"/g, '""')}",[],[],[],"${dateRanges.replace(/"/g, '""')}",[]`,
   ].join("\n");
   await page.goto("/projects");
   await page.locator('input[type="file"]').setInputFiles({

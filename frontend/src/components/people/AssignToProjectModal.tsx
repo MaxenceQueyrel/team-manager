@@ -2,7 +2,7 @@ import { useState } from "react";
 import { isoToday } from "@/components/common/dates";
 import { colors, Field, Modal, selectStyle } from "@/components/common/ui";
 import { AssignForm } from "@/components/projects/StaffingLaneCard";
-import { buildLanes, isOpenForStaffing } from "@/components/projects/staffing";
+import { buildLanes, formatFte, isOpenForStaffing } from "@/components/projects/staffing";
 import { assignmentsApi, errorMessage } from "@/services/api";
 import type { Assignment, Person, Project } from "@/types";
 
@@ -68,9 +68,9 @@ export function AssignToProjectModal({
       {project && lane && (
         <>
           <p style={{ margin: "0 0 0.25rem", fontSize: "0.85rem", color: colors.muted }}>
-            Needs {lane.nSlots} FTE
+            Needs {lane.requiredFte} FTE
             {lane.skillRequirements.length > 0 &&
-              ` · ${lane.skillRequirements.map((s) => `${s.id} ≥ ${s.min_level}`).join(", ")}`}
+              ` · ${lane.skillRequirements.map((s) => `${s.id} ≥ ${s.min_level} (${formatFte(s.fte)} FTE)`).join(", ")}`}
           </p>
           <AssignForm
             key={`${project.id}-${lane.key}`}

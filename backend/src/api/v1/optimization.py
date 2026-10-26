@@ -74,7 +74,6 @@ def solve_assignment(
 
     project_input = ProjectInput(
         id=project.id,
-        n_slots=project.n_slots,
         skill_requirements=project.skill_requirements,
         excluded_person_ids=project.excluded_person_ids,
         included_person_ids=project.included_person_ids,

@@ -79,3 +79,8 @@ def org_headers(client, manager_headers):
     """
     organization_id = create_org(client, manager_headers)
     return {**manager_headers, "X-Organization-Id": organization_id}
+
+
+# A skill need anyone can fill (a missing skill counts as level 0), for tests that
+# need a valid project but don't exercise skills.
+ONE_FTE_NEED = {"id": "general", "min_level": 0, "fte": 1}

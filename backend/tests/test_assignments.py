@@ -60,10 +60,10 @@ def test_get_missing_assignment_returns_404(client, org_headers):
 
 def test_list_filters_by_person_and_project(client, org_headers):
     _create_assignment(
-        client, org_headers, person_id="person-1", project_id="project-1", ratio=0.5
+        client, org_headers, person_id="person-1", project_id="project-1", ratio=0.6
     )
     _create_assignment(
-        client, org_headers, person_id="person-1", project_id="project-2", ratio=0.5
+        client, org_headers, person_id="person-1", project_id="project-2", ratio=0.4
     )
     _create_assignment(
         client, org_headers, person_id="person-2", project_id="project-1", ratio=1.0
@@ -88,7 +88,7 @@ def test_list_filters_by_person_and_project(client, org_headers):
 
 
 def test_update_assignment(client, org_headers):
-    created = _create_assignment(client, org_headers, ratio=0.5).json()
+    created = _create_assignment(client, org_headers, ratio=0.4).json()
 
     response = client.put(
         f"/api/v1/assignments/{created['id']}",
@@ -116,7 +116,7 @@ def test_update_missing_assignment_returns_404(client, org_headers):
         json={
             "person_id": "person-1",
             "project_id": "project-1",
-            "ratio": 0.5,
+            "ratio": 0.4,
             "start": "2026-01-01",
             "end": "2026-01-31",
         },
@@ -167,7 +167,7 @@ def test_overlapping_assignments_exceeding_fte_are_rejected(client, org_headers)
         client,
         org_headers,
         person_id="person-1",
-        ratio=0.5,
+        ratio=0.6,
         start="2026-01-15",
         end="2026-02-15",
     )
@@ -227,7 +227,7 @@ def test_update_excludes_its_own_assignment_from_fte_check(client, org_headers):
         json={
             "person_id": "person-1",
             "project_id": "project-1",
-            "ratio": 0.9,
+            "ratio": 0.8,
             "start": "2026-01-01",
             "end": "2026-01-31",
         },
@@ -235,3 +235,49 @@ def test_update_excludes_its_own_assignment_from_fte_check(client, org_headers):
     )
 
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("ratio", [0.5, 0.12, 0.88, 0.0, 0.1, 1.2])
+def test_off_grid_ratio_is_rejected(client, org_headers, ratio):
+    response = _create_assignment(client, org_headers, ratio=ratio)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("ratio", [0.2, 0.4, 0.6, 0.8, 1.0])
+def test_on_grid_ratio_is_accepted(client, org_headers, ratio):
+    response = _create_assignment(client, org_headers, ratio=ratio)
+
+    assert response.status_code == 201
+    assert response.json()["ratio"] == ratio
+
+
+def test_off_grid_ratio_error_explains_the_grid(client, org_headers):
+    response = _create_assignment(client, org_headers, ratio=0.5)
+
+    assert "multiple of 20%" in response.json()["detail"][0]["msg"]
+
+
+def test_update_rejects_off_grid_ratio(client, org_headers):
+    created = _create_assignment(client, org_headers, ratio=0.6).json()
+
+    response = client.put(
+        f"/api/v1/assignments/{created['id']}",
+        json={
+            "person_id": "person-1",
+            "project_id": "project-1",
+            "ratio": 0.5,
+            "start": "2026-01-01",
+            "end": "2026-01-31",
+        },
+        headers=org_headers,
+    )
+
+    assert response.status_code == 422
+
+
+def test_float_round_off_does_not_block_a_full_allocation(client, org_headers):
+    # 0.2 + 0.4 + 0.4 sums to 1.0000000000000002 in floating point.
+    for ratio in (0.2, 0.4, 0.4):
+        response = _create_assignment(client, org_headers, ratio=ratio)
+        assert response.status_code == 201

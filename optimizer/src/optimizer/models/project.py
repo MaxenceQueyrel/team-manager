@@ -7,11 +7,8 @@ from optimizer.models.squad import Squad
 
 class ProjectPhase(BaseModel):
     id: str = Field(description="Identifier of the phase (e.g. a project stage).")
-    n_slots: int = Field(
-        default=1, ge=1, description="FTE to staff during this phase; headcount varies with each person's allocation."
-    )
     skill_requirements: list[SkillRequirement] = Field(
-        default=[], description="Skills required during this phase, with minimum levels."
+        default=[], description="Skill needs of this phase; the FTE to staff is the sum of their fte."
     )
     date_range: DateRange | None = Field(
         default=None, description="Calendar span of this phase. None means no date constraint."
@@ -20,11 +17,8 @@ class ProjectPhase(BaseModel):
 
 class ProjectInput(BaseModel):
     id: str = Field(description="Identifier of the project.")
-    n_slots: int = Field(
-        default=1, ge=1, description="FTE to staff on the project; headcount varies with each person's allocation."
-    )
     skill_requirements: list[SkillRequirement] = Field(
-        default=[], description="Skills required by the project, with minimum levels."
+        default=[], description="Skill needs of the project; the FTE to staff is the sum of their fte."
     )
     excluded_person_ids: list[str] = Field(
         default=[], description="Person IDs that must not be assigned to the project."
@@ -39,8 +33,5 @@ class ProjectInput(BaseModel):
     )
     phases: list[ProjectPhase] = Field(
         default=[],
-        description=(
-            "Per-stage staffing needs. When non-empty, overrides the top-level n_slots, "
-            "skill_requirements, and date_ranges."
-        ),
+        description="Per-stage staffing needs. When non-empty, overrides the top-level skill_requirements and date_ranges.",
     )

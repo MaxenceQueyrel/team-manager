@@ -2,8 +2,8 @@ import { colors } from "@/components/common/ui";
 import { formatFte } from "@/components/projects/staffing";
 import type { InfeasibilityDetail, Person, PhaseConflict, Project } from "@/types";
 
-// Mirrors the optimizer's MIN_FTE_SHARE: the smallest share a selected person carries.
-const MIN_FTE_SHARE = 0.1;
+// Mirrors the optimizer's ALLOCATION_STEP: the smallest share a selected person carries.
+const ALLOCATION_STEP = 0.2;
 const MAX_LISTED_NAMES = 3;
 
 function listNames(names: string[]): string {
@@ -35,13 +35,13 @@ function explain(
   switch (conflict.reason) {
     case "squad_conflict":
       return {
-        reason: `${squadPhrase} must be staffed together at ${MIN_FTE_SHARE} FTE or more each, which doesn't fit ${fit}.`,
-        hint: `Drop or shrink the ${squads.length === 1 ? "squad" : "squads"}, or raise the required FTE.`,
+        reason: `${squadPhrase} must be staffed together at ${ALLOCATION_STEP} FTE or more each, which doesn't fit ${fit}.`,
+        hint: `Drop or shrink the ${squads.length === 1 ? "squad" : "squads"}, or raise the required FTE or max people.`,
       };
     case "forced_member_conflict":
       return {
         reason: `Forced ${forcedNoun} ${forced} can't ${oneForced ? "be" : "all be"} staffed within ${fit}.`,
-        hint: `Un-force ${oneForced ? "this member" : "one of them"}, or raise the required FTE.`,
+        hint: `Un-force ${oneForced ? "this member" : "one of them"}, or raise the required FTE or max people.`,
       };
     case "squad_and_forced_member_conflict":
       return {
@@ -50,7 +50,7 @@ function explain(
       };
     case "fte_not_reachable":
       return {
-        reason: `No mix of available people adds up to ${fit}: anyone available below ${MIN_FTE_SHARE} FTE can only be staffed at exactly their availability.`,
+        reason: `No mix of available people adds up to ${fit} in whole days per week.`,
         hint: "Add candidates, or reduce the required FTE.",
       };
   }

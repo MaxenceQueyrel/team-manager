@@ -9,6 +9,7 @@ from api.models.team import Team, TeamCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
 from api.v1 import projects as projects_module
+from optimizer.grid import GRID_TOLERANCE
 from optimizer.models import ProjectInput
 from optimizer.schedule import schedule_anchor, shift_project
 
@@ -106,7 +107,7 @@ def _over_allocated_person_ids(
             )
         )
         if (
-            overlapping_ratio + candidate.ratio > 1.0
+            overlapping_ratio + candidate.ratio > 1.0 + GRID_TOLERANCE
             and candidate.person_id not in over_allocated
         ):
             over_allocated.append(candidate.person_id)

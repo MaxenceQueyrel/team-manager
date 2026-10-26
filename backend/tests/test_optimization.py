@@ -13,8 +13,8 @@ from api.v1 import people as people_module
 from api.v1 import projects as projects_module
 from api.v1 import roles as roles_module
 from api.v1 import teams as teams_module
-from optimizer.adapters.pulp_solver import MIN_FTE_SHARE
 from optimizer.models import Seniority
+from tests.conftest import ONE_FTE_NEED
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def client(tmp_path, monkeypatch):
 
 @pytest.fixture
 def project_id(client, org_headers):
-    """A 2-slot project in an organization of 6 people.
+    """A project needing 2 FTE in an organization of 6 people.
 
     The solver's default min_difference of 2 makes every alternative disjoint
     from earlier teams at this size, so 6 people yield exactly 3 teams.
@@ -52,7 +52,7 @@ def project_id(client, org_headers):
         )
     project = client.post(
         "/api/v1/projects/",
-        json={"name": "Project X", "n_slots": 2},
+        json={"name": "Project X", "skill_requirements": [{**ONE_FTE_NEED, "fte": 2}]},
         headers=org_headers,
     ).json()
     return project["id"]
@@ -183,6 +183,7 @@ def _busy_person_setup(client, headers):
             "/api/v1/projects/",
             json={
                 "name": name,
+                "skill_requirements": [ONE_FTE_NEED],
                 "date_ranges": NOVEMBER,
                 "included_person_ids": [bob_id],
             },
@@ -239,55 +240,107 @@ def test_solve_reports_coverage_for_best_and_alternatives(
                 "staffed_fte": 2.0,
                 "available_fte": 6.0,
                 "fte_met": True,
-                "skills": [],
+                "skills": [
+                    {
+                        "skill_id": "general",
+                        "required_level": 0.0,
+                        "required_fte": 2.0,
+                        "best_level": 0.0,
+                        "covered_fte": 2.0,
+                        "met": True,
+                    }
+                ],
             }
         ]
 
 
 def test_solve_reports_unmet_skill_and_persists_coverage(client, org_headers):
     client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
-    client.post(
-        "/api/v1/people/",
-        json={
-            "name": "Ada",
-            "role": "Backend Developer",
-            "seniority": Seniority.SENIOR,
-            "years_of_experience": 5.0,
-            "skills": [{"id": "python", "level": 2}],
-        },
-        headers=org_headers,
-    )
+    for name, level in (("Ada", 3), ("Bea", 1)):
+        client.post(
+            "/api/v1/people/",
+            json={
+                "name": name,
+                "role": "Backend Developer",
+                "seniority": Seniority.SENIOR,
+                "years_of_experience": 5.0,
+                "skills": [{"id": "python", "level": level}],
+            },
+            headers=org_headers,
+        )
     project_id = client.post(
         "/api/v1/projects/",
         json={
             "name": "Project Y",
-            "skill_requirements": [{"id": "python", "min_level": 4}],
+            "skill_requirements": [{"id": "python", "min_level": 2, "fte": 2}],
         },
         headers=org_headers,
     ).json()["id"]
 
     best = _solve(client, org_headers, project_id, n_alternatives=0).json()["best"]
 
+    # Bea is below min_level, so only Ada's single FTE can staff the 2 FTE need.
+    assert [m["skill_allocations"] for m in best["members"]] == [
+        [{"skill_id": "python", "fte": 1.0}]
+    ]
     assert best["fully_covered"] is False
-    assert best["coverage"][0]["fte_met"] is True
+    assert best["coverage"][0]["required_fte"] == 2.0
+    assert best["coverage"][0]["fte_met"] is False
     assert best["coverage"][0]["skills"] == [
         {
             "skill_id": "python",
-            "required_level": 4.0,
-            "best_level": 2.0,
-            "covered_fte": 0.0,
+            "required_level": 2.0,
+            "required_fte": 2.0,
+            "best_level": 3.0,
+            "covered_fte": 1.0,
             "met": False,
         }
     ]
     saved = client.get(f"/api/v1/teams/{best['id']}", headers=org_headers).json()
     assert saved["coverage"] == best["coverage"]
+    assert saved["members"] == best["members"]
     assert saved["fully_covered"] is False
+
+
+def test_solve_splits_a_need_on_the_allocation_grid(client, org_headers):
+    client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
+    for name, ratio in (("Ada", 0.5), ("Bea", 0.7)):
+        client.post(
+            "/api/v1/people/",
+            json={
+                "name": name,
+                "role": "Backend Developer",
+                "seniority": Seniority.SENIOR,
+                "years_of_experience": 5.0,
+                "availability_windows": [
+                    {"start": "2026-11-01", "end": "2026-11-30", "ratio": ratio}
+                ],
+            },
+            headers=org_headers,
+        )
+    project_id = client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Project S",
+            "skill_requirements": [{**ONE_FTE_NEED, "max_people": 2}],
+            "date_ranges": NOVEMBER,
+        },
+        headers=org_headers,
+    ).json()["id"]
+
+    best = _solve(client, org_headers, project_id, n_alternatives=0).json()["best"]
+
+    # Availabilities floor to 0.4 and 0.6, never an even 0.5 + 0.5 split.
+    assert sorted(m["fte_allocation"] for m in best["members"]) == [0.4, 0.6]
+    assert best["fully_covered"] is True
+    applied = client.post(f"/api/v1/teams/{best['id']}/apply", headers=org_headers)
+    assert applied.status_code == 201
+    assert sorted(a["ratio"] for a in applied.json()) == [0.4, 0.6]
 
 
 def test_solve_returns_409_with_conflicts_when_no_team_is_feasible(client, org_headers):
     client.post("/api/v1/roles/", json={"id": "Backend Developer"}, headers=org_headers)
-    # Each selected person carries at least MIN_FTE_SHARE, so a squad bigger than
-    # 1 / MIN_FTE_SHARE can never fit a single FTE.
+    # A 1 FTE need goes to at most one person, so a squad of two can never fit it.
     member_ids = [
         client.post(
             "/api/v1/people/",
@@ -299,11 +352,15 @@ def test_solve_returns_409_with_conflicts_when_no_team_is_feasible(client, org_h
             },
             headers=org_headers,
         ).json()["id"]
-        for i in range(int(1 / MIN_FTE_SHARE) + 1)
+        for i in range(2)
     ]
     project_id = client.post(
         "/api/v1/projects/",
-        json={"name": "Project Z", "squads": [{"member_ids": member_ids}]},
+        json={
+            "name": "Project Z",
+            "skill_requirements": [ONE_FTE_NEED],
+            "squads": [{"member_ids": member_ids}],
+        },
         headers=org_headers,
     ).json()["id"]
 
@@ -347,12 +404,11 @@ def _create_person(client, headers, name, vacations=()):
 
 
 def _oversized_squad(client, headers, vacations=()):
-    # Each selected person carries at least MIN_FTE_SHARE, so a squad bigger than
-    # 1 / MIN_FTE_SHARE can never fit a single FTE while all its members are free.
+    # A 1 FTE need goes to at most one person, so a squad of two can never fit it
+    # while both its members are free.
     return {
         "member_ids": [
-            _create_person(client, headers, f"Squad {i}", vacations)
-            for i in range(int(1 / MIN_FTE_SHARE) + 1)
+            _create_person(client, headers, f"Squad {i}", vacations) for i in range(2)
         ]
     }
 
@@ -400,6 +456,7 @@ def test_solve_with_window_skips_infeasible_starts(client, org_headers):
         "/api/v1/projects/",
         json={
             "name": "Project W",
+            "skill_requirements": [ONE_FTE_NEED],
             "squads": [squad],
             "date_ranges": [WEEK_1],
             "start_window": WINDOW,
@@ -435,7 +492,12 @@ def test_start_candidates_carry_their_team_and_can_be_applied(client, org_header
     early_id = _create_person(client, org_headers, "Early", vacations=[WEEK_3])
     project_id = client.post(
         "/api/v1/projects/",
-        json={"name": "Project V", "date_ranges": [WEEK_1], "start_window": WINDOW},
+        json={
+            "name": "Project V",
+            "skill_requirements": [ONE_FTE_NEED],
+            "date_ranges": [WEEK_1],
+            "start_window": WINDOW,
+        },
         headers=org_headers,
     ).json()["id"]
 
@@ -478,6 +540,7 @@ def test_solve_with_window_returns_409_when_every_start_is_infeasible(
         "/api/v1/projects/",
         json={
             "name": "Project Z",
+            "skill_requirements": [ONE_FTE_NEED],
             "squads": [squad],
             "date_ranges": [WEEK_1],
             "start_window": WINDOW,

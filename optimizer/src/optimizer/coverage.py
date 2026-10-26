@@ -1,7 +1,8 @@
 from optimizer.availability import effective_availability
+from optimizer.grid import floor_to_grid
 from optimizer.models import AssignedMember, PersonInput, PhaseCoverage, ProjectInput, SkillCoverage
 
-FTE_TOLERANCE = 1e-6  # absorbs solver round-off when comparing staffed FTE to the requested n_slots
+FTE_TOLERANCE = 1e-6  # absorbs float round-off when comparing staffed to required FTE
 
 
 def compute_coverage(
@@ -19,32 +20,33 @@ def compute_coverage(
         members: The members selected for this phase.
 
     Returns:
-        A PhaseCoverage comparing required to staffed FTE, and each skill requirement's
-        minimum level to the levels the staffed members bring.
+        A PhaseCoverage comparing the phase's required FTE (the sum of its skill needs) to
+        the staffed FTE, and each skill's required FTE to the FTE members give to it.
     """
     levels = {p.id: {s.id: s.level for s in p.skills} for p in candidates}
+    required = sum(req.fte for req in project.skill_requirements)
     staffed = sum(m.fte_allocation for m in members)
-    available = sum(min(effective_availability(p, project, p.assignments), 1.0) for p in candidates)
+    available = sum(floor_to_grid(min(effective_availability(p, project, p.assignments), 1.0)) for p in candidates)
 
     skills = []
     for req in project.skill_requirements:
-        member_levels = [(levels[m.person_id].get(req.id, 0.0), m.fte_allocation) for m in members]
-        covered = sum(fte for level, fte in member_levels if level >= req.min_level)
+        covered = sum(a.fte for m in members for a in m.skill_allocations if a.skill_id == req.id)
         skills.append(
             SkillCoverage(
                 skill_id=req.id,
                 required_level=req.min_level,
-                best_level=max((level for level, _ in member_levels), default=0.0),
+                required_fte=req.fte,
+                best_level=max((levels[m.person_id].get(req.id, 0.0) for m in members), default=0.0),
                 covered_fte=round(covered, 6),
-                met=covered > 0,
+                met=covered >= req.fte - FTE_TOLERANCE,
             )
         )
 
     return PhaseCoverage(
         phase_id=phase_id,
-        required_fte=project.n_slots,
+        required_fte=round(required, 6),
         staffed_fte=round(staffed, 6),
         available_fte=round(available, 6),
-        fte_met=staffed >= project.n_slots - FTE_TOLERANCE,
+        fte_met=staffed >= required - FTE_TOLERANCE,
         skills=skills,
     )

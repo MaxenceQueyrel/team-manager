@@ -31,3 +31,28 @@ export async function createPerson(page: Page, name: string, roleId: string): Pr
 export function uniqueSuffix(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
+
+/** Adds a skill requirement row to the open project form; a min level of 0 lets anyone fill it. */
+export async function addSkillRequirement(
+  page: Page,
+  { id, minLevel = 0, fte = 1 }: { id: string; minLevel?: number; fte?: number },
+): Promise<void> {
+  // With no rows yet the button is the form field's first control, so it takes the field's label.
+  await page.getByRole("button").filter({ hasText: "+ Add requirement" }).click();
+  await page.getByPlaceholder("skill id").last().fill(id);
+  // Clicking outside the skill combobox closes its suggestion list.
+  const level = page.getByLabel("Minimum level", { exact: true }).last();
+  await level.click();
+  await level.fill(String(minLevel));
+  await page.getByLabel("FTE", { exact: true }).last().selectOption(String(fte));
+}
+
+/** Creates a 1-FTE project anyone can staff through the Projects page form. */
+export async function createProject(page: Page, name: string): Promise<void> {
+  await page.goto("/projects");
+  await page.getByRole("button", { name: "New project" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await addSkillRequirement(page, { id: "general" });
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("heading", { name }).waitFor();
+}
