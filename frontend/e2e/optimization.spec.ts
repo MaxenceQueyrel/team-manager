@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
+  attentionRow,
   createPerson,
   createProject,
   MANAGER_EMAIL,
@@ -98,9 +99,34 @@ test("optimizing from the project workspace shows the best team", async ({ page 
   await page.getByRole("link", { name }).click();
 
   await runOptimization(page);
+  await expect(page.getByRole("tab", { name: /^Proposals/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page).toHaveURL(/\?tab=proposals$/);
   await expect(
     page.getByRole("region", { name: "Best team" }).getByText("Optimization score:"),
   ).toBeVisible();
+});
+
+test("the overview's Compare action opens the project's saved proposals", async ({ page }) => {
+  const name = `Compare Link ${uniqueSuffix()}`;
+
+  await createProject(page, name);
+  await page.getByRole("link", { name }).click();
+  await runOptimization(page);
+
+  await page.goto("/");
+  const row = await attentionRow(page, `Saved optimizer results on ${name}`);
+  await row.getByRole("link", { name: "Compare" }).click();
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Proposals/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    page.getByRole("region", { name: "Proposals", exact: true }).getByRole("listitem"),
+  ).toHaveCount(1);
 });
 
 test("alternative teams are collapsed by default and show their delta vs best", async ({
@@ -212,12 +238,13 @@ test("a flexible start window picks the start where the team is free and applyin
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(best.getByText(/^Starts /)).toHaveCount(0);
 
+  await page.getByRole("tab", { name: "Staffing" }).click();
   const timeline = page.getByRole("region", { name: "Timeline" });
   await expect(timeline).toContainText("5 Feb 2027");
   await expect(timeline).toContainText("7 Mar 2027");
   await expect(page.getByRole("region", { name: "Staffing" })).toContainText("1 of 1 FTE");
-  await expect(best.getByText(/^Starts /)).toHaveCount(0);
 });
 
 test("applying proposals replaces the project's staffing", async ({ page }) => {
@@ -239,9 +266,12 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
     page.getByText("This replaces current staffing for the whole project."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Apply", exact: true }).click();
-  await expect(lane).toContainText("1 of 1 FTE");
   await expect(best.getByText("added", { exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Staffing" }).click();
+  await expect(lane).toContainText("1 of 1 FTE");
 
+  // The result stays in place while switching tabs.
+  await page.getByRole("tab", { name: /^Proposals/ }).click();
   await page.getByRole("button", { name: "Show 2 alternative teams" }).click();
   const alternative = page.getByRole("region", { name: "Alternative 1" });
   await expect(alternative.getByText("added", { exact: true })).toHaveCount(1);
@@ -250,11 +280,14 @@ test("applying proposals replaces the project's staffing", async ({ page }) => {
   await alternative.getByRole("button", { name: "Apply to project" }).click();
   await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(alternative.getByText("added", { exact: true })).toHaveCount(0);
-  await expect(lane.getByRole("listitem")).toHaveCount(1);
 
   // The solve saves the best team; applying the alternative saves it too.
   const proposals = page.getByRole("region", { name: "Proposals", exact: true });
   await expect(proposals.getByRole("listitem")).toHaveCount(2);
+  await expect(page.getByRole("tab", { name: /^Proposals/ })).toContainText("2");
+
+  await page.getByRole("tab", { name: "Staffing" }).click();
+  await expect(lane.getByRole("listitem")).toHaveCount(1);
 });
 
 test("applying a stale proposal reports the FTE conflict by name", async ({ page }) => {
@@ -284,6 +317,7 @@ test("applying a stale proposal reports the FTE conflict by name", async ({ page
   await expect(lane).toContainText("1 of 1 FTE");
 
   await page.goto(`/projects/conflict-proposed-${suffix}`);
+  await page.getByRole("tab", { name: /^Proposals/ }).click();
   await page.getByRole("button", { name: "Review proposal 1" }).click();
   await page
     .getByRole("region", { name: "Proposal 1" })

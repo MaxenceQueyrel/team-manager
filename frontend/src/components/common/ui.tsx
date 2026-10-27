@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
   useEffect,
@@ -638,13 +639,15 @@ export interface TabItem {
 
 /** Underline tabs (page sections) or a segmented control (status/range filters). Items with
  * `to` render as `NavLink`s inside a `<nav>`; otherwise they are `role="tab"` buttons driven
- * by `value` / `onChange`. */
+ * by `value` / `onChange`, with arrow-key navigation. `panels` names the `TabPanel` group the
+ * tabs control, when they switch page sections. */
 export function Tabs({
   items,
   value,
   onChange,
   variant = "underline",
   ariaLabel,
+  panels,
   style,
 }: {
   items: TabItem[];
@@ -652,8 +655,10 @@ export function Tabs({
   onChange?: (value: string) => void;
   variant?: "underline" | "segmented";
   ariaLabel: string;
+  panels?: string;
   style?: CSSProperties;
 }) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const containerStyle: CSSProperties =
     variant === "underline"
       ? { display: "flex", gap: "0.25rem", borderBottom: `1px solid ${colors.border}`, ...style }
@@ -689,20 +694,84 @@ export function Tabs({
       </nav>
     );
   }
+  const moveTo = (event: ReactKeyboardEvent, index: number) => {
+    const last = items.length - 1;
+    const targets: Record<string, number> = {
+      ArrowLeft: index === 0 ? last : index - 1,
+      ArrowRight: index === last ? 0 : index + 1,
+      Home: 0,
+      End: last,
+    };
+    if (!(event.key in targets)) return;
+    event.preventDefault();
+    const target = targets[event.key];
+    onChange?.(items[target].value);
+    buttons.current[target]?.focus();
+  };
   return (
     <div role="tablist" aria-label={ariaLabel} style={containerStyle}>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <button
           key={item.value}
+          ref={(element) => {
+            buttons.current[index] = element;
+          }}
           type="button"
           role="tab"
+          id={panels && `${panels}-tab-${item.value}`}
+          aria-controls={panels && `${panels}-panel-${item.value}`}
           aria-selected={item.value === value}
+          tabIndex={item.value === value ? 0 : -1}
           className={item.value === value ? `${className} active` : className}
           onClick={() => onChange?.(item.value)}
+          onKeyDown={(event) => moveTo(event, index)}
         >
           {content(item)}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** The section controlled by the `Tabs` item `value` in group `group`. Inactive panels stay
+ * mounted, only hidden, so forms, pending requests and errors inside them survive a tab
+ * switch. */
+export function TabPanel({
+  group,
+  value,
+  active,
+  children,
+}: {
+  group: string;
+  value: string;
+  active: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={`${group}-panel-${value}`}
+      aria-labelledby={`${group}-tab-${value}`}
+      hidden={!active}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A wide main column beside a narrower side column; the side column wraps below the main
+ * one on narrow screens. */
+export function Columns({ main, side }: { main: ReactNode; side: ReactNode }) {
+  const column: CSSProperties = {
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.5rem",
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "1.5rem" }}>
+      <div style={{ ...column, flex: "999 1 34rem" }}>{main}</div>
+      <div style={{ ...column, flex: "1 1 20rem" }}>{side}</div>
     </div>
   );
 }

@@ -133,6 +133,7 @@ test("editing an availability window on the detail page updates the weekly strip
   await expect(page).toHaveURL(/\/people\/[^/]+$/);
   await expect(page.getByRole("heading", { name })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Availability" }).click();
   await page.getByRole("tab", { name: "Custom" }).click();
   await page.getByLabel("From", { exact: true }).fill("2026-01-05");
   await page.getByLabel("To", { exact: true }).fill("2026-01-18");
@@ -185,6 +186,7 @@ test("marking a week of vacation on the detail page books that week", async ({ p
   await createPerson(page, name, `qa-engineer-${suffix}`);
 
   await page.getByRole("link", { name }).click();
+  await page.getByRole("tab", { name: "Availability" }).click();
   await page.getByRole("tab", { name: "Custom" }).click();
   await page.getByLabel("From", { exact: true }).fill("2026-01-05");
   await page.getByLabel("To", { exact: true }).fill("2026-01-18");
@@ -229,16 +231,22 @@ test("an assigned person shows reduced availability on their detail page", async
 
   await page.goto("/people");
   await page.getByRole("link", { name }).click();
+  await page.getByRole("tab", { name: "Availability" }).click();
   await page.getByRole("tab", { name: "Custom" }).click();
   await page.getByLabel("From", { exact: true }).fill("2026-01-05");
   await page.getByLabel("To", { exact: true }).fill("2026-01-11");
   // Booked 3 days/week from the 5th to the 10th, free on the 11th: (6 × 0.4 + 1) / 7.
   await expect(page.getByTitle("Week of 2026-01-05: partly booked, 49% free")).toBeVisible();
 
-  const assignments = page.getByRole("region", { name: "Assignments" });
-  await expect(assignments.getByText("Not on any project right now")).toBeVisible();
-  await expect(assignments.getByText(/^1 Jan( 2026)? → 10 Jan( 2026)? · 10 days$/)).toBeVisible();
-  await assignments.getByRole("link", { name: projectName }).click();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(
+    page.getByRole("region", { name: "Assignments" }).getByText("Not on any project right now"),
+  ).toBeVisible();
+
+  await page.getByRole("tab", { name: /^History/ }).click();
+  const past = page.getByRole("region", { name: "Past assignments" });
+  await expect(past.getByText(/^1 Jan( 2026)? → 10 Jan( 2026)? · 10 days$/)).toBeVisible();
+  await past.getByRole("link", { name: projectName }).click();
   await expect(page).toHaveURL(/\/projects\/[^/]+$/);
   await expect(page.getByRole("heading", { level: 1, name: projectName })).toBeVisible();
 });

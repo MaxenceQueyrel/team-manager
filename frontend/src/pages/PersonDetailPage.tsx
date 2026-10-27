@@ -1,7 +1,7 @@
 import { isAxiosError } from "axios";
 import { ChevronRight, Pencil, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import {
   addDays,
@@ -14,6 +14,7 @@ import {
   Avatar,
   Button,
   Card,
+  Columns,
   colors,
   fonts,
   PageHeader,
@@ -21,6 +22,8 @@ import {
   StatTile,
   seniorityLabels,
   seniorityTones,
+  TabPanel,
+  Tabs,
 } from "@/components/common/ui";
 import { AssignToProjectModal } from "@/components/people/AssignToProjectModal";
 import { FREE_HORIZON_DAYS, freeNextDays } from "@/components/people/PeopleWorkspace";
@@ -36,6 +39,12 @@ import { useAuthStore } from "@/store/authStore";
 import type { Assignment, Person, Project } from "@/types";
 
 type Dialog = "profile" | "assign" | "skills" | "time-off" | null;
+
+type PersonTab = "overview" | "availability" | "history";
+
+function parseTab(value: string | null): PersonTab {
+  return value === "availability" || value === "history" ? value : "overview";
+}
 
 function joinList(items: string[]): string {
   if (items.length < 2) return items.join("");
@@ -84,6 +93,8 @@ export default function PersonDetailPage() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [freeSoon, setFreeSoon] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = parseTab(searchParams.get("tab"));
 
   useEffect(() => {
     fetchPeople();
@@ -233,101 +244,107 @@ export default function PersonDetailPage() {
         />
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
-        <div
-          style={{
-            flex: "999 1 520px",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.25rem",
-          }}
-        >
-          <WeeklyAvailability person={person} />
-          <SectionCard title="Assignments" flush>
-            {current.length === 0 ? (
-              <div style={{ padding: "0 1.5rem 1.25rem" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "1rem",
-                    flexWrap: "wrap",
-                    padding: "1.1rem 1.4rem",
-                    border: `1.5px dashed ${colors.borderStrong}`,
-                    borderRadius: "var(--radius-lg)",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600 }}>Not on any project right now</div>
-                    <div style={{ marginTop: 2, fontSize: "0.88rem", color: colors.muted }}>
-                      {skillMatchHint(person, projects, today)}
+      <Tabs
+        ariaLabel="Person views"
+        panels="person"
+        value={tab}
+        onChange={(value) => {
+          const next = parseTab(value);
+          // Replacing the entry keeps Back leaving the person instead of stepping through tabs.
+          setSearchParams(next === "overview" ? {} : { tab: next }, { replace: true });
+        }}
+        items={[
+          { value: "overview", label: "Overview" },
+          { value: "availability", label: "Availability" },
+          { value: "history", label: "History", count: past.length > 0 ? past.length : undefined },
+        ]}
+        style={{ marginBottom: "1.5rem" }}
+      />
+
+      <TabPanel group="person" value="overview" active={tab === "overview"}>
+        <Columns
+          main={
+            <SectionCard title="Assignments" flush>
+              {current.length === 0 ? (
+                <div style={{ padding: "0 1.5rem 1.25rem" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "1rem",
+                      flexWrap: "wrap",
+                      padding: "1.1rem 1.4rem",
+                      border: `1.5px dashed ${colors.borderStrong}`,
+                      borderRadius: "var(--radius-lg)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Not on any project right now</div>
+                      <div style={{ marginTop: 2, fontSize: "0.88rem", color: colors.muted }}>
+                        {skillMatchHint(person, projects, today)}
+                      </div>
                     </div>
+                    <Button onClick={() => setDialog("assign")}>Assign to project</Button>
                   </div>
-                  <Button onClick={() => setDialog("assign")}>Assign to project</Button>
                 </div>
-              </div>
-            ) : (
-              <AssignmentList assignments={current} projectName={projectName} today={today} />
-            )}
-            {past.length > 0 && (
-              <>
-                <div
-                  style={{
-                    padding: "0.25rem 1.5rem 0.5rem",
-                    fontSize: "0.85rem",
-                    color: colors.muted,
-                  }}
+              ) : (
+                <AssignmentList assignments={current} projectName={projectName} today={today} />
+              )}
+            </SectionCard>
+          }
+          side={
+            <SectionCard
+              title="Skills"
+              action={
+                canWritePeople && (
+                  <Button size="sm" ariaLabel="Edit skills" onClick={() => setDialog("skills")}>
+                    Edit
+                  </Button>
+                )
+              }
+            >
+              <SkillLevels person={person} />
+            </SectionCard>
+          }
+        />
+      </TabPanel>
+
+      <TabPanel group="person" value="availability" active={tab === "availability"}>
+        <Columns
+          main={<WeeklyAvailability person={person} />}
+          side={
+            <SectionCard title="Time off & exceptions">
+              <p style={{ margin: 0, fontSize: "0.88rem", color: colors.muted }}>
+                Leave, part-time weeks or any period where {person.name} works less than the usual{" "}
+                {formatFte(person.base_capacity)} FTE. These override project assignments.
+              </p>
+              <TimeOffList person={person} today={today} />
+              {canWritePeople && (
+                <Button
+                  icon={Plus}
+                  onClick={() => setDialog("time-off")}
+                  style={{ marginTop: "1rem" }}
                 >
-                  Past
-                </div>
-                <AssignmentList assignments={past} projectName={projectName} today={today} />
-              </>
-            )}
-          </SectionCard>
-        </div>
-
-        <div
-          style={{
-            flex: "1 1 320px",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.25rem",
-          }}
-        >
-          <SectionCard
-            title="Skills"
-            action={
-              canWritePeople && (
-                <Button size="sm" ariaLabel="Edit skills" onClick={() => setDialog("skills")}>
-                  Edit
+                  Add time off
                 </Button>
-              )
-            }
-          >
-            <SkillLevels person={person} />
-          </SectionCard>
+              )}
+            </SectionCard>
+          }
+        />
+      </TabPanel>
 
-          <SectionCard title="Time off & exceptions">
-            <p style={{ margin: 0, fontSize: "0.88rem", color: colors.muted }}>
-              Leave, part-time weeks or any period where {person.name} works less than the usual{" "}
-              {formatFte(person.base_capacity)} FTE. These override project assignments.
+      <TabPanel group="person" value="history" active={tab === "history"}>
+        <SectionCard title="Past assignments" flush>
+          {past.length === 0 ? (
+            <p style={{ margin: 0, padding: "0 1.5rem 1.25rem", color: colors.muted }}>
+              No past assignments yet.
             </p>
-            <TimeOffList person={person} today={today} />
-            {canWritePeople && (
-              <Button
-                icon={Plus}
-                onClick={() => setDialog("time-off")}
-                style={{ marginTop: "1rem" }}
-              >
-                Add time off
-              </Button>
-            )}
-          </SectionCard>
-        </div>
-      </div>
+          ) : (
+            <AssignmentList assignments={past} projectName={projectName} today={today} />
+          )}
+        </SectionCard>
+      </TabPanel>
 
       {dialog === "profile" && (
         <PersonForm

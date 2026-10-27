@@ -228,7 +228,7 @@ function attentionItems(
       title: `${count} staffing ${count === 1 ? "proposal" : "proposals"} to review`,
       detail: `Saved optimizer results on ${project.name}`,
       action: "Compare",
-      to: `/projects/${encodeURIComponent(project.id)}`,
+      to: `/projects/${encodeURIComponent(project.id)}?tab=proposals`,
     });
   }
 

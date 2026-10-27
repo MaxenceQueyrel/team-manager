@@ -10,13 +10,14 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { formatDay, isoToday } from "@/components/common/dates";
 import {
   Button,
   Card,
+  Columns,
   colors,
   IconButton,
   Menu,
@@ -25,6 +26,8 @@ import {
   Pill,
   priorityIcons,
   priorityTones,
+  TabPanel,
+  Tabs,
 } from "@/components/common/ui";
 import {
   OPTIMIZATION_PANEL_WIDTH,
@@ -63,6 +66,12 @@ function deltaVsBest(proposal: TeamProposal, best: Team): string {
   return `${loss > 0 ? "−" : "+"}${percent}% vs best`;
 }
 
+type ProjectTab = "staffing" | "proposals";
+
+function parseTab(value: string | null): ProjectTab {
+  return value === "proposals" ? value : "staffing";
+}
+
 export default function ProjectWorkspacePage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -97,6 +106,11 @@ export default function ProjectWorkspacePage() {
   const [savedProposalIds, setSavedProposalIds] = useState<Record<string, string>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [savingCompletion, setSavingCompletion] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = parseTab(searchParams.get("tab"));
+  // Replacing the entry keeps Back leaving the project instead of stepping through tabs.
+  const showTab = (next: ProjectTab) =>
+    setSearchParams(next === "proposals" ? { tab: next } : {}, { replace: true });
 
   useEffect(() => {
     fetchPeople();
@@ -122,6 +136,16 @@ export default function ProjectWorkspacePage() {
       .list({ project_id: id })
       .then(setAssignments)
       .catch((e) => setError(errorMessage(e)));
+  }, [id]);
+
+  // A solve can outlive the page or its project; its result must not switch the tab (a
+  // navigation) or show up once the user has moved on.
+  const shownProjectId = useRef<string | null>(id);
+  useEffect(() => {
+    shownProjectId.current = id;
+    return () => {
+      shownProjectId.current = null;
+    };
   }, [id]);
 
   if (notFound) {
@@ -294,152 +318,25 @@ export default function ProjectWorkspacePage() {
 
       {error && <p style={{ color: colors.danger, margin: "0 0 1rem" }}>{error}</p>}
 
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "1.5rem" }}>
-        <div
-          style={{
-            flex: "1 1 34rem",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem",
-          }}
-        >
-          {result && (
-            <section>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: "1rem",
-                  marginBottom: "0.75rem",
-                }}
-              >
-                <div>
-                  <h2 style={{ margin: 0 }}>Optimization result</h2>
-                  <p style={{ margin: "0.25rem 0 0", fontSize: "0.88rem", color: colors.muted }}>
-                    Compared with current staffing:{" "}
-                    <span style={{ color: colors.success }}>added</span> and{" "}
-                    <span style={{ color: colors.danger }}>dropped</span> people per phase.
-                  </p>
-                </div>
-                <IconButton icon={X} ariaLabel="Dismiss result" onClick={() => setResult(null)} />
-              </div>
-              {result.start_candidates.length > 0 && (
-                <StartCandidatesStrip
-                  candidates={result.start_candidates}
-                  chosen={result.best.start_date}
-                  selected={selectedStart ?? result.best.start_date}
-                  today={today}
-                  onSelect={(start) =>
-                    setSelectedStart(start === result.best.start_date ? null : start)
-                  }
-                />
-              )}
-              {selectedStart && selectedTeam ? (
-                <ProposalCard
-                  title="Team at selected start"
-                  members={selectedTeam.members}
-                  score={selectedTeam.optimization_score}
-                  maxScore={selectedTeam.optimization_max_score}
-                  coverage={selectedTeam.coverage}
-                  fullyCovered={selectedTeam.fully_covered}
-                  scoreNote={deltaVsBest(selectedTeam, result.best)}
-                  people={people}
-                  baseline={staffingBaseline(assignments, selectedTeam.members)}
-                  startDate={selectedTeam.start_date}
-                  plannedStart={span?.start ?? null}
-                  onApply={() => applyProposal(selectedTeam, `start-${selectedStart}`)}
-                  onClose={() => setSelectedStart(null)}
-                />
-              ) : (
-                <>
-                  <ProposalCard
-                    title="Best team"
-                    members={result.best.members}
-                    score={result.best.optimization_score}
-                    maxScore={result.best.optimization_max_score}
-                    coverage={result.best.coverage}
-                    fullyCovered={result.best.fully_covered}
-                    people={people}
-                    baseline={staffingBaseline(assignments, result.best.members)}
-                    startDate={result.best.start_date}
-                    plannedStart={span?.start ?? null}
-                    onApply={() => applyTeam(result.best.id)}
-                  />
-                  {result.alternatives.length > 0 && (
-                    <div style={{ marginTop: "0.75rem" }}>
-                      <Button
-                        variant="ghost"
-                        icon={showAlternatives ? ChevronDown : ChevronRight}
-                        onClick={() => setShowAlternatives(!showAlternatives)}
-                      >
-                        {showAlternatives
-                          ? "Hide alternatives"
-                          : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"}`}
-                      </Button>
-                      {showAlternatives && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "1rem",
-                            marginTop: "0.75rem",
-                          }}
-                        >
-                          {result.alternatives.map((proposal, i) => (
-                            <ProposalCard
-                              key={i}
-                              title={`Alternative ${i + 1}`}
-                              members={proposal.members}
-                              score={proposal.optimization_score}
-                              maxScore={proposal.optimization_max_score}
-                              coverage={proposal.coverage}
-                              fullyCovered={proposal.fully_covered}
-                              scoreNote={deltaVsBest(proposal, result.best)}
-                              people={people}
-                              baseline={staffingBaseline(assignments, proposal.members)}
-                              startDate={proposal.start_date}
-                              plannedStart={span?.start ?? null}
-                              onApply={() => applyProposal(proposal, `alternative-${i}`)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-          )}
+      <Tabs
+        ariaLabel="Project views"
+        panels="project"
+        value={tab}
+        onChange={(value) => showTab(parseTab(value))}
+        items={[
+          { value: "staffing", label: "Staffing" },
+          {
+            value: "proposals",
+            label: "Proposals",
+            count: proposals.length > 0 ? proposals.length : undefined,
+          },
+        ]}
+        style={{ marginBottom: "1.5rem" }}
+      />
 
-          {reviewed && (
-            <ProposalCard
-              title={`Proposal ${proposals.length - reviewIndex}`}
-              members={reviewed.members}
-              score={reviewed.optimization_score}
-              maxScore={reviewed.optimization_max_score}
-              coverage={reviewed.coverage}
-              fullyCovered={reviewed.fully_covered}
-              people={people}
-              baseline={staffingBaseline(assignments, reviewed.members)}
-              startDate={reviewed.start_date}
-              plannedStart={span?.start ?? null}
-              onApply={() => applyTeam(reviewed.id)}
-              onDelete={
-                canDeleteTeams
-                  ? async () => {
-                      if (!confirm("Delete this proposal?")) return;
-                      await deleteTeam(reviewed.id);
-                      setReviewingId(null);
-                    }
-                  : undefined
-              }
-              onClose={() => setReviewingId(null)}
-            />
-          )}
-
-          {lanes.map((lane) => (
+      <TabPanel group="project" value="staffing" active={tab === "staffing"}>
+        <Columns
+          main={lanes.map((lane) => (
             <StaffingLaneCard
               key={lane.key}
               lane={lane}
@@ -457,42 +354,195 @@ export default function ProjectWorkspacePage() {
               onSuggest={canRunOptimization ? () => setOptimizing(true) : undefined}
             />
           ))}
-        </div>
+          side={
+            <SidebarCard title="Timeline">
+              <PhaseTimeline lanes={lanes} today={today} />
+            </SidebarCard>
+          }
+        />
+      </TabPanel>
 
-        <div
-          style={{
-            flex: "1 1 20rem",
-            maxWidth: "26rem",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem",
-          }}
-        >
-          <SidebarCard title="Timeline">
-            <PhaseTimeline lanes={lanes} today={today} />
-          </SidebarCard>
-          <ProposalsCard
-            proposals={proposals}
-            people={people}
-            assignments={assignments}
-            totalFte={total}
-            today={today}
-            reviewingId={reviewingId}
-            onReview={setReviewingId}
-          />
-        </div>
-      </div>
+      <TabPanel group="project" value="proposals" active={tab === "proposals"}>
+        <Columns
+          main={
+            <>
+              {!result && !reviewed && (
+                <Card style={{ color: colors.muted }}>
+                  {proposals.length > 0
+                    ? "Review a saved proposal to compare it with the current staffing."
+                    : canRunOptimization
+                      ? "Run the optimizer to get staffing proposals for this project."
+                      : "No staffing proposals for this project yet."}
+                </Card>
+              )}
+
+              {result && (
+                <section>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "1rem",
+                      marginBottom: "0.75rem",
+                    }}
+                  >
+                    <div>
+                      <h2 style={{ margin: 0 }}>Optimization result</h2>
+                      <p
+                        style={{ margin: "0.25rem 0 0", fontSize: "0.88rem", color: colors.muted }}
+                      >
+                        Compared with current staffing:{" "}
+                        <span style={{ color: colors.success }}>added</span> and{" "}
+                        <span style={{ color: colors.danger }}>dropped</span> people per phase.
+                      </p>
+                    </div>
+                    <IconButton
+                      icon={X}
+                      ariaLabel="Dismiss result"
+                      onClick={() => setResult(null)}
+                    />
+                  </div>
+                  {result.start_candidates.length > 0 && (
+                    <StartCandidatesStrip
+                      candidates={result.start_candidates}
+                      chosen={result.best.start_date}
+                      selected={selectedStart ?? result.best.start_date}
+                      today={today}
+                      onSelect={(start) =>
+                        setSelectedStart(start === result.best.start_date ? null : start)
+                      }
+                    />
+                  )}
+                  {selectedStart && selectedTeam ? (
+                    <ProposalCard
+                      title="Team at selected start"
+                      members={selectedTeam.members}
+                      score={selectedTeam.optimization_score}
+                      maxScore={selectedTeam.optimization_max_score}
+                      coverage={selectedTeam.coverage}
+                      fullyCovered={selectedTeam.fully_covered}
+                      scoreNote={deltaVsBest(selectedTeam, result.best)}
+                      people={people}
+                      baseline={staffingBaseline(assignments, selectedTeam.members)}
+                      startDate={selectedTeam.start_date}
+                      plannedStart={span?.start ?? null}
+                      onApply={() => applyProposal(selectedTeam, `start-${selectedStart}`)}
+                      onClose={() => setSelectedStart(null)}
+                    />
+                  ) : (
+                    <>
+                      <ProposalCard
+                        title="Best team"
+                        members={result.best.members}
+                        score={result.best.optimization_score}
+                        maxScore={result.best.optimization_max_score}
+                        coverage={result.best.coverage}
+                        fullyCovered={result.best.fully_covered}
+                        people={people}
+                        baseline={staffingBaseline(assignments, result.best.members)}
+                        startDate={result.best.start_date}
+                        plannedStart={span?.start ?? null}
+                        onApply={() => applyTeam(result.best.id)}
+                      />
+                      {result.alternatives.length > 0 && (
+                        <div style={{ marginTop: "0.75rem" }}>
+                          <Button
+                            variant="ghost"
+                            icon={showAlternatives ? ChevronDown : ChevronRight}
+                            onClick={() => setShowAlternatives(!showAlternatives)}
+                          >
+                            {showAlternatives
+                              ? "Hide alternatives"
+                              : `Show ${result.alternatives.length} alternative ${result.alternatives.length === 1 ? "team" : "teams"}`}
+                          </Button>
+                          {showAlternatives && (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "1rem",
+                                marginTop: "0.75rem",
+                              }}
+                            >
+                              {result.alternatives.map((proposal, i) => (
+                                <ProposalCard
+                                  key={i}
+                                  title={`Alternative ${i + 1}`}
+                                  members={proposal.members}
+                                  score={proposal.optimization_score}
+                                  maxScore={proposal.optimization_max_score}
+                                  coverage={proposal.coverage}
+                                  fullyCovered={proposal.fully_covered}
+                                  scoreNote={deltaVsBest(proposal, result.best)}
+                                  people={people}
+                                  baseline={staffingBaseline(assignments, proposal.members)}
+                                  startDate={proposal.start_date}
+                                  plannedStart={span?.start ?? null}
+                                  onApply={() => applyProposal(proposal, `alternative-${i}`)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
+
+              {reviewed && (
+                <ProposalCard
+                  title={`Proposal ${proposals.length - reviewIndex}`}
+                  members={reviewed.members}
+                  score={reviewed.optimization_score}
+                  maxScore={reviewed.optimization_max_score}
+                  coverage={reviewed.coverage}
+                  fullyCovered={reviewed.fully_covered}
+                  people={people}
+                  baseline={staffingBaseline(assignments, reviewed.members)}
+                  startDate={reviewed.start_date}
+                  plannedStart={span?.start ?? null}
+                  onApply={() => applyTeam(reviewed.id)}
+                  onDelete={
+                    canDeleteTeams
+                      ? async () => {
+                          if (!confirm("Delete this proposal?")) return;
+                          await deleteTeam(reviewed.id);
+                          setReviewingId(null);
+                        }
+                      : undefined
+                  }
+                  onClose={() => setReviewingId(null)}
+                />
+              )}
+            </>
+          }
+          side={
+            <ProposalsCard
+              proposals={proposals}
+              people={people}
+              assignments={assignments}
+              totalFte={total}
+              today={today}
+              reviewingId={reviewingId}
+              onReview={setReviewingId}
+            />
+          }
+        />
+      </TabPanel>
 
       {optimizing && (
         <OptimizationPanel
           project={project}
           onResult={(response) => {
+            if (shownProjectId.current !== project.id) return;
             setResult(response);
             setShowAlternatives(false);
             setSelectedStart(null);
             setSavedProposalIds({});
             fetchTeams();
+            showTab("proposals");
           }}
           onClose={() => setOptimizing(false)}
         />

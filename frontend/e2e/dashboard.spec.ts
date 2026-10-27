@@ -1,20 +1,5 @@
-import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { addSkillRequirement, uniqueSuffix } from "./helpers";
-
-/** The "Needs your attention" row whose title is `title`, expanding the list if it is capped. */
-async function attentionRow(page: Page, title: string): Promise<Locator> {
-  const attention = page.getByRole("region", { name: "Needs your attention" });
-  const row = attention.getByRole("listitem").filter({ hasText: title });
-  // The shared manager org collects projects from every spec, so the list is usually capped,
-  // and the cap can kick in only once the store and assignments have both loaded.
-  await expect(async () => {
-    const showAll = attention.getByRole("button", { name: /^Show all/ });
-    if ((await showAll.count()) > 0) await showAll.click();
-    await expect(row).toBeVisible({ timeout: 1000 });
-  }).toPass();
-  return row;
-}
+import { addSkillRequirement, attentionRow, uniqueSuffix } from "./helpers";
 
 test("a project created from the overview shows up as unstaffed", async ({ page }) => {
   const name = `Nova Redesign ${uniqueSuffix()}`;
