@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { formatDay, isoToday } from "@/components/common/dates";
 import {
@@ -25,6 +25,7 @@ import {
   Pill,
   priorityIcons,
   priorityTones,
+  Tabs,
 } from "@/components/common/ui";
 import {
   OPTIMIZATION_PANEL_WIDTH,
@@ -63,6 +64,8 @@ function deltaVsBest(proposal: TeamProposal, best: Team): string {
   return `${loss > 0 ? "−" : "+"}${percent}% vs best`;
 }
 
+type ProjectTab = "staffing" | "proposals";
+
 export default function ProjectWorkspacePage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -97,6 +100,11 @@ export default function ProjectWorkspacePage() {
   const [savedProposalIds, setSavedProposalIds] = useState<Record<string, string>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [savingCompletion, setSavingCompletion] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: ProjectTab = searchParams.get("tab") === "proposals" ? "proposals" : "staffing";
+  // Replacing the entry keeps Back leaving the project instead of stepping through tabs.
+  const showTab = (next: ProjectTab) =>
+    setSearchParams(next === "proposals" ? { tab: next } : {}, { replace: true });
 
   useEffect(() => {
     fetchPeople();
@@ -294,6 +302,21 @@ export default function ProjectWorkspacePage() {
 
       {error && <p style={{ color: colors.danger, margin: "0 0 1rem" }}>{error}</p>}
 
+      <Tabs
+        ariaLabel="Project views"
+        value={tab}
+        onChange={(value) => showTab(value === "proposals" ? "proposals" : "staffing")}
+        items={[
+          { value: "staffing", label: "Staffing" },
+          {
+            value: "proposals",
+            label: "Proposals",
+            count: proposals.length > 0 ? proposals.length : undefined,
+          },
+        ]}
+        style={{ marginBottom: "1.5rem" }}
+      />
+
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "1.5rem" }}>
         <div
           style={{
@@ -304,7 +327,15 @@ export default function ProjectWorkspacePage() {
             gap: "1.5rem",
           }}
         >
-          {result && (
+          {tab === "proposals" && !result && !reviewed && (
+            <Card style={{ color: colors.muted }}>
+              {proposals.length > 0
+                ? "Review a saved proposal to compare it with the current staffing."
+                : "Run the optimizer to get staffing proposals for this project."}
+            </Card>
+          )}
+
+          {tab === "proposals" && result && (
             <section>
               <div
                 style={{
@@ -413,7 +444,7 @@ export default function ProjectWorkspacePage() {
             </section>
           )}
 
-          {reviewed && (
+          {tab === "proposals" && reviewed && (
             <ProposalCard
               title={`Proposal ${proposals.length - reviewIndex}`}
               members={reviewed.members}
@@ -439,24 +470,25 @@ export default function ProjectWorkspacePage() {
             />
           )}
 
-          {lanes.map((lane) => (
-            <StaffingLaneCard
-              key={lane.key}
-              lane={lane}
-              title={phased ? lane.label : "Staffing"}
-              people={people}
-              today={today}
-              onAssign={async (data) => {
-                const created = await assignmentsApi.create({ ...data, project_id: project.id });
-                setAssignments((current) => [...current, created]);
-              }}
-              onRemove={async (assignmentId) => {
-                await assignmentsApi.delete(assignmentId);
-                setAssignments((current) => current.filter((a) => a.id !== assignmentId));
-              }}
-              onSuggest={canRunOptimization ? () => setOptimizing(true) : undefined}
-            />
-          ))}
+          {tab === "staffing" &&
+            lanes.map((lane) => (
+              <StaffingLaneCard
+                key={lane.key}
+                lane={lane}
+                title={phased ? lane.label : "Staffing"}
+                people={people}
+                today={today}
+                onAssign={async (data) => {
+                  const created = await assignmentsApi.create({ ...data, project_id: project.id });
+                  setAssignments((current) => [...current, created]);
+                }}
+                onRemove={async (assignmentId) => {
+                  await assignmentsApi.delete(assignmentId);
+                  setAssignments((current) => current.filter((a) => a.id !== assignmentId));
+                }}
+                onSuggest={canRunOptimization ? () => setOptimizing(true) : undefined}
+              />
+            ))}
         </div>
 
         <div
@@ -469,18 +501,21 @@ export default function ProjectWorkspacePage() {
             gap: "1.5rem",
           }}
         >
-          <SidebarCard title="Timeline">
-            <PhaseTimeline lanes={lanes} today={today} />
-          </SidebarCard>
-          <ProposalsCard
-            proposals={proposals}
-            people={people}
-            assignments={assignments}
-            totalFte={total}
-            today={today}
-            reviewingId={reviewingId}
-            onReview={setReviewingId}
-          />
+          {tab === "staffing" ? (
+            <SidebarCard title="Timeline">
+              <PhaseTimeline lanes={lanes} today={today} />
+            </SidebarCard>
+          ) : (
+            <ProposalsCard
+              proposals={proposals}
+              people={people}
+              assignments={assignments}
+              totalFte={total}
+              today={today}
+              reviewingId={reviewingId}
+              onReview={setReviewingId}
+            />
+          )}
         </div>
       </div>
 
@@ -493,6 +528,7 @@ export default function ProjectWorkspacePage() {
             setSelectedStart(null);
             setSavedProposalIds({});
             fetchTeams();
+            showTab("proposals");
           }}
           onClose={() => setOptimizing(false)}
         />
