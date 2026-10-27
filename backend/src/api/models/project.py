@@ -2,7 +2,13 @@ from datetime import date
 from typing import Self
 
 from pydantic import BaseModel, model_validator
-from optimizer.models import SkillRequirement, ProjectPhase, DateRange, Squad
+from optimizer.models import (
+    DateRange,
+    ProjectPhase,
+    ProjectPriority,
+    SkillRequirement,
+    Squad,
+)
 
 MAX_START_CANDIDATES = 52
 
@@ -16,7 +22,7 @@ class ProjectBase(BaseModel):
     squads: list[Squad] = []
     date_ranges: list[DateRange] = []
     phases: list[ProjectPhase] = []
-    priority: str = "medium"
+    priority: ProjectPriority = ProjectPriority.MEDIUM
     completed_at: date | None = None
     # Absolute earliest/latest allowed start; it bounds the start only, so the
     # project may end after start_window.end.

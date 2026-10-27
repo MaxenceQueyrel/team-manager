@@ -27,6 +27,30 @@ const MAX_ALTERNATIVES = 5;
 
 export const OPTIMIZATION_PANEL_WIDTH = 360;
 
+/** One slider per objective weight, bound to the store's shared `optimizationWeights`. */
+export function WeightSliders() {
+  const { optimizationWeights, setWeights } = useAppStore();
+  return WEIGHT_KEYS.map(({ key, label, description }) => (
+    <div key={key} style={{ marginBottom: "0.85rem", fontSize: "0.85rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+        <strong>{label}</strong>
+        <span>{(optimizationWeights[key] * 100).toFixed(0)}%</span>
+      </div>
+      <div style={{ color: colors.muted, fontSize: "0.78rem" }}>{description}</div>
+      <input
+        type="range"
+        aria-label={label}
+        min={0}
+        max={1}
+        step={0.05}
+        value={optimizationWeights[key]}
+        onChange={(e) => setWeights({ [key]: parseFloat(e.target.value) })}
+        style={{ width: "100%" }}
+      />
+    </div>
+  ));
+}
+
 /** Right-side panel holding the solver settings for one project; results are handed to the caller. */
 export function OptimizationPanel({
   project,
@@ -37,7 +61,7 @@ export function OptimizationPanel({
   onResult: (result: OptimizationResponse) => void;
   onClose: () => void;
 }) {
-  const { optimizationWeights, setWeights, people } = useAppStore();
+  const { optimizationWeights, people, projects } = useAppStore();
   const [respectExclusions, setRespectExclusions] = useState(true);
   const [nAlternatives, setNAlternatives] = useState(2);
   const [loading, setLoading] = useState(false);
@@ -114,25 +138,7 @@ export function OptimizationPanel({
       <p style={{ color: colors.muted, fontSize: "0.8rem", marginTop: 0 }}>
         Define what "best team" means for this project.
       </p>
-      {WEIGHT_KEYS.map(({ key, label, description }) => (
-        <div key={key} style={{ marginBottom: "0.85rem", fontSize: "0.85rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-            <strong>{label}</strong>
-            <span>{(optimizationWeights[key] * 100).toFixed(0)}%</span>
-          </div>
-          <div style={{ color: colors.muted, fontSize: "0.78rem" }}>{description}</div>
-          <input
-            type="range"
-            aria-label={label}
-            min={0}
-            max={1}
-            step={0.05}
-            value={optimizationWeights[key]}
-            onChange={(e) => setWeights({ [key]: parseFloat(e.target.value) })}
-            style={{ width: "100%" }}
-          />
-        </div>
-      ))}
+      <WeightSliders />
 
       <label
         style={{
@@ -175,7 +181,14 @@ export function OptimizationPanel({
           {error}
         </p>
       )}
-      {infeasible && <InfeasibilityReport detail={infeasible} project={project} people={people} />}
+      {infeasible && (
+        <InfeasibilityReport
+          detail={infeasible}
+          project={project}
+          people={people}
+          projects={projects}
+        />
+      )}
     </aside>
   );
 }

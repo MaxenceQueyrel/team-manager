@@ -184,7 +184,8 @@ export type InfeasibilityReason =
   | "squad_conflict"
   | "forced_member_conflict"
   | "squad_and_forced_member_conflict"
-  | "fte_not_reachable";
+  | "fte_not_reachable"
+  | "cross_project_forced_conflict";
 
 export interface PhaseConflict {
   phase_id: string | null;
@@ -193,6 +194,12 @@ export interface PhaseConflict {
   need_fte: number; // FTE the solver had to staff exactly, after capping by pool capacity
   squad_indices: number[]; // positions in project.squads
   forced_person_ids: string[]; // subset of project.included_person_ids
+  // Set for cross_project_forced_conflict only: the forced person, every project they are
+  // forced into (this one included), and the overlap that can't fit; period is null when
+  // only undated scopes are involved.
+  person_id?: string | null;
+  project_ids?: string[];
+  period?: DateRange | null;
 }
 
 // `detail` of the 409 returned by optimizationApi.solve when no team is feasible.
@@ -217,6 +224,23 @@ export interface OptimizationResponse {
   best: Team;
   alternatives: TeamProposal[];
   start_candidates: StartCandidate[]; // empty when the project has no start_window
+}
+
+export interface BatchOptimizationRequest {
+  project_ids: string[]; // 2–10 distinct, non-completed projects
+  weights: OptimizationWeights;
+  respect_exclusions: boolean;
+}
+
+export interface BatchOptimizationResponse {
+  teams: Team[]; // one saved team per project, in project_ids order
+  ignored_start_window_project_ids: string[]; // solved at their planned dates
+}
+
+// `detail` of the 409 returned by optimizationApi.solveBatch: only the infeasible projects.
+export interface BatchInfeasibilityDetail {
+  message: string;
+  projects: InfeasibilityDetail[];
 }
 
 export interface User {

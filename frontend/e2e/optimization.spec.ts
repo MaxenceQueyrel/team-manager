@@ -438,3 +438,73 @@ test("a user without optimization:run sees no Optimize button", async ({ page })
   await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Optimize staffing" })).toHaveCount(0);
 });
+
+test("selected projects are optimized together and applied all at once", async ({ page }) => {
+  const suffix = uniqueSuffix();
+  const people = [1, 2].map((i) => ({
+    id: `batch-${i}-${suffix}`,
+    name: `Batch Person ${i} ${suffix}`,
+  }));
+  await importPeople(page, people);
+  const excluded = await everyoneElse(
+    page,
+    people.map((p) => p.id),
+  );
+
+  // Two 1-FTE projects over the same month, each staffable by one of the two people.
+  const names = ["Alpha", "Beta", "Gamma"].map((n) => `Batch ${n} ${suffix}`);
+  const skills = [{ id: "general", min_level: 0, fte: 1 }];
+  const dateRanges = [{ start: "2027-01-01", end: "2027-01-31" }];
+  const csv = [
+    PROJECT_CSV_HEADER,
+    ...names.map(
+      (name, i) =>
+        `batch-${i}-${suffix},${name},,${i === 0 ? "high" : "low"},${quote(skills)},${quote(excluded)},[],[],${quote(dateRanges)},[]`,
+    ),
+  ].join("\n");
+  await page.goto("/projects");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "projects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+  await expect(page.getByText("Import complete — created 3.")).toBeVisible();
+
+  await page.getByRole("link", { name: names[2] }).click();
+  await page.getByRole("button", { name: `More actions for ${names[2]}` }).click();
+  await page.getByRole("menuitem", { name: "Mark complete" }).click();
+  await expect(page.getByText(/^Marked complete on/)).toBeVisible();
+
+  await page.goto("/projects");
+  await expect(page.getByLabel(`Select ${names[2]}`)).toBeDisabled();
+  await page.getByLabel(`Select ${names[0]}`).check();
+  await expect(page.getByRole("button", { name: "Optimize selected (1)" })).toBeDisabled();
+  await page.getByLabel(`Select ${names[1]}`).check();
+  await page.getByRole("button", { name: "Optimize selected (2)" }).click();
+  await expect(page).toHaveURL(/\/projects\/optimize\?ids=/);
+
+  await page.getByRole("button", { name: "Find optimal teams" }).click();
+  const results = page.getByRole("region", { name: "Optimization results" });
+  await expect(results.getByText("projects fully covered")).toBeVisible();
+  await expect(results.getByText("2 / 2", { exact: true })).toBeVisible();
+  const cards = results.getByRole("region", { name: /^Batch (Alpha|Beta) / });
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toHaveAccessibleName(names[0]);
+  for (const name of names.slice(0, 2)) {
+    const card = results.getByRole("region", { name, exact: true });
+    await expect(card.getByText("All requirements covered")).toBeVisible();
+    await expect(card.getByText("Optimization score:")).toBeVisible();
+  }
+
+  await results.getByRole("button", { name: "Apply all" }).click();
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(page.getByText("Applied all 2 teams.")).toBeVisible();
+
+  await page.goto("/projects");
+  for (const name of names.slice(0, 2)) {
+    const row = page
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name, exact: true }) });
+    await expect(row).toContainText("1 / 1");
+  }
+});

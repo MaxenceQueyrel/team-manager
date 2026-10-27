@@ -7,6 +7,8 @@ from optimizer.models import (
     AssignmentResult,
     DateRange,
     PhaseConflict,
+    PortfolioProject,
+    PortfolioResult,
     StartDateScan,
 )
 
@@ -24,6 +26,26 @@ class InfeasibleAssignmentError(ValueError):
         self.conflicts = conflicts
         causes = ", ".join(f"{c.reason} in phase {c.phase_id}" if c.phase_id else str(c.reason) for c in conflicts)
         super().__init__(f"Could not staff project '{project_id}': {causes or 'no feasible assignment'}.")
+
+
+class InfeasiblePortfolioError(InfeasibleAssignmentError):
+    """Raised when the hard constraints of a portfolio solve admit no set of teams.
+
+    It is an InfeasibleAssignmentError whose ``project_id`` and ``conflicts`` are those
+    of the first infeasible project, so a handler written for a single project still
+    gets a coherent error; ``project_errors`` holds every infeasible project.
+
+    Attributes:
+        project_errors: One error per infeasible project, in input order, each with that
+            project's conflicts. A CROSS_PROJECT_FORCED_CONFLICT is listed under every
+            project it involves, once per phase of that project.
+    """
+
+    def __init__(self, project_errors: list[InfeasibleAssignmentError]) -> None:
+        self.project_errors = project_errors
+        self.project_id = project_errors[0].project_id
+        self.conflicts = project_errors[0].conflicts
+        ValueError.__init__(self, " ".join(str(error) for error in project_errors))
 
 
 class AssignmentSolverPort(ABC):
@@ -133,4 +155,37 @@ class AssignmentSolverPort(ABC):
             ValueError: If the project has no date range to shift.
             InfeasibleAssignmentError: If every candidate start is infeasible; carries the
                 conflicts of the earliest candidate.
+        """
+
+    @abstractmethod
+    def solve_portfolio(
+        self,
+        projects: list[PortfolioProject],
+        people: list[PersonInput],
+        weights: AssignmentWeights,
+        respect_exclusions: bool = True,
+    ) -> PortfolioResult:
+        """Finds the best teams for several projects that compete for the same people, jointly.
+
+        Every phase of every project is staffed in one model. A phase may be staffed below
+        its need, and a person's allocations to scopes that overlap in time must together
+        fit their availability over each overlapping period; a scope without dates overlaps
+        everything. Teams are chosen lexicographically: staffed FTE of each priority tier,
+        critical first, so a higher tier is never short-staffed to benefit a lower one; then
+        the summed quality score of every project. Chemistry and handover only count within
+        a project.
+
+        Args:
+            projects: The projects to staff, at the dates they should be solved at.
+            people: Pool of candidate people shared by every project.
+            weights: Relative weights for performance, chemistry, growth and cost.
+            respect_exclusions: Whether to honour each project's excluded_person_ids.
+
+        Returns:
+            A PortfolioResult with one AssignmentResult per project, in input order, each
+            with its own score, max_score, coverage and fully_covered.
+
+        Raises:
+            InfeasiblePortfolioError: If no feasible set of teams exists, with the conflicts
+                of every infeasible project.
         """

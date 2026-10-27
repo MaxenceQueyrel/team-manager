@@ -93,3 +93,45 @@ class InfeasibilityDetail(BaseModel):
     message: str
     project_id: str
     conflicts: list[PhaseConflict]
+
+
+class BatchOptimizationRequest(BaseModel):
+    project_ids: list[str] = Field(min_length=2, max_length=10)
+    weights: AssignmentWeights = AssignmentWeights()
+    respect_exclusions: bool = True
+
+    @field_validator("project_ids")
+    @classmethod
+    def _check_distinct(cls, project_ids: list[str]) -> list[str]:
+        if len(set(project_ids)) != len(project_ids):
+            raise ValueError("Each project can be selected only once")
+        return project_ids
+
+
+class BatchOptimizationResponse(BaseModel):
+    teams: list[Team]
+    ignored_start_window_project_ids: list[str] = []
+
+
+class BatchInfeasibilityDetail(BaseModel):
+    """The `detail` body of a 409 returned when a batch solve admits no set of teams.
+
+    Attributes:
+        message: Human-readable summary of the failure.
+        projects: One entry per infeasible project, in request order. A
+            `cross_project_forced_conflict` is listed under every project it involves.
+    """
+
+    message: str
+    projects: list[InfeasibilityDetail]
+
+
+class ApplyBatchRequest(BaseModel):
+    team_ids: list[str] = Field(min_length=1)
+
+    @field_validator("team_ids")
+    @classmethod
+    def _check_distinct(cls, team_ids: list[str]) -> list[str]:
+        if len(set(team_ids)) != len(team_ids):
+            raise ValueError("Each team can be applied only once")
+        return team_ids
