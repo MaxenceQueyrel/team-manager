@@ -224,6 +224,37 @@ def test_overlap_among_new_assignments_is_rejected(client, org_headers):
     assert _list_assignments(client, org_headers) == []
 
 
+def test_assignments_overlapping_at_different_times_are_not_summed(client, org_headers):
+    # Alice's two kept assignments both overlap the new one but not each other, so
+    # no day exceeds 1.0 FTE although 0.4 + 0.4 + 0.6 does.
+    for start, end in (("2026-01-05", "2026-01-14"), ("2026-01-15", "2026-01-25")):
+        client.post(
+            "/api/v1/assignments/",
+            json={
+                "person_id": "alice",
+                "project_id": "other-project",
+                "ratio": 0.4,
+                "start": start,
+                "end": end,
+            },
+            headers=org_headers,
+        )
+    project_id = _create_project(
+        client,
+        org_headers,
+        phases=[],
+        date_ranges=[{"start": "2026-01-05", "end": "2026-01-25"}],
+    )
+    team_id = _create_team(
+        client, org_headers, project_id, [{"person_id": "alice", "fte_allocation": 0.6}]
+    )
+
+    response = _apply(client, org_headers, team_id)
+
+    assert response.status_code == 201
+    assert len(_list_assignments(client, org_headers)) == 3
+
+
 def test_reapplying_replaces_assignments_for_that_phase_only(client, org_headers):
     project_id = _create_project(client, org_headers)
     design_team = _create_team(
