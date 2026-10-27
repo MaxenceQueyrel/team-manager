@@ -215,6 +215,41 @@ def test_solve_batch_result_applies_cleanly(client, org_headers):
     assert all(total <= 1.0 + 1e-9 for total in load.values())
 
 
+def test_solve_batch_result_applies_after_moving_a_person_to_a_higher_priority(
+    client, org_headers
+):
+    bob_id = _create_person(client, org_headers, "Bob")
+    low = _create_project(client, org_headers, "Low", priority="low")
+    critical = _create_project(client, org_headers, "Critical", priority="critical")
+    _assign(client, org_headers, bob_id, low)
+    teams = _solve_batch(client, org_headers, [low, critical]).json()["teams"]
+    assert teams[0]["members"] == []
+
+    response = client.post(
+        "/api/v1/teams/apply-batch",
+        json={"team_ids": [team["id"] for team in teams]},
+        headers=org_headers,
+    )
+
+    assert response.status_code == 201
+    stored = client.get("/api/v1/assignments/", headers=org_headers).json()
+    assert [(a["person_id"], a["project_id"]) for a in stored] == [(bob_id, critical)]
+
+
+def test_project_with_an_unknown_priority_is_rejected(client, org_headers):
+    response = client.post(
+        "/api/v1/projects/",
+        json={
+            "name": "Apollo",
+            "skill_requirements": [ONE_FTE_NEED],
+            "priority": "urgent",
+        },
+        headers=org_headers,
+    )
+
+    assert response.status_code == 422
+
+
 def test_solve_batch_returns_409_with_cross_project_forced_conflict(
     client, org_headers
 ):

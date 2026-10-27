@@ -183,9 +183,7 @@ def test_apply_batch_with_a_dateless_team_writes_nothing(client, org_headers):
     assert _list_assignments(client, org_headers) == []
 
 
-def test_apply_batch_replaces_only_the_covered_phases_of_each_project(
-    client, org_headers
-):
+def test_apply_batch_replaces_every_assignment_of_each_project(client, org_headers):
     apollo = _create_project(client, org_headers, "Apollo", phases=PHASES)
     gemini = _create_project(client, org_headers, "Gemini")
     old_design = _create_assignment(
@@ -235,14 +233,11 @@ def test_apply_batch_replaces_only_the_covered_phases_of_each_project(
     assert response.status_code == 201
     stored = _list_assignments(client, org_headers)
     ids = {a["id"] for a in stored}
-    assert old_build["id"] in ids
-    assert old_design["id"] not in ids
-    assert old_gemini["id"] not in ids
+    assert ids.isdisjoint({old_design["id"], old_build["id"], old_gemini["id"]})
     assert {
         (a["person_id"], a["project_id"], a["phase_id"], a["ratio"]) for a in stored
     } == {
         ("alice", apollo, "design", 0.4),
-        ("alice", apollo, "build", 1.0),
         ("alice", gemini, None, 0.6),
     }
 

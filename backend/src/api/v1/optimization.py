@@ -31,7 +31,6 @@ from optimizer.models import (
     AvailabilityWindow,
     PortfolioProject,
     ProjectInput,
-    ProjectPriority,
     StartCandidate,
 )
 
@@ -222,7 +221,7 @@ def solve_batch(
             squads=project.squads,
             date_ranges=project.date_ranges,
             phases=project.phases,
-            priority=ProjectPriority(project.priority),
+            priority=project.priority,
         )
         for project in projects
     ]

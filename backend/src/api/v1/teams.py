@@ -209,10 +209,12 @@ def apply_teams(
 ):
     """Commits several teams, each of a different project, all at once or not at all.
 
-    Each team replaces its project's assignments for the phases it covers, as
-    `apply_team` does. The FTE check runs over every new assignment together,
-    against the assignments that are kept. Nothing is written if any team
-    fails.
+    Each team replaces all of its project's assignments, not only the phases it
+    covers as `apply_team` does: solve-batch freed every assignment of the
+    selected projects, so keeping any of them could over-allocate a person the
+    solve moved elsewhere. The FTE check runs over every new assignment
+    together, against the assignments that are kept. Nothing is written if any
+    team fails.
 
     Args:
         request: The teams to apply.
@@ -251,15 +253,14 @@ def apply_teams(
             )
 
     new_assignments: list[AssignmentBase] = []
-    covered: set[tuple[str, str | None]] = set()
     for team, project in teams_and_projects:
         new_assignments.extend(_resolve_assignments(team, project))
-        covered.update((project.id, member.phase_id) for member in team.members)
 
+    covered = set(project_ids)
     replaced: list[Assignment] = []
     kept: list[Assignment] = []
     for existing in assignments_module.repo.list(organization_id):
-        if (existing.project_id, existing.phase_id) in covered:
+        if existing.project_id in covered:
             replaced.append(existing)
         else:
             kept.append(existing)

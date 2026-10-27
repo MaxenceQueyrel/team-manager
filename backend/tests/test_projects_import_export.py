@@ -171,6 +171,13 @@ def test_import_rejects_invalid_field_value(client, org_headers, skill_requireme
     assert client.get("/api/v1/projects/proj-1", headers=org_headers).status_code == 404
 
 
+def test_import_rejects_an_unknown_priority(client, org_headers):
+    response = _upload_csv(client, org_headers, _csv_row(priority="urgent"))
+
+    assert response.status_code == 400
+    assert "Row 2" in response.json()["detail"]
+
+
 def test_import_fails_closed_on_partial_bad_row(client, org_headers):
     csv_text = _csv_rows({"id": "good"}, {"id": "bad", "skill_requirements": "[]"})
 

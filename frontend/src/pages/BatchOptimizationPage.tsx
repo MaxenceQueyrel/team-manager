@@ -237,8 +237,8 @@ export default function BatchOptimizationPage() {
           }
         >
           <p style={{ marginTop: 0 }}>
-            Each team replaces its project's current staffing for the phases it covers. All teams
-            are applied together, or none is.
+            Each team replaces all of its project's current staffing. All teams are applied
+            together, or none is.
           </p>
           {applyAllError && (
             <p role="alert" style={{ color: colors.danger, marginBottom: 0 }}>
