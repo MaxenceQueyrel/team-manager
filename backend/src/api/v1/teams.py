@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.core.deps import require_org_member
 from api.models.assignment import Assignment, AssignmentBase, AssignmentCreate
 from api.models.project import Project
-from api.models.team import Team, TeamCreate
+from api.models.team import ApplyBatchRequest, Team, TeamCreate
 from api.repositories.file_repository import FileRepository
 from api.v1 import assignments as assignments_module
 from api.v1 import projects as projects_module
@@ -96,21 +96,21 @@ def _over_allocated_person_ids(
     candidates: list[AssignmentBase], kept: list[Assignment]
 ) -> list[str]:
     over_allocated: list[str] = []
-    for i, candidate in enumerate(candidates):
-        others = [*kept, *candidates[:i], *candidates[i + 1 :]]
-        overlapping_ratio = sum(
-            other.ratio
-            for other in others
-            if other.person_id == candidate.person_id
-            and assignments_module._overlaps(
-                other.start, other.end, candidate.start, candidate.end
-            )
-        )
-        if (
-            overlapping_ratio + candidate.ratio > 1.0 + GRID_TOLERANCE
-            and candidate.person_id not in over_allocated
-        ):
-            over_allocated.append(candidate.person_id)
+    for person_id in dict.fromkeys(candidate.person_id for candidate in candidates):
+        own_candidates = [c for c in candidates if c.person_id == person_id]
+        own = [*own_candidates, *(k for k in kept if k.person_id == person_id)]
+        # The load is checked per period, as the optimizer does: the set of active
+        # assignments only changes on a boundary, so checking each boundary day
+        # covers every day. Two assignments that both overlap a third one but not
+        # each other are never summed together.
+        boundaries = {a.start for a in own} | {a.end + timedelta(days=1) for a in own}
+        for day in sorted(boundaries):
+            if not any(c.start <= day <= c.end for c in own_candidates):
+                continue
+            load = sum(a.ratio for a in own if a.start <= day <= a.end)
+            if load > 1.0 + GRID_TOLERANCE:
+                over_allocated.append(person_id)
+                break
     return over_allocated
 
 
@@ -195,6 +195,85 @@ def apply_team(team_id: str, organization_id: str = Depends(require_org_member))
             assignment.model_dump(exclude={"id", "organization_id"}),
             organization_id,
         )
+    for existing in replaced:
+        assignments_module.repo.delete(existing.id, organization_id)
+    return [
+        assignments_module.repo.create(assignment.model_dump(), organization_id)
+        for assignment in new_assignments
+    ]
+
+
+@router.post("/apply-batch", response_model=list[Assignment], status_code=201)
+def apply_teams(
+    request: ApplyBatchRequest, organization_id: str = Depends(require_org_member)
+):
+    """Commits several teams, each of a different project, all at once or not at all.
+
+    Each team replaces its project's assignments for the phases it covers, as
+    `apply_team` does. The FTE check runs over every new assignment together,
+    against the assignments that are kept. Nothing is written if any team
+    fails.
+
+    Args:
+        request: The teams to apply.
+        organization_id: The active organization.
+
+    Returns:
+        The created assignments, team by team in request order.
+
+    Raises:
+        HTTPException: 404 if a team or its project is not found; 400 if two
+            teams belong to the same project, a team has a shifted start, a
+            phase or project lacks dates, or a person would be over-allocated.
+    """
+    teams_and_projects: list[tuple[Team, Project]] = []
+    for team_id in request.team_ids:
+        team = repo.get(team_id, organization_id)
+        if not team:
+            raise HTTPException(status_code=404, detail=f"Team '{team_id}' not found")
+        project = projects_module.repo.get(team.project_id, organization_id)
+        if not project:
+            raise HTTPException(
+                status_code=404, detail=f"Project of team '{team_id}' not found"
+            )
+        teams_and_projects.append((team, project))
+
+    project_ids = [project.id for _, project in teams_and_projects]
+    if len(set(project_ids)) != len(project_ids):
+        raise HTTPException(
+            status_code=400, detail="Each team must belong to a different project"
+        )
+    for team, _ in teams_and_projects:
+        if team.start_date is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Team '{team.id}' has a shifted start; apply it on its own",
+            )
+
+    new_assignments: list[AssignmentBase] = []
+    covered: set[tuple[str, str | None]] = set()
+    for team, project in teams_and_projects:
+        new_assignments.extend(_resolve_assignments(team, project))
+        covered.update((project.id, member.phase_id) for member in team.members)
+
+    replaced: list[Assignment] = []
+    kept: list[Assignment] = []
+    for existing in assignments_module.repo.list(organization_id):
+        if (existing.project_id, existing.phase_id) in covered:
+            replaced.append(existing)
+        else:
+            kept.append(existing)
+
+    over_allocated = _over_allocated_person_ids(new_assignments, kept)
+    if over_allocated:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Applying these teams would exceed 1.0 FTE for: "
+                + ", ".join(over_allocated)
+            ),
+        )
+
     for existing in replaced:
         assignments_module.repo.delete(existing.id, organization_id)
     return [
