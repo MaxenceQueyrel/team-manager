@@ -14,6 +14,7 @@ import {
   Avatar,
   Button,
   Card,
+  Columns,
   colors,
   fonts,
   PageHeader,
@@ -21,6 +22,7 @@ import {
   StatTile,
   seniorityLabels,
   seniorityTones,
+  TabPanel,
   Tabs,
 } from "@/components/common/ui";
 import { AssignToProjectModal } from "@/components/people/AssignToProjectModal";
@@ -244,6 +246,7 @@ export default function PersonDetailPage() {
 
       <Tabs
         ariaLabel="Person views"
+        panels="person"
         value={tab}
         onChange={(value) => {
           const next = parseTab(value);
@@ -258,7 +261,7 @@ export default function PersonDetailPage() {
         style={{ marginBottom: "1.5rem" }}
       />
 
-      {tab === "overview" && (
+      <TabPanel group="person" value="overview" active={tab === "overview"}>
         <Columns
           main={
             <SectionCard title="Assignments" flush>
@@ -305,9 +308,9 @@ export default function PersonDetailPage() {
             </SectionCard>
           }
         />
-      )}
+      </TabPanel>
 
-      {tab === "availability" && (
+      <TabPanel group="person" value="availability" active={tab === "availability"}>
         <Columns
           main={<WeeklyAvailability person={person} />}
           side={
@@ -329,9 +332,9 @@ export default function PersonDetailPage() {
             </SectionCard>
           }
         />
-      )}
+      </TabPanel>
 
-      {tab === "history" && (
+      <TabPanel group="person" value="history" active={tab === "history"}>
         <SectionCard title="Past assignments" flush>
           {past.length === 0 ? (
             <p style={{ margin: 0, padding: "0 1.5rem 1.25rem", color: colors.muted }}>
@@ -341,7 +344,7 @@ export default function PersonDetailPage() {
             <AssignmentList assignments={past} projectName={projectName} today={today} />
           )}
         </SectionCard>
-      )}
+      </TabPanel>
 
       {dialog === "profile" && (
         <PersonForm
@@ -391,16 +394,6 @@ export default function PersonDetailPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-/** The tab body: a wide main column with a narrower side column that wraps below it. */
-function Columns({ main, side }: { main: ReactNode; side: ReactNode }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
-      <div style={{ flex: "999 1 520px", minWidth: 0 }}>{main}</div>
-      <div style={{ flex: "1 1 320px", minWidth: 0 }}>{side}</div>
     </div>
   );
 }

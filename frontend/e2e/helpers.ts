@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Shared manager account, provisioned once by auth.setup.ts. */
 export const MANAGER_EMAIL = "e2e-manager@example.com";
@@ -55,4 +55,19 @@ export async function createProject(page: Page, name: string): Promise<void> {
   await addSkillRequirement(page, { id: "general" });
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("heading", { name }).waitFor();
+}
+
+/** The overview's "Needs your attention" row containing `text`, expanding the list if it is
+ * capped. */
+export async function attentionRow(page: Page, text: string): Promise<Locator> {
+  const attention = page.getByRole("region", { name: "Needs your attention" });
+  const row = attention.getByRole("listitem").filter({ hasText: text });
+  // The shared manager org collects projects from every spec, so the list is usually capped,
+  // and the cap can kick in only once the store and assignments have both loaded.
+  await expect(async () => {
+    const showAll = attention.getByRole("button", { name: /^Show all/ });
+    if ((await showAll.count()) > 0) await showAll.click();
+    await expect(row).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  return row;
 }

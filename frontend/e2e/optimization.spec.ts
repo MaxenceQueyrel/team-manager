@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
+  attentionRow,
   createPerson,
   createProject,
   MANAGER_EMAIL,
@@ -106,6 +107,26 @@ test("optimizing from the project workspace shows the best team", async ({ page 
   await expect(
     page.getByRole("region", { name: "Best team" }).getByText("Optimization score:"),
   ).toBeVisible();
+});
+
+test("the overview's Compare action opens the project's saved proposals", async ({ page }) => {
+  const name = `Compare Link ${uniqueSuffix()}`;
+
+  await createProject(page, name);
+  await page.getByRole("link", { name }).click();
+  await runOptimization(page);
+
+  await page.goto("/");
+  const row = await attentionRow(page, `Saved optimizer results on ${name}`);
+  await row.getByRole("link", { name: "Compare" }).click();
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Proposals/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(
+    page.getByRole("region", { name: "Proposals", exact: true }).getByRole("listitem"),
+  ).toHaveCount(1);
 });
 
 test("alternative teams are collapsed by default and show their delta vs best", async ({
