@@ -1,6 +1,6 @@
-import { ChevronRight, Download, Plus, Upload } from "lucide-react";
+import { ChevronRight, Download, Plus, SlidersHorizontal, Upload } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { daysBetween, formatSpan, isoToday } from "@/components/common/dates";
 import {
@@ -45,6 +45,10 @@ const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
   running: "Running",
   ended: "Ended",
 };
+
+// The batch solve endpoint accepts 2–10 projects.
+const MIN_BATCH_PROJECTS = 2;
+const MAX_BATCH_PROJECTS = 10;
 
 const COLUMNS = "minmax(0, 2.3fr) minmax(0, 1.2fr) minmax(0, 1.7fr) 7.5rem 1.25rem";
 
@@ -110,6 +114,8 @@ export default function ProjectsPage() {
   } = useAppStore();
   const skillOptions = useAppStore(useShallow(knownSkillIds));
   const canWriteProjects = useAuthStore((s) => s.permissions.has("projects:write"));
+  const canRunOptimization = useAuthStore((s) => s.permissions.has("optimization:run"));
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   // Local state mirrored to the URL: binding the search input to the URL directly drops
   // keystrokes, since react-router applies location changes in a transition.
@@ -123,6 +129,8 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // In click order, which sets the order of the batch results.
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const today = isoToday();
 
@@ -172,6 +180,11 @@ export default function ProjectsPage() {
   const requested = rows.reduce((sum, row) => sum + row.total, 0);
   const staffed = rows.reduce((sum, row) => sum + row.staffed, 0);
 
+  const toggleSelected = (id: string) =>
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((selected) => selected !== id) : [...current, id],
+    );
+
   const handleImportFile = async (file: File) => {
     setImporting(true);
     setError(null);
@@ -202,34 +215,49 @@ export default function ProjectsPage() {
         title="Projects"
         subtitle={`${rows.length} ${rows.length === 1 ? "project" : "projects"} · ${formatFte(requested)} FTE requested · ${formatFte(staffed)} FTE staffed`}
         actions={
-          canWriteProjects && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) handleImportFile(file);
-                }}
-              />
+          <>
+            {canRunOptimization && (
               <Button
-                icon={Upload}
-                disabled={importing}
-                onClick={() => fileInputRef.current?.click()}
+                icon={SlidersHorizontal}
+                disabled={
+                  selectedIds.length < MIN_BATCH_PROJECTS || selectedIds.length > MAX_BATCH_PROJECTS
+                }
+                onClick={() =>
+                  navigate(`/projects/optimize?ids=${encodeURIComponent(selectedIds.join(","))}`)
+                }
               >
-                {importing ? "Importing…" : "Import"}
+                Optimize selected ({selectedIds.length})
               </Button>
-              <Button icon={Download} disabled={exporting} onClick={handleExport}>
-                {exporting ? "Exporting…" : "Export"}
-              </Button>
-              <Button variant="primary" icon={Plus} onClick={() => setEditing("new")}>
-                New project
-              </Button>
-            </>
-          )
+            )}
+            {canWriteProjects && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) handleImportFile(file);
+                  }}
+                />
+                <Button
+                  icon={Upload}
+                  disabled={importing}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {importing ? "Importing…" : "Import"}
+                </Button>
+                <Button icon={Download} disabled={exporting} onClick={handleExport}>
+                  {exporting ? "Exporting…" : "Export"}
+                </Button>
+                <Button variant="primary" icon={Plus} onClick={() => setEditing("new")}>
+                  New project
+                </Button>
+              </>
+            )}
+          </>
         }
       />
 
@@ -316,6 +344,10 @@ export default function ProjectsPage() {
                   key={row.project.id}
                   row={row}
                   today={today}
+                  selected={selectedIds.includes(row.project.id)}
+                  onToggleSelected={
+                    canRunOptimization ? () => toggleSelected(row.project.id) : undefined
+                  }
                   onSetDates={canWriteProjects ? () => setEditing(row.project) : undefined}
                 />
               ))}
@@ -343,10 +375,14 @@ export default function ProjectsPage() {
 function ProjectListRow({
   row,
   today,
+  selected,
+  onToggleSelected,
   onSetDates,
 }: {
   row: ProjectRow;
   today: string;
+  selected: boolean;
+  onToggleSelected?: () => void;
   onSetDates?: () => void;
 }) {
   const { project, staffed, total, status, span, members } = row;
@@ -365,6 +401,19 @@ function ProjectListRow({
     >
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.6rem" }}>
+          {onToggleSelected && (
+            <input
+              type="checkbox"
+              aria-label={`Select ${project.name}`}
+              title={project.completed_at ? "Completed projects can't be optimized" : undefined}
+              checked={selected}
+              disabled={Boolean(project.completed_at)}
+              onChange={onToggleSelected}
+              // The row-wide link comes later in the DOM, so it would paint over the checkbox
+              // without a z-index.
+              style={{ position: "relative", zIndex: 1, margin: 0 }}
+            />
+          )}
           <h3 style={{ margin: 0 }}>
             <Link to={`/projects/${encodeURIComponent(project.id)}`} style={{ color: "inherit" }}>
               {project.name}

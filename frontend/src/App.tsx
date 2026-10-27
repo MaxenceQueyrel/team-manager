@@ -4,6 +4,7 @@ import Layout from "@/components/common/Layout";
 import RequireAuth from "@/components/common/RequireAuth";
 import RequireOrganization from "@/components/common/RequireOrganization";
 import PeopleWorkspace from "@/components/people/PeopleWorkspace";
+import BatchOptimizationPage from "@/pages/BatchOptimizationPage";
 import DashboardPage from "@/pages/DashboardPage";
 import LoginPage from "@/pages/LoginPage";
 import OrganizationPage from "@/pages/OrganizationPage";
@@ -41,6 +42,7 @@ export default function App() {
             </Route>
             <Route path="people/:id" element={<PersonDetailPage />} />
             <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/optimize" element={<BatchOptimizationPage />} />
             <Route path="projects/:id" element={<ProjectWorkspacePage />} />
             <Route path="teams" element={<Navigate to="/projects" replace />} />
             <Route path="optimization" element={<Navigate to="/projects" replace />} />

@@ -1,6 +1,9 @@
 import axios, { isAxiosError } from "axios";
 import type {
   Assignment,
+  BatchInfeasibilityDetail,
+  BatchOptimizationRequest,
+  BatchOptimizationResponse,
   InfeasibilityDetail,
   OptimizationRequest,
   OptimizationResponse,
@@ -93,6 +96,18 @@ export function infeasibilityDetail(e: unknown): InfeasibilityDetail | null {
     Array.isArray(e.response.data?.detail?.conflicts)
   ) {
     return e.response.data.detail as InfeasibilityDetail;
+  }
+  return null;
+}
+
+/** The per-project reasons a batch solve found no feasible set of teams, or null for any other error. */
+export function batchInfeasibilityDetail(e: unknown): BatchInfeasibilityDetail | null {
+  if (
+    isAxiosError(e) &&
+    e.response?.status === 409 &&
+    Array.isArray(e.response.data?.detail?.projects)
+  ) {
+    return e.response.data.detail as BatchInfeasibilityDetail;
   }
   return null;
 }
@@ -214,6 +229,11 @@ export const teamsApi = {
   create: (data: TeamProposal & { project_id: string }) =>
     client.post<Team>("/api/v1/teams/", data).then((r) => r.data),
   apply: (id: string) => client.post<Assignment[]>(`/api/v1/teams/${id}/apply`).then((r) => r.data),
+  // Atomic: every team's assignments are written, or none.
+  applyBatch: (teamIds: string[]) =>
+    client
+      .post<Assignment[]>("/api/v1/teams/apply-batch", { team_ids: teamIds })
+      .then((r) => r.data),
   delete: (id: string) => client.delete(`/api/v1/teams/${id}`),
 };
 
@@ -238,6 +258,10 @@ export const skillsApi = {
 export const optimizationApi = {
   solve: (request: OptimizationRequest) =>
     client.post<OptimizationResponse>("/api/v1/optimization/solve", request).then((r) => r.data),
+  solveBatch: (request: BatchOptimizationRequest) =>
+    client
+      .post<BatchOptimizationResponse>("/api/v1/optimization/solve-batch", request)
+      .then((r) => r.data),
 };
 
 export const organizationsApi = {
