@@ -1,3 +1,4 @@
+import { formatDay } from "@/components/common/dates";
 import { colors } from "@/components/common/ui";
 import { formatFte } from "@/components/projects/staffing";
 import type { InfeasibilityDetail, Person, PhaseConflict, Project } from "@/types";
@@ -15,6 +16,7 @@ function explain(
   conflict: PhaseConflict,
   project: Project,
   nameOf: (id: string) => string,
+  projectNameOf: (id: string) => string,
 ): { reason: string; hint: string } {
   const scope = conflict.phase_id === null ? "the project" : `phase '${conflict.phase_id}'`;
   const need = formatFte(conflict.need_fte);
@@ -53,20 +55,39 @@ function explain(
         reason: `No mix of available people adds up to ${fit} in whole days per week.`,
         hint: "Add candidates, or reduce the required FTE.",
       };
+    case "cross_project_forced_conflict": {
+      const person = nameOf(conflict.person_id ?? "");
+      const others = (conflict.project_ids ?? []).filter((id) => id !== project.id);
+      const scopes =
+        others.length === 0
+          ? "overlapping phases of this project"
+          : `this project and ${listNames(others.map(projectNameOf))}`;
+      const period = conflict.period
+        ? ` from ${formatDay(conflict.period.start, true)} to ${formatDay(conflict.period.end, true)}`
+        : "";
+      return {
+        reason: `${person} is forced into ${scopes}, but their availability${period} can't give each at least ${ALLOCATION_STEP} FTE.`,
+        hint: `Un-force ${person} from one of them, or move the dates so they don't overlap.`,
+      };
+    }
   }
 }
 
-/** Explains, in terms of the project's own setup, why the optimizer found no feasible team. */
+/** Explains, in terms of the project's own setup, why the optimizer found no feasible team.
+ * `projects` names the other projects a batch-solve conflict involves. */
 export function InfeasibilityReport({
   detail,
   project,
   people,
+  projects,
 }: {
   detail: InfeasibilityDetail;
   project: Project;
   people: Person[];
+  projects: Project[];
 }) {
   const nameOf = (id: string) => people.find((p) => p.id === id)?.name ?? id;
+  const projectNameOf = (id: string) => projects.find((p) => p.id === id)?.name ?? id;
   return (
     <div
       role="alert"
@@ -85,7 +106,7 @@ export function InfeasibilityReport({
       ) : (
         <ul style={{ margin: "0.4rem 0 0", paddingLeft: "1.1rem" }}>
           {detail.conflicts.map((conflict, i) => {
-            const { reason, hint } = explain(conflict, project, nameOf);
+            const { reason, hint } = explain(conflict, project, nameOf, projectNameOf);
             return (
               <li key={i} style={{ marginBottom: "0.4rem" }}>
                 {reason}
