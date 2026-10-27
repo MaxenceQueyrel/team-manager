@@ -378,6 +378,9 @@ def test_solve_returns_409_with_conflicts_when_no_team_is_feasible(client, org_h
             "need_fte": 1.0,
             "squad_indices": [0],
             "forced_person_ids": [],
+            "person_id": None,
+            "project_ids": [],
+            "period": None,
         }
     ]
     assert client.get("/api/v1/teams/", headers=org_headers).json() == []

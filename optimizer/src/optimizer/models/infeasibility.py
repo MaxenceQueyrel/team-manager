@@ -2,6 +2,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from optimizer.models.date_range import DateRange
+
 
 class InfeasibilityReason(StrEnum):
     """Why a phase admits no feasible team, judged by which relaxation would make it solvable.
@@ -15,12 +17,17 @@ class InfeasibilityReason(StrEnum):
         FTE_NOT_REACHABLE: No relaxation of squads or forced members makes the phase solvable.
             The need is sized to what the pool can staff on the allocation grid, so this
             is not expected to occur.
+        CROSS_PROJECT_FORCED_CONFLICT: In a portfolio solve, a person is forced into more
+            overlapping scopes (phases, possibly of different projects) than their
+            availability over the overlap has allocation steps, one step per scope
+            being the least a selected member can take.
     """
 
     SQUAD_CONFLICT = "squad_conflict"
     FORCED_MEMBER_CONFLICT = "forced_member_conflict"
     SQUAD_AND_FORCED_MEMBER_CONFLICT = "squad_and_forced_member_conflict"
     FTE_NOT_REACHABLE = "fte_not_reachable"
+    CROSS_PROJECT_FORCED_CONFLICT = "cross_project_forced_conflict"
 
 
 class PhaseConflict(BaseModel):
@@ -31,7 +38,8 @@ class PhaseConflict(BaseModel):
     )
     need_fte: float = Field(
         description=(
-            "FTE the solver had to staff exactly: each skill's fte capped by what its qualified people can supply."
+            "FTE the solver had to staff (exactly in a single-project solve, at most in a portfolio solve): "
+            "each skill's fte capped by what its qualified people can supply."
         )
     )
     squad_indices: list[int] = Field(
@@ -39,4 +47,18 @@ class PhaseConflict(BaseModel):
     )
     forced_person_ids: list[str] = Field(
         default=[], description="Members of ProjectInput.included_person_ids involved in the conflict."
+    )
+    person_id: str | None = Field(
+        default=None, description="For cross_project_forced_conflict, the person forced into the overlapping scopes."
+    )
+    project_ids: list[str] = Field(
+        default=[],
+        description="For cross_project_forced_conflict, every project with a scope the person is forced into.",
+    )
+    period: DateRange | None = Field(
+        default=None,
+        description=(
+            "For cross_project_forced_conflict, the overlap the forced allocations don't fit in; "
+            "None when only scopes without dates are involved."
+        ),
     )
